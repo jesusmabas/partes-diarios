@@ -76,16 +76,20 @@ const ProjectsViewer = () => {
 
     const handleDelete = async (projectId) => {
     // 1. Confirmación:  La tienes, ¡bien!
+	console.log("handleDelete llamado con projectId:", projectId); // AÑADE ESTO
     if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
+		console.log("Eliminación cancelada por el usuario");
       return; // <---  IMPORTANTE: Detener la ejecución si el usuario cancela.
     }
 
     // 2. Manejo de errores y actualización de la UI:
     try {
+		console.log("Intentando eliminar proyecto:", projectId);
       await deleteProject(projectId); // Usamos la función del hook
       setSuccessMessage("Proyecto eliminado correctamente!");
       setErrorMessage(""); // Limpiar errores anteriores
     } catch (err) {
+		console.error("Error en handleDelete:", err);
       setErrorMessage(`Error al eliminar proyecto: ${err.message}`);
       setSuccessMessage(""); // Limpiar mensaje de éxito si hay error
     }

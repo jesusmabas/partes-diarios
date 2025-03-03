@@ -51,15 +51,18 @@ export const useProjects = () => {
     }
   }, [fetchProjects]);
 
-  const deleteProject = useCallback(async (projectId) => {
+    const deleteProject = useCallback(async (projectId) => {
     setLoading(true);
-    setError(null);
+    setError(null); // Limpiar errores
     try {
+		console.log("deleteProject llamado con projectId:", projectId);
       await deleteDoc(doc(db, "projects", projectId));
-      await fetchProjects(); // <-  Importante: Refrescar la lista DESPUÉS de eliminar.
+	  console.log("deleteDoc completado, llamando a fetchProjects");
+      await fetchProjects(); // Refrescar después de eliminar
     } catch (err) {
+		console.error("Error en deleteProject:", err);
       setError(err.message);
-      throw err; // Re-lanzar el error.
+      throw err; // Re-lanzar para que el componente pueda manejarlo
     } finally {
       setLoading(false);
     }
