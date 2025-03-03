@@ -1,6 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { setLogLevel } from "firebase/app"; // Asegúrate de importar setLogLevel
+
+setLogLevel("debug"); // Habilita logs detallados
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
@@ -11,6 +14,12 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+try {
+  const app = initializeApp(firebaseConfig);
+  console.log("Firebase App initialized successfully:", app);
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+}
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
