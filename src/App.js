@@ -1,11 +1,11 @@
 // src/App.js
-import React, { useState, useEffect } from "react"; // Importa useEffect
+import React, { useState, useEffect } from "react";
 import DailyReportForm from "./components/DailyReportForm";
 import ReportsViewer from "./components/ReportsViewer";
 import ProjectsViewer from "./components/ProjectsViewer";
-import LoginForm from "./components/LoginForm"; // Importa el componente LoginForm
+import LoginForm from "./components/LoginForm";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { app } from './firebase'; // Importa 'app'
+import { app } from './firebase';
 import "./App.css";
 
 function App() {
@@ -15,15 +15,11 @@ function App() {
   const auth = getAuth(app);
 
   useEffect(() => {
-    // Observador del estado de autenticación
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
-
-    // Limpieza del observador cuando el componente se desmonta
     return () => unsubscribe();
   }, [auth]);
-
 
   return (
     <div className="App">
@@ -32,30 +28,31 @@ function App() {
       </header>
       <div className="app-container">
         <nav className="tab-buttons">
-          <button
-            className={activeTab === "partes" ? "active" : ""}
-            onClick={() => setActiveTab("partes")}
-          >
-            Partes
-          </button>
-          <button
-            className={activeTab === "informes" ? "active" : ""}
-            onClick={() => setActiveTab("informes")}
-          >
-            Informes
-          </button>
-          <button
-            className={activeTab === "proyectos" ? "active" : ""}
-            onClick={() => setActiveTab("proyectos")}
-          >
-            Proyectos
-          </button>
+          {/* ... (tus botones de navegación) ... */}
+           <button
+             className={activeTab === "partes" ? "active" : ""}
+             onClick={() => setActiveTab("partes")}
+           >
+             Partes
+           </button>
+           <button
+             className={activeTab === "informes" ? "active" : ""}
+             onClick={() => setActiveTab("informes")}
+           >
+             Informes
+           </button>
+           <button
+             className={activeTab === "proyectos" ? "active" : ""}
+             onClick={() => setActiveTab("proyectos")}
+           >
+             Proyectos
+           </button>
         </nav>
         <main>
-          {user ? ( // Muestra contenido si el usuario está logueado
+          {user ? (
             <>
               {activeTab === "partes" ? (
-                <DailyReportForm />
+                <DailyReportForm userId={user.uid} /> // <-- PASA EL UID
               ) : activeTab === "informes" ? (
                 <ReportsViewer />
               ) : (
@@ -63,7 +60,7 @@ function App() {
               )}
             </>
           ) : (
-            <LoginForm /> // Muestra el formulario de login
+            <LoginForm />
           )}
         </main>
       </div>

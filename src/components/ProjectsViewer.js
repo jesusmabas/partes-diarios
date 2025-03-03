@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from "react";
 import { useProjects } from "../hooks/useProjects";
-import { addDoc, collection, updateDoc, doc, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase";
+// import { addDoc, collection, updateDoc, doc, deleteDoc } from "firebase/firestore"; // Ya no se necesitan aquí
+// import { db } from "../firebase";  // Ya no se necesita aquí
 import { formatCurrency } from "../utils/formatters";
 import { useDailyReports } from "../hooks/useDailyReports";
 
 const ProjectsViewer = () => {
+  // Usamos el hook useProjects, que ahora maneja toda la lógica de Firestore.
   const { projects, loading, error, addProject, updateProject, deleteProject } = useProjects();
   const { allReports } = useDailyReports(); // Para calcular costes
   const [newProject, setNewProject] = useState({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
@@ -40,7 +41,7 @@ const ProjectsViewer = () => {
     }
 
     try {
-      await addProject(newProject);
+      await addProject(newProject);  // Usamos la función del hook
       setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
       setSuccessMessage("Proyecto añadido correctamente!");
       setErrorMessage("");
@@ -62,7 +63,7 @@ const ProjectsViewer = () => {
     }
 
     try {
-      await updateProject(editedProject.id, editedProject);
+      await updateProject(editedProject.id, editedProject); // Usamos la función del hook
       setEditingProjectId(null);
       setEditedProject(null);
       setSuccessMessage("Proyecto actualizado correctamente!");
@@ -72,18 +73,24 @@ const ProjectsViewer = () => {
     }
   };
 
-  const handleDelete = async (projectId) => {
+
+    const handleDelete = async (projectId) => {
+    // 1. Confirmación:  La tienes, ¡bien!
     if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
-      return;
+      return; // <---  IMPORTANTE: Detener la ejecución si el usuario cancela.
     }
+
+    // 2. Manejo de errores y actualización de la UI:
     try {
-      await deleteProject(projectId);
+      await deleteProject(projectId); // Usamos la función del hook
       setSuccessMessage("Proyecto eliminado correctamente!");
-      setErrorMessage("");
+      setErrorMessage(""); // Limpiar errores anteriores
     } catch (err) {
       setErrorMessage(`Error al eliminar proyecto: ${err.message}`);
+      setSuccessMessage(""); // Limpiar mensaje de éxito si hay error
     }
   };
+
 
   // Calcular costes totales por proyecto (solo para proyectos por horas)
   const calculateProjectCosts = (projectId, projectType) => {

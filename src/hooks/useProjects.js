@@ -9,6 +9,7 @@ export const useProjects = () => {
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
+    setError(null); // Limpiar errores anteriores
     try {
       const querySnapshot = await getDocs(collection(db, "projects"));
       const projectsData = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -20,14 +21,16 @@ export const useProjects = () => {
     }
   }, []);
 
+  // Añadimos el try/catch a todas las funciones que interactúan con Firestore
   const addProject = useCallback(async (project) => {
     setLoading(true);
+    setError(null);
     try {
       await addDoc(collection(db, "projects"), project);
       await fetchProjects(); // Refrescar la lista
     } catch (err) {
       setError(err.message);
-      throw err;
+      throw err; // Re-lanzar el error para que se maneje en el componente
     } finally {
       setLoading(false);
     }
@@ -35,6 +38,7 @@ export const useProjects = () => {
 
   const updateProject = useCallback(async (projectId, updatedProject) => {
     setLoading(true);
+    setError(null);
     try {
       const projectRef = doc(db, "projects", projectId);
       await updateDoc(projectRef, updatedProject);
@@ -49,16 +53,19 @@ export const useProjects = () => {
 
   const deleteProject = useCallback(async (projectId) => {
     setLoading(true);
+    setError(null);
     try {
       await deleteDoc(doc(db, "projects", projectId));
-      await fetchProjects(); // Refrescar la lista
+      await fetchProjects(); // <-  Importante: Refrescar la lista DESPUÉS de eliminar.
     } catch (err) {
       setError(err.message);
-      throw err;
+      throw err; // Re-lanzar el error.
     } finally {
       setLoading(false);
     }
   }, [fetchProjects]);
+
+
 
   useEffect(() => {
     fetchProjects();
