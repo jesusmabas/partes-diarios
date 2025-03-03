@@ -1,7 +1,7 @@
+// firebase.js
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-// import { setLogLevel } from "firebase/app"; // Ya no es necesario en las versiones modernas del SDK
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -13,7 +13,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-// console.log("Firebase App initialized successfully:", app); // Puedes dejarlo o quitarlo, según prefieras
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export { app }; // Exporta la instancia de la app
