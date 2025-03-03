@@ -14,11 +14,14 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID,
 };
 
+let app; // Declara app fuera del try para que sea accesible globalmente
+
 try {
-  const app = initializeApp(firebaseConfig);
+  app = initializeApp(firebaseConfig);
   console.log("Firebase App initialized successfully:", app);
 } catch (error) {
   console.error("Firebase initialization failed:", error);
+  throw error; // Opcional: lanza el error para que otros componentes puedan manejarlo
 }
 
 export const db = getFirestore(app);
