@@ -48,7 +48,8 @@ const DailyReportForm = () => {
     }));
   }, []);
 
-  const handleSubmit = async (e) => {
+
+    const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject || !report.reportDate) {
       setErrorMessage("Por favor, completa todos los campos requeridos.");
@@ -59,24 +60,31 @@ const DailyReportForm = () => {
     setIsSubmitting(true);
     setErrorMessage("");
     setSuccessMessage("");
+
+    // Inicializa reportData con valores comunes:
     let reportData = {
       projectId: selectedProject.id,
       weekNumber: getWeekNumber(report.reportDate),
       reportDate: report.reportDate,
       workPerformed: report.workPerformed,
+      userId: auth.currentUser.uid, // IMPORTANT: Guarda el ID del usuario.
     };
 
     if (selectedProject.type === "hourly") {
       const totalMaterialsCost = report.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
       reportData = {
-        ...reportData,
+        ...reportData, // Incluye los datos comunes
         labor: { ...report.labor, ...laborData },
         materials: report.materials,
         totalMaterialsCost,
         totalCost: laborData.totalLaborCost + totalMaterialsCost,
       };
     } else if (selectedProject.type === "fixed") {
-      reportData.invoicedAmount = report.workPerformed.invoicedAmount || 0;
+       reportData = { //MUY IMPORTANTE, ASIGNAR A REPORTDATA
+        ...reportData,
+        invoicedAmount: report.workPerformed.invoicedAmount || 0, // Añadido aquí y se guarda en la BD
+      };
+
     }
 
     try {
@@ -86,9 +94,10 @@ const DailyReportForm = () => {
         reportDate: new Date().toISOString().split("T")[0],
         labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
         materials: [],
-        workPerformed: { description: "", photos: [], invoicedAmount: 0 },
+        workPerformed: { description: "", photos: [], invoicedAmount: 0 }, // Resetear invoicedAmount
       });
       setSelectedProject(null);
+
     } catch (err) {
       setErrorMessage(`Error al guardar: ${err.message}`);
     } finally {

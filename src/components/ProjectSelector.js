@@ -5,7 +5,8 @@ const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
   const { projects, loading, error } = useProjects();
 
   const handleChange = (e) => {
-    const project = projects.find((p) => p.id === e.target.value);
+    const selectedProjectId = e.target.value; // Mejor legibilidad
+    const project = projects.find((p) => p.id === selectedProjectId);
     onProjectSelect(project);
   };
 
@@ -26,8 +27,13 @@ const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
           <p>Dirección: {selectedProject.address}</p>
           <p>Cliente: {selectedProject.client}</p>
           <p>NIF/NIE: {selectedProject.nifNie}</p>
-          <p>Precio oficial: {selectedProject.officialPrice} €/h</p>
-          <p>Precio peón: {selectedProject.workerPrice} €/h</p>
+          {/* SÓLO MUESTRA PRECIOS SI ES POR HORAS */}
+          {selectedProject.type === "hourly" && (
+            <>
+              <p>Precio oficial: {selectedProject.officialPrice} €/h</p>
+              <p>Precio peón: {selectedProject.workerPrice} €/h</p>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -39,6 +39,42 @@ const styles = StyleSheet.create({
   costColLabel: { width: "70%", padding: 5, fontWeight: "bold", fontSize: 11 },
   costColValue: { width: "30%", padding: 5, textAlign: "right", fontSize: 11 },
   errorImage: { width: 200, height: 150, backgroundColor: "#f0f0f0", textAlign: "center", padding: 10, fontSize: 10 },
+  //Nuevos estilos (CORREGIDOS)
+  budgetTable: {
+    display: "table",
+    width: "auto", // O "100%" si quieres que ocupe todo el ancho
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginTop: 10,
+  },
+  budgetRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+  budgetTableHeader: {
+    // Estilo para las celdas de encabezado
+    backgroundColor: "#f0f0f0",
+    fontWeight: "bold",
+    fontSize: 11,
+    padding: 5,
+    textAlign: "center", // Centrado para los encabezados
+    width: "50%", // Importante: Usar porcentajes
+  },
+  budgetTableCell: {
+    // Estilo para las celdas de datos
+    padding: 5,
+    fontSize: 11,
+     width: "50%",  // Importante: Usar porcentajes
+     textAlign: "left",
+  },
+   budgetTableCellAmount: { //Clase específica para los importes
+        padding: 5,
+        fontSize: 11,
+        width: "50%",
+        textAlign: "right", //Alineados a la derecha
+  }
 });
 
 const ReportPDFGenerator = ({ reports, projects }) => {
@@ -159,21 +195,39 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                 <Text style={styles.text}>Albaranes/facturas:</Text>
                 {report.materials?.map((m, i) => (
                   <Text key={`material-invoice-${i}`} style={styles.text}>
-                    Factura {i + 1} (<Link src={m.invoiceUrl} style={styles.link}>Descargar PDF</Link>)
+                    Factura {i + 1} (
+                    <Link src={m.invoiceUrl} style={styles.link}>
+                      Descargar PDF
+                    </Link>
+                    )
                   </Text>
                 ))}
                 <Text style={styles.text}>Coste total de materiales: {formatCurrency(report.totalMaterialsCost || 0)}</Text>
               </>
             ) : (
+              // --- MODIFICACIONES PARA PROYECTOS "FIXED" ---
               <>
-                <Text style={styles.text}>Proyecto con presupuesto cerrado - No se registran horas ni materiales.</Text>
-                <Text style={styles.text}><strong>Importe presupuestado:</strong> {formatCurrency(budgetAmount)}</Text>
-                <Text style={styles.text}><strong>Importe facturado:</strong> {formatCurrency(invoicedTotal)}</Text>
-                <Text style={styles.text}><strong>Resta por facturar:</strong> {formatCurrency(remainingToInvoice)}</Text>
-                {report.invoicedAmount > 0 && (
-                  <Text style={styles.text}>Facturado hoy: {formatCurrency(report.invoicedAmount)}</Text>
-                )}
+               <View style={styles.budgetTable}>
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableHeader}>Concepto</Text>
+                        <Text style={styles.budgetTableHeader}>Importe</Text>
+                    </View>
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableCell}>Importe presupuestado</Text>
+                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetAmount)}</Text> {/* Clase amount */}
+                    </View>
+
+                    <View style={styles.budgetRow}>
+                         <Text style={styles.budgetTableCell}>Importe facturado</Text>
+                         <Text style={styles.budgetTableCellAmount}>{formatCurrency(invoicedTotal)}</Text>  {/* Clase amount */}
+                    </View>
+                    <View style={styles.budgetRow}>
+                         <Text style={styles.budgetTableCell}>Importe restante</Text>
+                         <Text style={styles.budgetTableCellAmount}>{formatCurrency(remainingToInvoice)}</Text>  {/* Clase amount */}
+                    </View>
+                </View>
               </>
+              // --- FIN MODIFICACIONES ---
             )}
 
             <Text style={styles.sectionTitle}>Trabajos realizados</Text>
@@ -188,18 +242,18 @@ const ReportPDFGenerator = ({ reports, projects }) => {
 
             {isHourly && (
               <>
-                <Text style={styles.sectionTitle}>Coste total MO + materiais</Text>
+                <Text style={styles.sectionTitle}>Coste total MO + materiales</Text>
                 <View style={styles.costSummary}>
                   <View style={styles.costRow}>
                     <Text style={styles.costColLabel}>Coste total mano de obra</Text>
                     <Text style={styles.costColValue}>{formatCurrency(report.labor?.totalLaborCost || 0)}</Text>
                   </View>
                   <View style={styles.costRow}>
-                    <Text style={styles.costColLabel}>Coste total de materiais</Text>
+                    <Text style={styles.costColLabel}>Coste total de materiales</Text>
                     <Text style={styles.costColValue}>{formatCurrency(report.totalMaterialsCost || 0)}</Text>
                   </View>
                   <View style={styles.costRow}>
-                    <Text style={styles.costColLabel}>Coste total MO + materiais</Text>
+                    <Text style={styles.costColLabel}>Coste total MO + materiales</Text>
                     <Text style={styles.costColValue}>{formatCurrency(report.totalCost || 0)}</Text>
                   </View>
                 </View>

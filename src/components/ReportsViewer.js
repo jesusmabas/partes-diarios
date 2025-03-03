@@ -1,33 +1,52 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useDailyReports } from "../hooks/useDailyReports";
 import { formatCurrency, formatNumber, getWeekNumber } from "../utils/formatters";
 import ReportPDFGenerator from "./ReportPDFGenerator";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { useProjects } from "../hooks/useProjects";
-import { updateDoc, doc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { updateDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useStorage } from "../hooks/useStorage";
 
 const ReportsViewer = () => {
   const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+  const [selectedProjectId, setSelectedProjectId] = useState(""); // Nuevo estado para el proyecto seleccionado
   const [showPDFLink, setShowPDFLink] = useState(false);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [editingReportId, setEditingReportId] = useState(null);
   const [editedReport, setEditedReport] = useState(null);
-  const { reports, loading, error, deleteReport } = useDailyReports(dateRange);
+  const [pdfDisabledReason, setPdfDisabledReason] = useState(null); // NUEVO: Estado para el mensaje
+
+  // Los hooks se usan sin filtros iniciales
+  const { reports, loading, error, deleteReport, fetchReports } = useDailyReports(); // <--- Sin dateRange!
   const { projects } = useProjects();
   const { uploadFile, uploading: storageUploading, error: storageError } = useStorage();
+
+  // --- DEFINICIONES DE FUNCIONES (MOVIDAS AQUÍ) ---
 
   const handleDateRangeChange = useCallback((e) => {
     setDateRange((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }, []);
 
-  const handleGeneratePDF = () => {
-    if (reports.length > 0) {
-      setShowPDFLink(true);
-      console.log("Generando PDF:", reports);
+  const handleProjectChange = useCallback((e) => {
+    setSelectedProjectId(e.target.value);
+    //setDateRange({ startDate: "", endDate: "" }); // <- Podrías resetear, pero no es obligatorio
+    // Actualiza el mensaje de deshabilitación
+    if (e.target.value === "") {
+      setPdfDisabledReason("Selecciona un proyecto para generar el PDF.");
     } else {
-      console.log("No hay reportes para generar PDF.");
+      setPdfDisabledReason(null); // Limpia el mensaje si se selecciona un proyecto
+    }
+  }, []);
+
+  const handleGeneratePDF = () => {
+    if (filteredReports.length > 0 && selectedProjectId) {
+      //  <-  Comprobación adicional
+      setShowPDFLink(true);
+      console.log("Generando PDF:", filteredReports);
+    } else {
+      //Se podría mostrar el mensaje de error aquí también
+      console.log("No hay reportes para generar PDF, o no se ha seleccionado un proyecto.");
     }
   };
 
@@ -52,7 +71,9 @@ const ReportsViewer = () => {
         if (parent === "labor") {
           return { ...prev, labor: { ...prev.labor, [field]: value } };
         } else if (parent === "workPerformed") {
-          return { ...prev, workPerformed: { ...prev.workPerformed, [field]: value } };
+          //Si se modifica el invoicedAmount, hay que parsearlo a Float.
+          const updatedValue = field === "invoicedAmount" ? parseFloat(value) : value;
+          return { ...prev, workPerformed: { ...prev.workPerformed, [field]: updatedValue } };
         }
       }
       return { ...prev, [name]: value };
@@ -124,17 +145,30 @@ const ReportsViewer = () => {
     e.preventDefault();
     try {
       const reportRef = doc(db, "dailyReports", editingReportId);
-      await updateDoc(reportRef, {
+
+      // Preparar los datos a actualizar, manejando los casos de proyecto por horas y presupuesto cerrado
+      const updatedData = {
         reportDate: editedReport.reportDate,
         weekNumber: getWeekNumber(editedReport.reportDate),
-        labor: editedReport.labor,
         materials: editedReport.materials || [],
         workPerformed: {
           ...editedReport.workPerformed,
           description: editedReport.workPerformed.description,
           photos: editedReport.workPerformed.photos || [],
         },
-      });
+      };
+
+      // Si el proyecto es por horas, incluir los datos de labor
+      if (editedReport.labor) {
+        updatedData.labor = editedReport.labor;
+      }
+
+      // Si el proyecto es de presupuesto cerrado, incluir 'invoicedAmount'
+      if (editedReport.workPerformed?.invoicedAmount !== undefined) {
+        updatedData.invoicedAmount = editedReport.workPerformed.invoicedAmount;
+      }
+
+      await updateDoc(reportRef, updatedData);
       setEditingReportId(null);
       setEditedReport(null);
     } catch (err) {
@@ -142,20 +176,62 @@ const ReportsViewer = () => {
     }
   };
 
+  // FILTRO COMBINADO: Primero por proyecto, luego por fechas
+  const filteredReports = useMemo(() => {
+    let result = reports;
+
+    if (selectedProjectId) {
+      result = result.filter((report) => report.projectId === selectedProjectId);
+    }
+
+    if (dateRange.startDate && dateRange.endDate) {
+      const start = new Date(dateRange.startDate);
+      const end = new Date(dateRange.endDate);
+      end.setHours(23, 59, 59, 999); // Incluir todo el día final
+
+      result = result.filter((report) => {
+        const reportDate = new Date(report.reportDate);
+        return reportDate >= start && reportDate <= end;
+      });
+    }
+
+    return result.sort((a, b) => new Date(a.reportDate) - new Date(b.reportDate)); // Ordenar por fecha
+  }, [reports, selectedProjectId, dateRange]);
+
   useEffect(() => {
-    if (reports.length > 0) {
-      console.log("Datos disponibles para PDF:", reports);
+    fetchReports();
+  }, [fetchReports, selectedProjectId, dateRange]);
+
+  useEffect(() => {
+    if (filteredReports.length > 0) {
+      console.log("Datos disponibles para PDF:", filteredReports);
     } else {
       console.log("No hay reportes para generar PDF.");
     }
-  }, [reports]);
+  }, [filteredReports]);
 
   if (loading) return <p>Cargando reportes...</p>;
   if (error) return <p className="error-message">Error: {error}</p>;
 
+  // --- JSX (sin cambios, solo indentación) ---
   return (
     <div className="reports-viewer">
       <h2>Informes</h2>
+
+      {/* Selector de Proyecto */}
+      <div>
+        <label>Filtrar por Proyecto: </label>
+        <select value={selectedProjectId} onChange={handleProjectChange}>
+          <option value="">Todos los proyectos</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.id} - {project.client}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Selectores de Fecha */}
       <div className="date-range">
         <div className="date-field">
           <label>Fecha de inicio:</label>
@@ -166,19 +242,26 @@ const ReportsViewer = () => {
           <input type="date" name="endDate" value={dateRange.endDate} onChange={handleDateRangeChange} />
         </div>
       </div>
-      <button onClick={handleGeneratePDF} disabled={!reports.length}>
+
+      {/* Botón y enlace de descarga */}
+      <button onClick={handleGeneratePDF} disabled={!selectedProjectId || !filteredReports.length}>
         Generar PDF
       </button>
-      {showPDFLink && reports.length > 0 && (
+      {/* Mensaje de deshabilitación */}
+      {pdfDisabledReason && <p style={{ color: "red" }}>{pdfDisabledReason}</p>}
+
+      {showPDFLink && filteredReports.length > 0 && (
         <PDFDownloadLink
-          document={<ReportPDFGenerator reports={reports} projects={projects} />}
-          fileName={`informe_${dateRange.startDate}_${dateRange.endDate}.pdf`}
+          document={<ReportPDFGenerator reports={filteredReports} projects={projects} />}
+          fileName={`informe_${selectedProjectId || 'todos'}_${dateRange.startDate || 'inicio'}_${dateRange.endDate || 'fin'}.pdf`}
         >
           {({ loading: pdfLoading }) => (pdfLoading ? "Generando PDF..." : "Descargar Informe en PDF")}
         </PDFDownloadLink>
       )}
+
       <h3>Partes en el rango seleccionado:</h3>
-      {reports.map((report) => {
+
+      {filteredReports.map((report) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isEditing = editingReportId === report.id;
 
@@ -187,63 +270,78 @@ const ReportsViewer = () => {
             {isEditing ? (
               <form onSubmit={handleEditSubmit} className="edit-form">
                 <label>Fecha del parte:</label>
-                <input
-                  type="date"
-                  name="reportDate"
-                  value={editedReport.reportDate}
-                  onChange={handleEditChange}
-                />
-                <h4>Mano de obra</h4>
-                <div className="labor-row">
-                  <div className="labor-field">
-                    <label>Hora entrada oficial</label>
-                    <input
-                      type="time"
-                      name="labor.officialEntry"
-                      value={editedReport.labor.officialEntry}
-                      onChange={handleEditChange}
-                      className="time-input"
-                    />
-                  </div>
-                  <div className="labor-field">
-                    <label>Hora salida oficial</label>
-                    <input
-                      type="time"
-                      name="labor.officialExit"
-                      value={editedReport.labor.officialExit}
-                      onChange={handleEditChange}
-                      className="time-input"
-                    />
-                  </div>
-                </div>
-                <div className="labor-row">
-                  <div className="labor-field">
-                    <label>Hora entrada peón</label>
-                    <input
-                      type="time"
-                      name="labor.workerEntry"
-                      value={editedReport.labor.workerEntry}
-                      onChange={handleEditChange}
-                      className="time-input"
-                    />
-                  </div>
-                  <div className="labor-field">
-                    <label>Hora salida peón</label>
-                    <input
-                      type="time"
-                      name="labor.workerExit"
-                      value={editedReport.labor.workerExit}
-                      onChange={handleEditChange}
-                      className="time-input"
-                    />
-                  </div>
-                </div>
+                <input type="date" name="reportDate" value={editedReport.reportDate} onChange={handleEditChange} />
+
+                {project.type === "hourly" && (
+                  <>
+                    <h4>Mano de obra</h4>
+                    <div className="labor-row">
+                      <div className="labor-field">
+                        <label>Hora entrada oficial</label>
+                        <input
+                          type="time"
+                          name="labor.officialEntry"
+                          value={editedReport.labor?.officialEntry || ""}
+                          onChange={handleEditChange}
+                          className="time-input"
+                        />
+                      </div>
+                      <div className="labor-field">
+                        <label>Hora salida oficial</label>
+                        <input
+                          type="time"
+                          name="labor.officialExit"
+                          value={editedReport.labor?.officialExit || ""}
+                          onChange={handleEditChange}
+                          className="time-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="labor-row">
+                      <div className="labor-field">
+                        <label>Hora entrada peón</label>
+                        <input
+                          type="time"
+                          name="labor.workerEntry"
+                          value={editedReport.labor?.workerEntry || ""}
+                          onChange={handleEditChange}
+                          className="time-input"
+                        />
+                      </div>
+                      <div className="labor-field">
+                        <label>Hora salida peón</label>
+                        <input
+                          type="time"
+                          name="labor.workerExit"
+                          value={editedReport.labor?.workerExit || ""}
+                          onChange={handleEditChange}
+                          className="time-input"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
                 <label>Descripción trabajos:</label>
                 <textarea
                   name="workPerformed.description"
-                  value={editedReport.workPerformed.description}
+                  value={editedReport.workPerformed?.description || ""}
                   onChange={handleEditChange}
                 />
+                {project.type === "fixed" && (
+                  <>
+                    <label>Importe Facturado (€)</label>
+                    <input
+                      type="number"
+                      name="invoicedAmount"
+                      min="0"
+                      step="0.01"
+                      value={editedReport.workPerformed?.invoicedAmount}
+                      onChange={handleEditChange}
+                    />
+                  </>
+                )}
+
                 <h4>Materiales</h4>
                 {editedReport.materials?.map((m) => (
                   <div key={m.id} className="material-item">
@@ -314,29 +412,42 @@ const ReportsViewer = () => {
                 <p>
                   <strong>Dirección:</strong> {project.address || "No disponible"}
                 </p>
-                <h5>Mano de obra</h5>
-                <p>Oficial: {formatNumber(report.labor.officialHours)} h - {formatCurrency(report.labor.officialCost)}</p>
-                <p>Peón: {formatNumber(report.labor.workerHours)} h - {formatCurrency(report.labor.workerCost)}</p>
-                <p>Total mano de obra: {formatCurrency(report.labor.totalLaborCost)}</p>
-                <h5>Materiales</h5>
-                {report.materials.length > 0 ? (
-                  report.materials.map((m, i) => (
-                    <p key={i}>
-                      {m.description} - {formatCurrency(m.cost)} (
-                      <a href={m.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                        Ver factura
-                      </a>
-                      )
-                    </p>
-                  ))
+
+                {project.type === "hourly" ? (
+                  <>
+                    <h5>Mano de obra</h5>
+                    <p>Oficial: {formatNumber(report.labor?.officialHours || 0)} h - {formatCurrency(report.labor?.officialCost || 0)}</p>
+                    <p>Peón: {formatNumber(report.labor?.workerHours || 0)} h - {formatCurrency(report.labor?.workerCost || 0)}</p>
+                    <p>Total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</p>
+                    <h5>Materiales</h5>
+                    {report.materials && report.materials.length > 0 ? (
+                      report.materials.map((m, i) => (
+                        <p key={i}>
+                          {m.description} - {formatCurrency(m.cost)} (
+                          <a href={m.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                            Ver factura
+                          </a>
+                          )
+                        </p>
+                      ))
+                    ) : (
+                      <p>No hay materiales registrados.</p>
+                    )}
+                    <p>Total materiales: {formatCurrency(report.totalMaterialsCost || 0)}</p>
+                  </>
                 ) : (
-                  <p>No hay materiales registrados.</p>
+                  <>
+                    <p>
+                      <strong>Importe facturado:</strong>{" "}
+                      {formatCurrency(report.invoicedAmount || 0)}
+                    </p>
+                  </>
                 )}
-                <p>Total materiales: {formatCurrency(report.totalMaterialsCost)}</p>
+
                 <h5>Trabajos realizados</h5>
-                <p>{report.workPerformed.description || "Sin descripción"}</p>
+                <p>{report.workPerformed?.description || "Sin descripción"}</p>
                 <div className="photos-container">
-                  {report.workPerformed.photos.map((photo, i) => (
+                  {report.workPerformed?.photos?.map((photo, i) => (
                     <img
                       key={i}
                       src={photo.url}
@@ -345,9 +456,13 @@ const ReportsViewer = () => {
                     />
                   ))}
                 </div>
-                <p>
-                  <strong>Total:</strong> {formatCurrency(report.totalCost)}
-                </p>
+
+                {project.type === "hourly" && (
+                  <p>
+                    <strong>Total:</strong> {formatCurrency(report.totalCost || 0)}
+                  </p>
+                )}
+
                 <button onClick={() => startEditing(report)}>Editar</button>
                 <button
                   onClick={() => confirmDelete(report.id)}
