@@ -1,7 +1,8 @@
 {
   "projects": {
     "default": "partesdiarios-bbcc1",
-    "test": "partesdiarios-bbcc1"
+    "test": "partesdiarios-bbcc1",
+    "partes-diarios": "partesdiarios-bbcc1"
   },
   "targets": {},
   "etags": {}

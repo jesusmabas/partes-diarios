@@ -1,12 +1,8 @@
 [
   {
-    "origin": ["http://localhost:3000"],
-    "method": ["GET", "HEAD"],
-    "maxAgeSeconds": 3600
-  },
-  {
-    "origin": ["https://tu-proyecto.vercel.app"], 
-    "method": ["GET", "HEAD"],
-    "maxAgeSeconds": 3600
+    "origin": ["https://partes-diarios.vercel.app", "http://localhost:3000"],
+    "method": ["GET", "PUT", "POST", "DELETE"],
+    "maxAgeSeconds": 3600,
+    "headers": ["Content-Type", "Authorization"]
   }
 ]
