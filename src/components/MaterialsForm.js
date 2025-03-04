@@ -7,23 +7,31 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
   const { uploadFile, uploading, error: uploadError } = useStorage();
 
   const handleInputChange = useCallback((e) => {
-    setNewMaterial((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    // Muy importante, parsear el coste a Float.
+    const { name, value } = e.target;
+     const updatedValue = name === "cost" ? parseFloat(value) : value;
+    setNewMaterial((prev) => ({ ...prev, [name]: updatedValue }));
+
   }, []);
 
-  const handleAddMaterial = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (!file || !newMaterial.description || !newMaterial.cost) {
-      return; // Error manejado por uploadError
-    }
 
-    const url = await uploadFile(file, "invoices", `${projectId}_${reportDate}`);
-    if (url) {
-      const newMat = { id: Date.now(), description: newMaterial.description, cost: parseFloat(newMaterial.cost), invoiceUrl: url };
-      onMaterialsChange([...materials, newMat]);
-      setNewMaterial({ description: "", cost: "" });
-      e.target.value = null;
-    }
-  }, [newMaterial, materials, onMaterialsChange, projectId, reportDate, uploadFile]);
+    const handleAddMaterial = useCallback(async (e) => {
+        const file = e.target.files[0];
+        //Validar que se haya añadido una descripción y un coste
+        if (!file || !newMaterial.description || !newMaterial.cost) {
+            alert("Por favor, añade una descripción, un coste y una factura (PDF)");
+        return; // Error manejado por uploadError
+        }
+
+        const url = await uploadFile(file, "invoices", `${projectId}_${reportDate}`);
+        if (url) {
+        const newMat = { id: Date.now(), description: newMaterial.description, cost: parseFloat(newMaterial.cost), invoiceUrl: url }; //Asegúrate de que sea Float
+        onMaterialsChange([...materials, newMat]);
+        setNewMaterial({ description: "", cost: "" });
+        e.target.value = null;
+        }
+    }, [newMaterial, materials, onMaterialsChange, projectId, reportDate, uploadFile]);
+
 
   const handleRemoveMaterial = useCallback((id) => {
     onMaterialsChange(materials.filter((m) => m.id !== id));
