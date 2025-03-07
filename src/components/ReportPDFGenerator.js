@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginTop: 15, marginBottom: 10, fontFamily: "Times-Roman" },
   text: { fontSize: 11, marginBottom: 5 },
   link: { color: "#007bff", textDecoration: "underline", fontSize: 11 },
-  image: { width: 200, height: 150, margin: 5, border: "1px solid #000" },
+  image: { height: 150, margin: 5, border: "1px solid #000" },
   imageRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   table: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000" },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000" },
