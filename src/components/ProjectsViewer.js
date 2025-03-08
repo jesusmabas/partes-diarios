@@ -1,12 +1,9 @@
 import React, { useState, useCallback } from "react";
 import { useProjects } from "../hooks/useProjects";
-// import { addDoc, collection, updateDoc, doc, deleteDoc } from "firebase/firestore"; // Ya no se necesitan aquí
-// import { db } from "../firebase";  // Ya no se necesita aquí
 import { formatCurrency } from "../utils/formatters";
 import { useDailyReports } from "../hooks/useDailyReports";
 
 const ProjectsViewer = () => {
-  // Usamos el hook useProjects, que ahora maneja toda la lógica de Firestore.
   const { projects, loading, error, addProject, updateProject, deleteProject } = useProjects();
   const { allReports } = useDailyReports(); // Para calcular costes
   const [newProject, setNewProject] = useState({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
@@ -32,23 +29,28 @@ const ProjectsViewer = () => {
     }
   }, [editingProjectId]);
 
-  const handleAddProject = async (e) => {
-    e.preventDefault();
-    if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
-      setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
-      setSuccessMessage("");
-      return;
-    }
+ const handleAddProject = async (e) => {
+  e.preventDefault();
+  if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
+    setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
+    setSuccessMessage("");
+    return;
+  }
 
-    try {
-      await addProject(newProject);  // Usamos la función del hook
-      setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
-      setSuccessMessage("Proyecto añadido correctamente!");
-      setErrorMessage("");
-    } catch (err) {
-      setErrorMessage(`Error al añadir proyecto: ${err.message}`);
-    }
-  };
+  try {
+    // Crear una copia del proyecto con el ID recortado
+    const trimmedProject = {
+      ...newProject,
+      id: newProject.id.trim()
+    };
+    await addProject(trimmedProject);  // Usamos la función del hook
+    setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
+    setSuccessMessage("Proyecto añadido correctamente!");
+    setErrorMessage("");
+  } catch (err) {
+    setErrorMessage(`Error al añadir proyecto: ${err.message}`);
+  }
+};
 
   const startEditing = (project) => {
     setEditingProjectId(project.id);
@@ -73,30 +75,25 @@ const ProjectsViewer = () => {
     }
   };
 
-
-    const handleDelete = async (projectId) => {
-    // 1. Confirmación:  La tienes, ¡bien!
-	console.log("handleDelete llamado con projectId:", projectId); // AÑADE ESTO
+  const handleDelete = async (projectId) => {
+    console.log("handleDelete llamado con projectId:", projectId);
     if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
-		console.log("Eliminación cancelada por el usuario");
+      console.log("Eliminación cancelada por el usuario");
       return; // <---  IMPORTANTE: Detener la ejecución si el usuario cancela.
     }
 
-    // 2. Manejo de errores y actualización de la UI:
     try {
-		console.log("Intentando eliminar proyecto:", projectId);
+      console.log("Intentando eliminar proyecto:", projectId);
       await deleteProject(projectId); // Usamos la función del hook
       setSuccessMessage("Proyecto eliminado correctamente!");
       setErrorMessage(""); // Limpiar errores anteriores
     } catch (err) {
-		console.error("Error en handleDelete:", err);
+      console.error("Error en handleDelete:", err);
       setErrorMessage(`Error al eliminar proyecto: ${err.message}`);
       setSuccessMessage(""); // Limpiar mensaje de éxito si hay error
     }
   };
 
-
-  // Calcular costes totales por proyecto (solo para proyectos por horas)
   const calculateProjectCosts = (projectId, projectType) => {
     if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0 };
     const projectReports = allReports.filter((report) => report.projectId === projectId);
@@ -115,7 +112,6 @@ const ProjectsViewer = () => {
     };
   };
 
-  // Calcular importe facturado total para proyectos "fixed"
   const calculateInvoicedTotal = (projectId) => {
     const projectReports = allReports.filter((report) => report.projectId === projectId && report.invoicedAmount);
     return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
@@ -187,12 +183,12 @@ const ProjectsViewer = () => {
         ) : (
           <input
             type="number"
-            name="budgetAmount"
-            placeholder="Importe presupuestado (€)"
-            value={newProject.budgetAmount}
-            onChange={handleInputChange}
-            min="0"
-            step="0.01"
+              name="budgetAmount"
+              placeholder="Importe presupuestado (€)"
+              value={newProject.budgetAmount}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
           />
         )}
         <button type="submit" disabled={loading}>
@@ -300,11 +296,11 @@ const ProjectsViewer = () => {
                   )}
                   <button onClick={() => startEditing(project)}>Editar</button>
                   <button
-                    onClick={() => handleDelete(project.id)}
-                    style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
-                  >
-                    Eliminar
-                  </button>
+  onClick={() => handleDelete(project.id)}
+  style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
+>
+  Eliminar
+</button>
                 </>
               )}
             </div>

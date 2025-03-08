@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export const useProjects = () => {
@@ -21,12 +21,26 @@ export const useProjects = () => {
     }
   }, []);
 
-  // Añadimos el try/catch a todas las funciones que interactúan con Firestore
   const addProject = useCallback(async (project) => {
     setLoading(true);
     setError(null);
     try {
-      await addDoc(collection(db, "projects"), project);
+      // Asegurarse de que el ID no tenga espacios al principio ni al final
+      const cleanedProject = {
+        ...project,
+        id: project.id.trim()
+      };
+      
+      // Verificar si ya existe un proyecto con este ID
+      const existingProjects = await getDocs(collection(db, "projects"));
+      const exists = existingProjects.docs.some(doc => doc.id === cleanedProject.id);
+      
+      if (exists) {
+        throw new Error(`Ya existe un proyecto con el ID ${cleanedProject.id}`);
+      }
+      
+      // Usar el ID del proyecto como el ID del documento en Firestore
+      await addDoc(collection(db, "projects"), cleanedProject);
       await fetchProjects(); // Refrescar la lista
     } catch (err) {
       setError(err.message);
@@ -51,24 +65,42 @@ export const useProjects = () => {
     }
   }, [fetchProjects]);
 
-    const deleteProject = useCallback(async (projectId) => {
+  const deleteProject = useCallback(async (projectId) => {
     setLoading(true);
     setError(null); // Limpiar errores
     try {
-		console.log("deleteProject llamado con projectId:", projectId);
-      await deleteDoc(doc(db, "projects", projectId));
-	  console.log("deleteDoc completado, llamando a fetchProjects");
+      console.log("deleteProject llamado con projectId:", projectId);
+      
+      // Verificar todos los proyectos en la base de datos
+      const querySnapshot = await getDocs(collection(db, "projects"));
+      console.log("Proyectos en la base de datos:");
+      querySnapshot.docs.forEach(doc => {
+        console.log(`ID del documento: "${doc.id}" - Datos:`, doc.data());
+      });
+      
+      // Buscar el proyecto por su propiedad id dentro de los datos, no por el ID del documento
+      const projectDoc = querySnapshot.docs.find(doc => {
+        const data = doc.data();
+        return data.id === projectId;
+      });
+      
+      if (!projectDoc) {
+        throw new Error(`El proyecto con ID ${projectId} no existe.`);
+      }
+      
+      // Usar el ID del documento de Firestore para eliminarlo
+      const projectRef = doc(db, "projects", projectDoc.id);
+      await deleteDoc(projectRef);
+      console.log("deleteDoc completado, llamando a fetchProjects");
       await fetchProjects(); // Refrescar después de eliminar
     } catch (err) {
-		console.error("Error en deleteProject:", err);
+      console.error("Error en deleteProject:", err);
       setError(err.message);
       throw err; // Re-lanzar para que el componente pueda manejarlo
     } finally {
       setLoading(false);
     }
   }, [fetchProjects]);
-
-
 
   useEffect(() => {
     fetchProjects();
