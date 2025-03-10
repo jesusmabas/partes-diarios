@@ -111,17 +111,25 @@ form {
   gap: 20px;
 }
 
+/* MODIFICACIÓN: Ajuste para todos los campos de formulario */
 input,
 select,
 textarea {
   padding: 10px;
   margin-top: 5px;
   width: 100%;
-  max-width: 400px;
+  max-width: 100%; /* Cambiado de 400px a 100% */
+  box-sizing: border-box; /* CLAVE: incluye padding y border en el ancho total */
   border: 1px solid #ddd;
   border-radius: 5px;
   font-size: 14px;
   font-family: "Atkinson Hyperlegible", sans-serif;
+}
+
+/* NUEVO: Estilo específico para formularios de login */
+.login-form {
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 button {
@@ -223,12 +231,14 @@ h3 {
   font-size: 14px;
 }
 
+/* MODIFICACIÓN: Asegurar que los inputs de fecha respeten el ancho */
 .date-field input {
   padding: 10px;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #ddd;
   border-radius: 5px;
   font-size: 14px;
-  width: 100%;
 }
 
 .report-card {

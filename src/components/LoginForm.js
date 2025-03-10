@@ -13,7 +13,7 @@ function LoginForm() {
     const auth = getAuth(app);
 
     // Lista blanca de correos electrónicos permitidos (¡Ajusta esto a tus necesidades!)
-const allowedEmails = ['info@alqatifa.com', 'jesusmabas@gmail.com']; // ¡Coma agregada!
+    const allowedEmails = ['info@alqatifa.com', 'jesusmabas@gmail.com']; // ¡Coma agregada!
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -62,7 +62,7 @@ const allowedEmails = ['info@alqatifa.com', 'jesusmabas@gmail.com']; // ¡Coma a
                     <button onClick={handleSignOut}>Cerrar Sesión</button>
                 </div>
             ) : (
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} className="login-form">
                     <h2>{isRegistering ? 'Registrarse' : 'Iniciar Sesión'}</h2>
                     {error && <p style={{ color: 'red' }}>{error}</p>}
                     <div>
