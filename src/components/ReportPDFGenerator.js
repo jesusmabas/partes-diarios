@@ -1,7 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer";
 import { formatNumber, formatCurrency, formatFullDate } from "../utils/formatters";
-import { useProjects } from "../hooks/useProjects"; // Para obtener el tipo del proyecto
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 12, fontFamily: "Helvetica", flexDirection: "column", height: "100%" },
@@ -69,11 +68,93 @@ const styles = StyleSheet.create({
      width: "50%",  // Importante: Usar porcentajes
      textAlign: "left",
   },
-   budgetTableCellAmount: { //Clase específica para los importes
-        padding: 5,
-        fontSize: 11,
-        width: "50%",
-        textAlign: "right", //Alineados a la derecha
+  budgetTableCellAmount: { //Clase específica para los importes
+    padding: 5,
+    fontSize: 11,
+    width: "50%",
+    textAlign: "right", //Alineados a la derecha
+  },
+  // Nuevos estilos para la página de resumen
+  summaryPage: { 
+    padding: 20, 
+    fontSize: 12, 
+    fontFamily: "Helvetica", 
+    flexDirection: "column" 
+  },
+  summaryTitle: { 
+    fontSize: 18, 
+    fontWeight: "bold", 
+    marginBottom: 30, 
+    textAlign: "center", 
+    fontFamily: "Times-Roman" 
+  },
+  summaryTable: { 
+    display: "table", 
+    width: "100%", 
+    borderStyle: "solid", 
+    borderWidth: 1, 
+    borderColor: "#000", 
+    marginBottom: 30 
+  },
+  summaryRow: { 
+    flexDirection: "row", 
+    borderBottomWidth: 1, 
+    borderBottomColor: "#000" 
+  },
+  summaryLastRow: { 
+    flexDirection: "row" 
+  },
+  summaryColLabel: { 
+    width: "70%", 
+    padding: 8, 
+    fontSize: 12, 
+    borderRightWidth: 1, 
+    borderRightColor: "#000", 
+    backgroundColor: "#f9f9f9" 
+  },
+  summaryColValue: { 
+    width: "30%", 
+    padding: 8, 
+    fontSize: 12, 
+    textAlign: "right" 
+  },
+  summaryHeaderRow: { 
+    flexDirection: "row", 
+    borderBottomWidth: 1, 
+    borderBottomColor: "#000", 
+    backgroundColor: "#f0f0f0" 
+  },
+  summaryHeaderCol: { 
+    padding: 8, 
+    fontSize: 12, 
+    fontWeight: "bold", 
+    textAlign: "center" 
+  },
+  summaryTotalRow: { 
+    flexDirection: "row", 
+    backgroundColor: "#f0f0f0" 
+  },
+  summaryTotalLabel: { 
+    width: "70%", 
+    padding: 8, 
+    fontSize: 12, 
+    fontWeight: "bold", 
+    borderRightWidth: 1, 
+    borderRightColor: "#000" 
+  },
+  summaryTotalValue: { 
+    width: "30%", 
+    padding: 8, 
+    fontSize: 12, 
+    fontWeight: "bold", 
+    textAlign: "right" 
+  },
+  summaryNote: {
+    fontSize: 10,
+    fontStyle: "italic",
+    marginTop: 20,
+    textAlign: "center",
+    color: "#666"
   }
 });
 
@@ -107,6 +188,46 @@ const ReportPDFGenerator = ({ reports, projects }) => {
     const projectReports = reports.filter((report) => report.projectId === projectId && report.invoicedAmount);
     return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
   };
+
+  // Calcular totales para la página de resumen
+  const calculateTotals = () => {
+    let totalLabor = 0;
+    let totalMaterials = 0;
+    let totalCost = 0;
+    let totalInvoiced = 0;
+
+    reports.forEach(report => {
+      // Para proyectos por horas
+      if (report.labor) {
+        totalLabor += report.labor.totalLaborCost || 0;
+      }
+      
+      totalMaterials += report.totalMaterialsCost || 0;
+      
+      // El coste total puede venir directamente o calcularse
+      if (report.totalCost) {
+        totalCost += report.totalCost;
+      } else if (report.labor) {
+        // Si no existe totalCost pero sí labor, calculamos la suma
+        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        totalInvoiced += report.invoicedAmount;
+      }
+    });
+
+    return {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced
+    };
+  };
+
+  const totals = calculateTotals();
+  const isHourlyProject = project.type === "hourly";
 
   return (
     <Document>
@@ -262,6 +383,72 @@ const ReportPDFGenerator = ({ reports, projects }) => {
           </Page>
         );
       })}
+
+      {/* Nueva página de resumen de totales */}
+      <Page size="A4" style={styles.summaryPage}>
+        <Text style={styles.summaryTitle}>
+          Resumen de Totales - Proyecto {project.id}
+        </Text>
+        
+        <View style={styles.detailsTable}>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsColLeft}>Promotor: {project.client || "No disponible"}</Text>
+            <Text style={styles.detailsColRight}>Fecha: {currentDate}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsColLeft}>Proyecto: {project.address || "No disponible"}</Text>
+            <Text style={styles.detailsColRight}>Tipo: {isHourlyProject ? "Por horas" : "Presupuesto cerrado"}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsColLeft}>Semana: {firstReport?.weekNumber || 0}</Text>
+            <Text style={styles.detailsColRight}>Total partes: {reports.length}</Text>
+          </View>
+        </View>
+
+        {isHourlyProject ? (
+          <View style={styles.summaryTable}>
+            <View style={styles.summaryHeaderRow}>
+              <Text style={{...styles.summaryHeaderCol, width: "70%"}}>Concepto</Text>
+              <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryColLabel}>Total mano de obra</Text>
+              <Text style={styles.summaryColValue}>{formatCurrency(totals.totalLabor)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryColLabel}>Total materiales</Text>
+              <Text style={styles.summaryColValue}>{formatCurrency(totals.totalMaterials)}</Text>
+            </View>
+            <View style={styles.summaryTotalRow}>
+              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
+              <Text style={styles.summaryTotalValue}>{formatCurrency(totals.totalCost)}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.summaryTable}>
+            <View style={styles.summaryHeaderRow}>
+              <Text style={{...styles.summaryHeaderCol, width: "70%"}}>Concepto</Text>
+              <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryColLabel}>Importe presupuestado</Text>
+              <Text style={styles.summaryColValue}>{formatCurrency(project.budgetAmount || 0)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryColLabel}>Total facturado</Text>
+              <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced)}</Text>
+            </View>
+            <View style={styles.summaryTotalRow}>
+              <Text style={styles.summaryTotalLabel}>Importe restante</Text>
+              <Text style={styles.summaryTotalValue}>{formatCurrency((project.budgetAmount || 0) - totals.totalInvoiced)}</Text>
+            </View>
+          </View>
+        )}
+
+        <Text style={styles.summaryNote}>
+          Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado.
+        </Text>
+      </Page>
     </Document>
   );
 };
