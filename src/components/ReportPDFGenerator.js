@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet, Image, Link, Font } from "@react-pdf/renderer";
+import CompressedImage from "./CompressedImage";
 import { formatNumber, formatCurrency, formatFullDate } from "../utils/formatters";
 
 // Registrar las fuentes personalizadas
@@ -266,24 +267,31 @@ const ReportPDFGenerator = ({ reports, projects }) => {
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   const renderImage = (src) => {
-    try {
-      if (!src || typeof src !== "string" || !src.startsWith("http")) {
-        return (
-          <View style={styles.errorImage}>
-            <Text>Imagen no disponible</Text>
-          </View>
-        );
-      }
-      return <Image src={src} style={styles.image} />;
-    } catch (error) {
-      console.error("Error al cargar imagen en PDF:", error);
+  try {
+    if (!src || typeof src !== "string" || !src.startsWith("http")) {
       return (
         <View style={styles.errorImage}>
           <Text>Imagen no disponible</Text>
         </View>
       );
     }
-  };
+    // Usar el componente CompressedImage en lugar de Image directamente
+    return <CompressedImage 
+             src={src} 
+             style={styles.image} 
+             maxWidth={600} 
+             maxHeight={500} 
+             quality={0.5} // Puedes ajustar la calidad aquí (0.1 a 1)
+           />;
+  } catch (error) {
+    console.error("Error al cargar imagen en PDF:", error);
+    return (
+      <View style={styles.errorImage}>
+        <Text>Imagen no disponible</Text>
+      </View>
+    );
+  }
+};
 
   // Calcular importe facturado total para proyectos "fixed"
   const calculateInvoicedTotal = (projectId) => {

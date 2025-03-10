@@ -1,9 +1,7 @@
 import React, { useCallback } from "react";
-import { useStorage } from "../hooks/useStorage";
+import ImageUploader from "./ImageUploader"; // Importamos nuestro nuevo componente
 
 const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, reportDate }) => {
-  const { uploadFile, uploading, error: uploadError } = useStorage();
-
   const handleDescriptionChange = useCallback(
     (e) => {
       onWorkPerformedChange({ ...workPerformed, description: e.target.value });
@@ -11,29 +9,22 @@ const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, re
     [workPerformed, onWorkPerformedChange]
   );
 
-  const handleAddPhoto = useCallback(
-    async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const url = await uploadFile(file, "photos", `${projectId}_${reportDate}`);
-      if (url) {
+  // Manejador para las imágenes subidas o eliminadas
+  const handleImagesChange = useCallback(
+    ({ type, images, id }) => {
+      if (type === 'add' && images && images.length > 0) {
+        // Añadir nuevas imágenes
         onWorkPerformedChange({
           ...workPerformed,
-          photos: [...workPerformed.photos, { id: Date.now(), url }],
+          photos: [...(workPerformed.photos || []), ...images],
         });
-        e.target.value = null;
+      } else if (type === 'remove' && id) {
+        // Eliminar una imagen existente
+        onWorkPerformedChange({
+          ...workPerformed,
+          photos: (workPerformed.photos || []).filter((p) => p.id !== id),
+        });
       }
-    },
-    [workPerformed, onWorkPerformedChange, projectId, reportDate, uploadFile]
-  );
-
-  const handleRemovePhoto = useCallback(
-    (id) => {
-      onWorkPerformedChange({
-        ...workPerformed,
-        photos: workPerformed.photos.filter((p) => p.id !== id),
-      });
     },
     [workPerformed, onWorkPerformedChange]
   );
@@ -42,21 +33,20 @@ const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, re
     <div>
       <h3>Trabajos realizados</h3>
       <textarea
-        value={workPerformed.description}
+        value={workPerformed.description || ""}
         onChange={handleDescriptionChange}
         placeholder="Descripción de los trabajos realizados"
       />
-      <input type="file" accept="image/*" onChange={handleAddPhoto} disabled={uploading} />
-      {uploading && <p>Subiendo...</p>}
-      {uploadError && <p className="error-message">Error: {uploadError}</p>}
-      <div style={{ display: "flex", flexWrap: "wrap" }}>
-        {workPerformed.photos.map((photo) => (
-          <div key={photo.id} className="photo-container">
-            <img src={photo.url} alt="Trabajo" style={{ width: "100px" }} />
-            <button onClick={() => handleRemovePhoto(photo.id)}>Eliminar</button>
-          </div>
-        ))}
-      </div>
+      
+      {/* Reemplazamos el input file por nuestro ImageUploader */}
+      <ImageUploader
+        onImagesUploaded={handleImagesChange}
+        folder="photos"
+        prefix={`${projectId}_${reportDate}`}
+        maxFiles={10}
+        acceptedTypes="image/*"
+        existingImages={workPerformed.photos || []}
+      />
     </div>
   );
 };
