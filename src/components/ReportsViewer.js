@@ -269,7 +269,7 @@ const ReportsViewer = () => {
       <h2>Informes</h2>
 
       {/* Selector de Proyecto */}
-      <div>
+      <div className="filter-section">
         <label>Filtrar por Proyecto: </label>
         <select value={selectedProjectId} onChange={handleProjectChange}>
           <option value="">Todos los proyectos</option>
@@ -279,17 +279,17 @@ const ReportsViewer = () => {
             </option>
           ))}
         </select>
-      </div>
 
-      {/* Selectores de Fecha */}
-      <div className="date-range">
-        <div className="date-field">
-          <label>Fecha de inicio:</label>
-          <input type="date" name="startDate" value={dateRange.startDate} onChange={handleDateRangeChange} />
-        </div>
-        <div className="date-field">
-          <label>Fecha de fin:</label>
-          <input type="date" name="endDate" value={dateRange.endDate} onChange={handleDateRangeChange} />
+        {/* Selectores de Fecha */}
+        <div className="date-range">
+          <div className="date-field">
+            <label>Fecha de inicio:</label>
+            <input type="date" name="startDate" value={dateRange.startDate} onChange={handleDateRangeChange} />
+          </div>
+          <div className="date-field">
+            <label>Fecha de fin:</label>
+            <input type="date" name="endDate" value={dateRange.endDate} onChange={handleDateRangeChange} />
+          </div>
         </div>
       </div>
 
@@ -351,7 +351,7 @@ const ReportsViewer = () => {
         </PDFDownloadLink>
       )}
 
-      <h3>Partes en el rango seleccionado:</h3>
+      <h3 className="section-title">Partes en el rango seleccionado:</h3>
 
       {filteredReports.map((report) => {
         const project = projects.find((p) => p.id === report.projectId) || {};

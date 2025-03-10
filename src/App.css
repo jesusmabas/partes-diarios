@@ -1,11 +1,58 @@
-/* Importar fuente moderna */
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
+/* Declaración de fuentes personalizadas */
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  src: url('../public/fonts/Atkinson-Hyperlegible-Regular-102.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cormorant';
+  src: url('../public/fonts/Cormorant-Bold.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Quitar la importación anterior de Roboto */
+/* @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"); */
 
 .App {
-  font-family: "Roboto", sans-serif;
+  font-family: "Atkinson Hyperlegible", sans-serif;
   min-height: 100vh;
   background-color: #f5f7fa;
   padding: 20px 0;
+}
+
+/* Aplicar Cormorant a todos los encabezados con tamaños aumentados */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Cormorant", serif;
+}
+
+/* Tamaños específicos para los headings */
+h1 {
+  font-size: 2.5rem; /* 40px */
+}
+
+h2 {
+  font-size: 2.1rem; /* 33.6px */
+}
+
+h3 {
+  font-size: 1.8rem; /* 28.8px */
+}
+
+h4 {
+  font-size: 1.5rem; /* 24px */
+}
+
+h5 {
+  font-size: 1.25rem; /* 20px */
+}
+
+h6 {
+  font-size: 1.1rem; /* 17.6px */
 }
 
 .app-header {
@@ -74,6 +121,7 @@ textarea {
   border: 1px solid #ddd;
   border-radius: 5px;
   font-size: 14px;
+  font-family: "Atkinson Hyperlegible", sans-serif;
 }
 
 button {
@@ -85,6 +133,7 @@ button {
   cursor: pointer;
   transition: background-color 0.3s ease;
   font-weight: 500;
+  font-family: "Atkinson Hyperlegible", sans-serif;
 }
 
 button:disabled {
@@ -99,8 +148,8 @@ button:hover:not(:disabled) {
 h3 {
   margin-top: 30px;
   color: #2c3e50;
-  font-size: 20px;
   font-weight: 500;
+  /* El tamaño se controla ahora con los estilos generales de headings */
 }
 
 .error-message {
@@ -131,6 +180,26 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.filter-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #8D432D;
+}
+
+.filter-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.filter-section select {
+  margin-bottom: 20px;
 }
 
 .date-range {
@@ -275,6 +344,17 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+/* Nuevo estilo para títulos de sección */
+.section-title {
+  margin-top: 40px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #8D432D;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 /* Responsive Design */

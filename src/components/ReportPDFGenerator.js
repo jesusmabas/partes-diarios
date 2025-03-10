@@ -1,51 +1,114 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Image, Link, Font } from "@react-pdf/renderer";
 import { formatNumber, formatCurrency, formatFullDate } from "../utils/formatters";
 
+// Registrar las fuentes personalizadas
+Font.register({
+  family: 'AtkinsonHyperlegible',
+  fonts: [
+    { src: `${process.env.PUBLIC_URL}/fonts/Atkinson-Hyperlegible-Regular-102.ttf`, fontWeight: 'normal', fontStyle: 'normal' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Atkinson-Hyperlegible-Regular-102.ttf`, fontWeight: 'normal', fontStyle: 'italic' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Atkinson-Hyperlegible-Regular-102.ttf`, fontWeight: 'bold', fontStyle: 'normal' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Atkinson-Hyperlegible-Regular-102.ttf`, fontWeight: 'bold', fontStyle: 'italic' }
+  ]
+});
+
+Font.register({
+  family: 'Cormorant',
+  fonts: [
+    { src: `${process.env.PUBLIC_URL}/fonts/Cormorant-Bold.ttf`, fontWeight: 'normal', fontStyle: 'normal' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Cormorant-Bold.ttf`, fontWeight: 'normal', fontStyle: 'italic' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Cormorant-Bold.ttf`, fontWeight: 'bold', fontStyle: 'normal' },
+    { src: `${process.env.PUBLIC_URL}/fonts/Cormorant-Bold.ttf`, fontWeight: 'bold', fontStyle: 'italic' }
+  ]
+});
+
 const styles = StyleSheet.create({
-  page: { padding: 20, fontSize: 12, fontFamily: "Helvetica", flexDirection: "column", height: "100%" },
-  logoContainer: {
+  // Estilo optimizado para la página
+  page: { 
+    padding: 18, 
+    fontSize: 11, 
+    fontFamily: "AtkinsonHyperlegible", 
+    flexDirection: "column", 
+    height: "100%" 
+  },
+  // Portada con estructura optimizada
+  coverPage: {
+    padding: 20,
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    justifyContent: "space-between",
+    fontFamily: "AtkinsonHyperlegible"
+  },
+  logoSection: {
     flex: 1,
+    display: "flex",
     justifyContent: "center",
     alignItems: "center",
   },
-  logo: { width: 100, height: 36, marginBottom: 0, alignSelf: "center" },
+  logo: { 
+    width: 100, 
+    height: 36
+  },
   contentContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
     marginTop: "auto",
   },
-  title: { fontSize: 18, fontWeight: "bold", marginBottom: 30, textAlign: "center", fontFamily: "Times-Roman" },
-  detailsTable: { display: "table", width: "100%", marginBottom: 20 },
+  title: { 
+    fontSize: 20, 
+    fontWeight: "bold", 
+    marginBottom: 25, 
+    textAlign: "center", 
+    fontFamily: "Cormorant" 
+  },
+  detailsTable: { display: "table", width: "100%", marginBottom: 18 },
   detailsRow: { flexDirection: "row" },
-  detailsColLeft: { width: "50%", padding: 5 },
-  detailsColRight: { width: "50%", padding: 5, textAlign: "right" },
-  footer: { fontSize: 12, textAlign: "right", marginTop: 10 },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", marginTop: 15, marginBottom: 10, fontFamily: "Times-Roman" },
-  text: { fontSize: 11, marginBottom: 5 },
+  detailsColLeft: { width: "50%", padding: 4, fontSize: 11 },
+  detailsColRight: { width: "50%", padding: 4, textAlign: "right", fontSize: 11 },
+  footer: { fontSize: 11, textAlign: "right", marginTop: 10 },
+  
+  // Secciones con margen vertical optimizado
+  section: { marginBottom: 12 },
+  sectionTitle: { 
+    fontSize: 16, 
+    fontWeight: "bold", 
+    marginTop: 16, 
+    marginBottom: 8, 
+    fontFamily: "Cormorant" 
+  },
+  text: { fontSize: 11, marginBottom: 4 },
   link: { color: "#007bff", textDecoration: "underline", fontSize: 11 },
-  image: { height: 150, margin: 5, border: "1px solid #000" },
-  imageRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  table: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000" },
+  
+  // Imágenes que respetan el aspect ratio
+  image: { height: 150, objectFit: "contain", margin: 4, border: "1px solid #000" },
+  imageRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
+  
+  // Tablas mejor espaciadas
+  table: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000", marginTop: 8, marginBottom: 8 },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000" },
   tableHeader: { backgroundColor: "#f0f0f0", fontWeight: "bold", fontSize: 11 },
-  tableCol: { width: "25%", borderRightWidth: 1, borderRightColor: "#000", padding: 5, fontSize: 11 },
-  tableColWide: { width: "50%", borderRightWidth: 1, borderRightColor: "#000", padding: 5, fontSize: 11 },
-  tableColLast: { width: "25%", padding: 5, fontSize: 11 },
-  costSummary: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000", marginTop: 20 },
+  tableCol: { width: "25%", borderRightWidth: 1, borderRightColor: "#000", padding: 4, fontSize: 11 },
+  tableColWide: { width: "50%", borderRightWidth: 1, borderRightColor: "#000", padding: 4, fontSize: 11 },
+  tableColLast: { width: "25%", padding: 4, fontSize: 11 },
+  
+  // Resumen de costos
+  costSummary: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000", marginTop: 12, marginBottom: 12 },
   costRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000" },
-  costColLabel: { width: "70%", padding: 5, fontWeight: "bold", fontSize: 11 },
-  costColValue: { width: "30%", padding: 5, textAlign: "right", fontSize: 11 },
-  errorImage: { width: 200, height: 150, backgroundColor: "#f0f0f0", textAlign: "center", padding: 10, fontSize: 10 },
-  //Nuevos estilos (CORREGIDOS)
+  costColLabel: { width: "70%", padding: 4, fontWeight: "bold", fontSize: 11 },
+  costColValue: { width: "30%", padding: 4, textAlign: "right", fontSize: 11 },
+  
+  // Mensajes de error de imagen
+  errorImage: { width: 180, height: 150, backgroundColor: "#f0f0f0", textAlign: "center", padding: 5, fontSize: 10 },
+  
+  // Tabla de presupuesto
   budgetTable: {
     display: "table",
-    width: "auto", // O "100%" si quieres que ocupe todo el ancho
+    width: "100%",
     borderStyle: "solid",
     borderWidth: 1,
     borderColor: "#000",
-    marginTop: 10,
+    marginTop: 8,
+    marginBottom: 8
   },
   budgetRow: {
     flexDirection: "row",
@@ -53,40 +116,39 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000",
   },
   budgetTableHeader: {
-    // Estilo para las celdas de encabezado
     backgroundColor: "#f0f0f0",
     fontWeight: "bold",
     fontSize: 11,
-    padding: 5,
-    textAlign: "center", // Centrado para los encabezados
-    width: "50%", // Importante: Usar porcentajes
+    padding: 4,
+    textAlign: "center",
+    width: "50%",
   },
   budgetTableCell: {
-    // Estilo para las celdas de datos
-    padding: 5,
-    fontSize: 11,
-     width: "50%",  // Importante: Usar porcentajes
-     textAlign: "left",
-  },
-  budgetTableCellAmount: { //Clase específica para los importes
-    padding: 5,
+    padding: 4,
     fontSize: 11,
     width: "50%",
-    textAlign: "right", //Alineados a la derecha
+    textAlign: "left",
   },
-  // Nuevos estilos para la página de resumen
+  budgetTableCellAmount: {
+    padding: 4,
+    fontSize: 11,
+    width: "50%",
+    textAlign: "right",
+  },
+  
+  // Página de resumen
   summaryPage: { 
     padding: 20, 
-    fontSize: 12, 
-    fontFamily: "Helvetica", 
+    fontSize: 11, 
+    fontFamily: "AtkinsonHyperlegible", 
     flexDirection: "column" 
   },
   summaryTitle: { 
-    fontSize: 18, 
+    fontSize: 20, 
     fontWeight: "bold", 
-    marginBottom: 30, 
+    marginBottom: 20, 
     textAlign: "center", 
-    fontFamily: "Times-Roman" 
+    fontFamily: "Cormorant" 
   },
   summaryTable: { 
     display: "table", 
@@ -94,7 +156,7 @@ const styles = StyleSheet.create({
     borderStyle: "solid", 
     borderWidth: 1, 
     borderColor: "#000", 
-    marginBottom: 30 
+    marginBottom: 20 
   },
   summaryRow: { 
     flexDirection: "row", 
@@ -106,16 +168,16 @@ const styles = StyleSheet.create({
   },
   summaryColLabel: { 
     width: "70%", 
-    padding: 8, 
-    fontSize: 12, 
+    padding: 6, 
+    fontSize: 11, 
     borderRightWidth: 1, 
     borderRightColor: "#000", 
     backgroundColor: "#f9f9f9" 
   },
   summaryColValue: { 
     width: "30%", 
-    padding: 8, 
-    fontSize: 12, 
+    padding: 6, 
+    fontSize: 11, 
     textAlign: "right" 
   },
   summaryHeaderRow: { 
@@ -125,8 +187,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0" 
   },
   summaryHeaderCol: { 
-    padding: 8, 
-    fontSize: 12, 
+    padding: 6, 
+    fontSize: 11, 
     fontWeight: "bold", 
     textAlign: "center" 
   },
@@ -136,26 +198,66 @@ const styles = StyleSheet.create({
   },
   summaryTotalLabel: { 
     width: "70%", 
-    padding: 8, 
-    fontSize: 12, 
+    padding: 6, 
+    fontSize: 11, 
     fontWeight: "bold", 
     borderRightWidth: 1, 
     borderRightColor: "#000" 
   },
   summaryTotalValue: { 
     width: "30%", 
-    padding: 8, 
-    fontSize: 12, 
+    padding: 6, 
+    fontSize: 11, 
     fontWeight: "bold", 
     textAlign: "right" 
   },
   summaryNote: {
     fontSize: 10,
-    fontStyle: "italic",
-    marginTop: 20,
+    fontStyle: "normal",
+    marginTop: 15,
     textAlign: "center",
     color: "#666"
-  }
+  },
+  
+  // Estilos para el nuevo diseño de 2 columnas
+  mainHeader: {
+    marginBottom: 10,
+  },
+  twoColumns: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+  leftColumn: {
+    width: "48%",
+    marginRight: "2%",
+  },
+  rightColumn: {
+    width: "48%",
+    marginLeft: "2%",
+  },
+  fullWidth: {
+    width: "100%",
+    marginBottom: 12,
+  },
+  subSectionTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 6,
+    marginBottom: 4,
+    fontFamily: "Cormorant"
+  },
+  materialsList: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  materialItem: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  workDescription: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
 });
 
 const ReportPDFGenerator = ({ reports, projects }) => {
@@ -232,9 +334,9 @@ const ReportPDFGenerator = ({ reports, projects }) => {
   return (
     <Document>
       {/* Portada */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.logoContainer}>
-          <Image src="/assets/logo.png" style={styles.logo} />
+      <Page size="A4" style={styles.coverPage}>
+        <View style={styles.logoSection}>
+          <Image src={`${process.env.PUBLIC_URL}/assets/logo.png`} style={styles.logo} />
         </View>
         <View style={styles.contentContainer}>
           <Text style={styles.title}>
@@ -243,7 +345,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
           <View style={styles.detailsTable}>
             <View style={styles.detailsRow}>
               <Text style={styles.detailsColLeft}>Promotor: {project.client || "No disponible"}</Text>
-              <Text style={styles.detailsColRight}>Redactado por: Jesús Moral Abisolo</Text>
+              <Text style={styles.detailsColRight}>Redactado por: Jesús Moral Abásolo</Text>
             </View>
             <View style={styles.detailsRow}>
               <Text style={styles.detailsColLeft}>NIF/NIE: {project.nifNie || "No disponible"}</Text>
@@ -258,7 +360,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         </View>
       </Page>
 
-      {/* Páginas por parte diario */}
+      {/* Páginas por parte diario - NUEVO LAYOUT */}
       {reports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
@@ -268,102 +370,113 @@ const ReportPDFGenerator = ({ reports, projects }) => {
 
         return (
           <Page key={`report-${index}`} size="A4" style={styles.page}>
-            <Text style={styles.sectionTitle}>Fecha: {formatFullDate(report.reportDate)}</Text>
-            <Text>Semana: {report.weekNumber}</Text>
-            <Text>Proyecto: {report.projectId || "No disponible"}</Text>
-            <Text>Cliente: {project.client || "No disponible"}</Text>
-            <Text>Dirección: {project.address || "No disponible"}</Text>
-
-            {isHourly ? (
-              <>
-                <Text style={styles.sectionTitle}>Mano de obra</Text>
-                <View style={styles.table}>
-                  <View style={[styles.tableRow, styles.tableHeader]}>
-                    <Text style={styles.tableColWide}> </Text>
-                    <Text style={styles.tableCol}>Oficial</Text>
-                    <Text style={styles.tableCol}>Peón</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableColWide}>Hora de entrada</Text>
-                    <Text style={styles.tableCol}>{report.labor?.officialEntry || "--:--"}</Text>
-                    <Text style={styles.tableCol}>{report.labor?.workerEntry || "--:--"}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableColWide}>Hora de salida</Text>
-                    <Text style={styles.tableCol}>{report.labor?.officialExit || "--:--"}</Text>
-                    <Text style={styles.tableCol}>{report.labor?.workerExit || "--:--"}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableColWide}>Horas trabajadas</Text>
-                    <Text style={styles.tableCol}>{formatNumber(report.labor?.officialHours || 0)}</Text>
-                    <Text style={styles.tableCol}>{formatNumber(report.labor?.workerHours || 0)}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableColWide}>Coste</Text>
-                    <Text style={styles.tableCol}>{formatCurrency(report.labor?.officialCost || 0)}</Text>
-                    <Text style={styles.tableCol}>{formatCurrency(report.labor?.workerCost || 0)}</Text>
-                  </View>
-                </View>
-                <Text style={styles.text}>Coste total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</Text>
-
-                <Text style={styles.sectionTitle}>Materiales</Text>
-                <Text style={styles.text}>Descripción materiales comprados:</Text>
-                {report.materials?.map((m, i) => (
-                  <Text key={`material-desc-${i}`} style={styles.text}>
-                    - {m.description || "Sin descripción"}
-                  </Text>
-                ))}
-                <Text style={styles.text}>Albaranes/facturas:</Text>
-                {report.materials?.map((m, i) => (
-                  <Text key={`material-invoice-${i}`} style={styles.text}>
-                    Factura {i + 1} (
-                    <Link src={m.invoiceUrl} style={styles.link}>
-                      Descargar PDF
-                    </Link>
-                    )
-                  </Text>
-                ))}
-                <Text style={styles.text}>Coste total de materiales: {formatCurrency(report.totalMaterialsCost || 0)}</Text>
-              </>
-            ) : (
-              // --- MODIFICACIONES PARA PROYECTOS "FIXED" ---
-              <>
-               <View style={styles.budgetTable}>
-                    <View style={styles.budgetRow}>
-                        <Text style={styles.budgetTableHeader}>Concepto</Text>
-                        <Text style={styles.budgetTableHeader}>Importe</Text>
-                    </View>
-                    <View style={styles.budgetRow}>
-                        <Text style={styles.budgetTableCell}>Importe presupuestado</Text>
-                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetAmount)}</Text> {/* Clase amount */}
-                    </View>
-
-                    <View style={styles.budgetRow}>
-                         <Text style={styles.budgetTableCell}>Importe facturado</Text>
-                         <Text style={styles.budgetTableCellAmount}>{formatCurrency(invoicedTotal)}</Text>  {/* Clase amount */}
-                    </View>
-                    <View style={styles.budgetRow}>
-                         <Text style={styles.budgetTableCell}>Importe restante</Text>
-                         <Text style={styles.budgetTableCellAmount}>{formatCurrency(remainingToInvoice)}</Text>  {/* Clase amount */}
-                    </View>
-                </View>
-              </>
-              // --- FIN MODIFICACIONES ---
-            )}
-
-            <Text style={styles.sectionTitle}>Trabajos realizados</Text>
-            <Text style={styles.text}>{report.workPerformed?.description || "Sin descripción"}</Text>
-
-            <Text style={styles.sectionTitle}>Fotografías</Text>
-            <View style={styles.imageRow}>
-              {report.workPerformed?.photos?.map((photo, i) => (
-                <View key={`photo-${i}`}>{renderImage(photo.url)}</View>
-              ))}
+            {/* Cabecera del parte */}
+            <View style={styles.mainHeader}>
+              <Text style={styles.sectionTitle}>Fecha: {formatFullDate(report.reportDate)}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                <Text style={{ fontSize: 11, marginRight: 20 }}>Semana: {report.weekNumber}</Text>
+                <Text style={{ fontSize: 11, marginRight: 20 }}>Proyecto: {report.projectId || "No disponible"}</Text>
+                <Text style={{ fontSize: 11 }}>Cliente: {project.client || "No disponible"}</Text>
+              </View>
+              <Text style={{ fontSize: 11 }}>Dirección: {project.address || "No disponible"}</Text>
             </View>
 
+            {/* Distribución en dos columnas para MO y Materiales */}
+            <View style={styles.twoColumns}>
+              {/* Columna izquierda - Mano de obra */}
+              <View style={styles.leftColumn}>
+                {isHourly ? (
+                  <>
+                    <Text style={styles.subSectionTitle}>Mano de obra</Text>
+                    <View style={styles.table}>
+                      <View style={[styles.tableRow, styles.tableHeader]}>
+                        <Text style={styles.tableColWide}> </Text>
+                        <Text style={styles.tableCol}>Oficial</Text>
+                        <Text style={styles.tableCol}>Peón</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableColWide}>Hora de entrada</Text>
+                        <Text style={styles.tableCol}>{report.labor?.officialEntry || "--:--"}</Text>
+                        <Text style={styles.tableCol}>{report.labor?.workerEntry || "--:--"}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableColWide}>Hora de salida</Text>
+                        <Text style={styles.tableCol}>{report.labor?.officialExit || "--:--"}</Text>
+                        <Text style={styles.tableCol}>{report.labor?.workerExit || "--:--"}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableColWide}>Horas trabajadas</Text>
+                        <Text style={styles.tableCol}>{formatNumber(report.labor?.officialHours || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatNumber(report.labor?.workerHours || 0)}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableColWide}>Coste</Text>
+                        <Text style={styles.tableCol}>{formatCurrency(report.labor?.officialCost || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatCurrency(report.labor?.workerCost || 0)}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 11, marginTop: 4 }}>Coste total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.subSectionTitle}>Presupuesto cerrado</Text>
+                    <View style={styles.budgetTable}>
+                      <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableHeader}>Concepto</Text>
+                        <Text style={styles.budgetTableHeader}>Importe</Text>
+                      </View>
+                      <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableCell}>Importe presupuestado</Text>
+                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetAmount)}</Text>
+                      </View>
+                      <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableCell}>Importe facturado</Text>
+                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(invoicedTotal)}</Text>
+                      </View>
+                      <View style={styles.budgetRow}>
+                        <Text style={styles.budgetTableCell}>Importe restante</Text>
+                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(remainingToInvoice)}</Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Columna derecha - Materiales */}
+              <View style={styles.rightColumn}>
+                <Text style={styles.subSectionTitle}>Materiales</Text>
+                <View style={styles.materialsList}>
+                  {report.materials && report.materials.length > 0 ? (
+                    <>
+                      <Text style={{ fontSize: 11, marginBottom: 4 }}>Descripción materiales comprados:</Text>
+                      {report.materials.map((m, i) => (
+                        <Text key={`material-desc-${i}`} style={styles.materialItem}>
+                          - {m.description || "Sin descripción"}
+                        </Text>
+                      ))}
+                      <Text style={{ fontSize: 11, marginTop: 6, marginBottom: 2 }}>Albaranes/facturas:</Text>
+                      {report.materials.map((m, i) => (
+                        <Text key={`material-invoice-${i}`} style={styles.materialItem}>
+                          Factura {i + 1} (
+                          <Link src={m.invoiceUrl} style={styles.link}>
+                            Descargar PDF
+                          </Link>
+                          )
+                        </Text>
+                      ))}
+                    </>
+                  ) : (
+                    <Text style={{ fontSize: 11 }}>No hay materiales registrados.</Text>
+                  )}
+                  <Text style={{ fontSize: 11, marginTop: 6 }}>Coste total de materiales: {formatCurrency(report.totalMaterialsCost || 0)}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Resumen de costes (ancho completo) */}
             {isHourly && (
-              <>
-                <Text style={styles.sectionTitle}>Coste total MO + materiales</Text>
+              <View style={styles.fullWidth}>
+                <Text style={styles.subSectionTitle}>Coste total MO + materiales</Text>
                 <View style={styles.costSummary}>
                   <View style={styles.costRow}>
                     <Text style={styles.costColLabel}>Coste total mano de obra</Text>
@@ -378,13 +491,34 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                     <Text style={styles.costColValue}>{formatCurrency(report.totalCost || 0)}</Text>
                   </View>
                 </View>
-              </>
+              </View>
             )}
+
+            {/* Trabajos realizados (ancho completo) */}
+            <View style={styles.fullWidth}>
+              <Text style={styles.subSectionTitle}>Trabajos realizados</Text>
+              <View style={styles.workDescription}>
+                <Text style={{ fontSize: 11 }}>{report.workPerformed?.description || "Sin descripción"}</Text>
+              </View>
+            </View>
+
+            {/* Fotografías (ancho completo) */}
+            <View style={styles.fullWidth}>
+              <Text style={styles.subSectionTitle}>Fotografías</Text>
+              <View style={styles.imageRow}>
+                {report.workPerformed?.photos?.map((photo, i) => (
+                  <View key={`photo-${i}`}>{renderImage(photo.url)}</View>
+                ))}
+                {(!report.workPerformed?.photos || report.workPerformed.photos.length === 0) && (
+                  <Text style={{ fontSize: 11 }}>No hay fotografías disponibles</Text>
+                )}
+              </View>
+            </View>
           </Page>
         );
       })}
 
-      {/* Nueva página de resumen de totales */}
+      {/* Página de resumen de totales */}
       <Page size="A4" style={styles.summaryPage}>
         <Text style={styles.summaryTitle}>
           Resumen de Totales - Proyecto {project.id}
