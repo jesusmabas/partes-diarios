@@ -17,6 +17,10 @@ const Dashboard = () => {
   const [selectedProject, setSelectedProject] = useState("");
   const [chartType, setChartType] = useState("costes"); // costes, lineas, area, facturacion
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({ 
+    startDate: "", 
+    endDate: new Date().toISOString().split("T")[0] // Fecha actual como fecha final por defecto
+  });
 
   // Establecer el primer proyecto como seleccionado por defecto cuando se cargan
   useEffect(() => {
@@ -36,8 +40,22 @@ const Dashboard = () => {
     let totalHours = 0;
     let totalCosts = 0;
     let totalMaterials = 0;
+    
+    // Filtrar informes por fecha si están establecidas
+    let filteredReports = [...allReports];
+    
+    if (dateRange.startDate && dateRange.endDate) {
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
+      
+      filteredReports = filteredReports.filter(report => {
+        const reportDate = new Date(report.reportDate);
+        return reportDate >= startDate && reportDate <= endDate;
+      });
+    }
 
-    allReports.forEach(report => {
+    filteredReports.forEach(report => {
       totalReports++;
       
       // Sumar horas (solo si existen)
@@ -63,16 +81,28 @@ const Dashboard = () => {
       totalCosts,
       totalMaterials
     };
-  }, [allReports, projects]);
+  }, [allReports, projects, dateRange]);
 
   // Preparar datos para gráficos por proyecto
   const chartData = useMemo(() => {
     if (!selectedProject) return [];
 
-    // Filtrar reportes del proyecto seleccionado
-    const projectReports = allReports.filter(
+    // Filtrar reportes del proyecto seleccionado y por fecha
+    let projectReports = allReports.filter(
       report => report.projectId === selectedProject
     );
+    
+    // Aplicar filtro de fechas si están definidas
+    if (dateRange.startDate && dateRange.endDate) {
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
+      
+      projectReports = projectReports.filter(report => {
+        const reportDate = new Date(report.reportDate);
+        return reportDate >= startDate && reportDate <= endDate;
+      });
+    }
 
     // Agrupar por fecha (semana o mes)
     const grouped = projectReports.reduce((acc, report) => {
@@ -107,12 +137,26 @@ const Dashboard = () => {
       const bNum = parseInt(b.period.split(' ')[1].split('/')[0]);
       return aNum - bNum;
     });
-  }, [allReports, selectedProject]);
+  }, [allReports, selectedProject, dateRange]);
 
   // Preparar datos para el gráfico de proyectos
   const projectCostData = useMemo(() => {
+    // Aplicar filtro de fecha a todos los reportes
+    let filteredReports = [...allReports];
+    
+    if (dateRange.startDate && dateRange.endDate) {
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
+      
+      filteredReports = filteredReports.filter(report => {
+        const reportDate = new Date(report.reportDate);
+        return reportDate >= startDate && reportDate <= endDate;
+      });
+    }
+    
     return projects.map(project => {
-      const projectReports = allReports.filter(
+      const projectReports = filteredReports.filter(
         report => report.projectId === project.id
       );
       
@@ -132,10 +176,14 @@ const Dashboard = () => {
         value: totalCost
       };
     }).sort((a, b) => b.value - a.value).slice(0, 5); // Top 5 proyectos
-  }, [allReports, projects]);
+  }, [allReports, projects, dateRange]);
 
   const handleProjectChange = (e) => {
     setSelectedProject(e.target.value);
+  };
+  
+  const handleDateRangeChange = (e) => {
+    setDateRange((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   if (loading) {
@@ -179,20 +227,50 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {/* Selector de proyecto */}
+      {/* Filtros - Proyecto y Fechas */}
       <div className="dashboard-filter">
-        <h3>Costos por proyecto</h3>
-        <select 
-          value={selectedProject} 
-          onChange={handleProjectChange}
-          className="project-selector"
-        >
-          {projects.map(project => (
-            <option key={project.id} value={project.id}>
-              {project.id} - {project.client}
-            </option>
-          ))}
-        </select>
+        <h3>Filtros</h3>
+        
+        {/* Selector de proyecto */}
+        <div className="filter-group">
+          <label htmlFor="project-select">Proyecto:</label>
+          <select 
+            id="project-select"
+            value={selectedProject} 
+            onChange={handleProjectChange}
+            className="project-selector"
+          >
+            {projects.map(project => (
+              <option key={project.id} value={project.id}>
+                {project.id} - {project.client}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Filtro de fechas */}
+        <div className="date-range">
+          <div className="date-field">
+            <label htmlFor="start-date">Fecha inicial:</label>
+            <input 
+              id="start-date"
+              type="date" 
+              name="startDate" 
+              value={dateRange.startDate} 
+              onChange={handleDateRangeChange}
+            />
+          </div>
+          <div className="date-field">
+            <label htmlFor="end-date">Fecha final:</label>
+            <input 
+              id="end-date"
+              type="date" 
+              name="endDate" 
+              value={dateRange.endDate} 
+              onChange={handleDateRangeChange}
+            />
+          </div>
+        </div>
       </div>
       
       {/* Gráfico de barras del proyecto seleccionado */}
