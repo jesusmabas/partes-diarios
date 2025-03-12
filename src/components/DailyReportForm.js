@@ -8,7 +8,7 @@ import WorkPerformedForm from "./WorkPerformedForm";
 import FixedReportForm from "./FixedReportForm";
 import { useLabor } from "../hooks/useLabor";
 import { useProjects } from "../hooks/useProjects";
-import { formatCurrency, getWeekNumber } from "../utils/formatters";
+import { formatNumber, getWeekNumber } from "../utils/formatters";
 
 const DailyReportForm = ({ userId }) => { // Recibe userId
   const [selectedProject, setSelectedProject] = useState(null);

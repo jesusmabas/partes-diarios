@@ -17,41 +17,13 @@ const ImageUploader = ({
   const [uploadErrors, setUploadErrors] = useState([]);
   const fileInputRef = useRef(null);
   
+  // eslint-disable-next-line no-unused-vars
   const { uploadFile, uploading, error: uploadError } = useStorage();
 
   // Prevenir comportamiento por defecto para eventos de arrastrar y soltar
   const preventDefaults = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-  }, []);
-
-  // Manejar entrada en la zona de drop
-  const handleDragEnter = useCallback((e) => {
-    preventDefaults(e);
-    setIsDragging(true);
-  }, [preventDefaults]);
-
-  // Manejar salida de la zona de drop
-  const handleDragLeave = useCallback((e) => {
-    preventDefaults(e);
-    setIsDragging(false);
-  }, [preventDefaults]);
-
-  // Manejar el evento de soltar archivos
-  const handleDrop = useCallback((e) => {
-    preventDefaults(e);
-    setIsDragging(false);
-    
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    handleFiles(droppedFiles);
-  }, [preventDefaults]);
-
-  // Manejar selección de archivos desde el input
-  const handleFileSelect = useCallback((e) => {
-    const selectedFiles = Array.from(e.target.files);
-    handleFiles(selectedFiles);
-    // Limpiar el input para permitir seleccionar el mismo archivo de nuevo
-    e.target.value = null;
   }, []);
 
   // Procesar los archivos seleccionados
@@ -81,6 +53,35 @@ const ImageUploader = ({
       reader.readAsDataURL(file);
     });
   }, [files, maxFiles]);
+
+  // Manejar entrada en la zona de drop
+  const handleDragEnter = useCallback((e) => {
+    preventDefaults(e);
+    setIsDragging(true);
+  }, [preventDefaults]);
+
+  // Manejar salida de la zona de drop
+  const handleDragLeave = useCallback((e) => {
+    preventDefaults(e);
+    setIsDragging(false);
+  }, [preventDefaults]);
+
+  // Manejar el evento de soltar archivos
+  const handleDrop = useCallback((e) => {
+    preventDefaults(e);
+    setIsDragging(false);
+    
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    handleFiles(droppedFiles);
+  }, [preventDefaults, handleFiles]);
+
+  // Manejar selección de archivos desde el input
+  const handleFileSelect = useCallback((e) => {
+    const selectedFiles = Array.from(e.target.files);
+    handleFiles(selectedFiles);
+    // Limpiar el input para permitir seleccionar el mismo archivo de nuevo
+    e.target.value = null;
+  }, [handleFiles]);
 
   // Eliminar una imagen de la lista
   const handleRemoveFile = useCallback((id) => {
