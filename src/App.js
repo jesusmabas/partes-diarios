@@ -1,18 +1,18 @@
-// src/App.js
+// src/App.js (Modificado para integrar el Dashboard)
 import React, { useState, useEffect } from "react";
 import DailyReportForm from "./components/DailyReportForm";
 import ReportsViewer from "./components/ReportsViewer";
 import ProjectsViewer from "./components/ProjectsViewer";
-import DashboardView from "./components/DashboardView";
+import Dashboard from "./components/Dashboard"; // Importar el nuevo componente
 import LoginForm from "./components/LoginForm";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from './firebase';
 import "./App.css";
-import "./components/dashboard/Dashboard.css";
+import "./components/Dashboard.css"; // Importar los estilos del Dashboard
 
 function App() {
-  const [activeTab, setActiveTab] = useState("partes");
-  const [user, setUser] = useState(null); // Estado para el usuario
+  const [activeTab, setActiveTab] = useState("dashboard"); // Cambiado a "dashboard" como tab inicial
+  const [user, setUser] = useState(null);
 
   const auth = getAuth(app);
 
@@ -30,6 +30,13 @@ function App() {
       </header>
       <div className="app-container">
         <nav className="tab-buttons">
+          {/* Añadido el botón de Dashboard */}
+          <button
+            className={activeTab === "dashboard" ? "active" : ""}
+            onClick={() => setActiveTab("dashboard")}
+          >
+            Dashboard
+          </button>
           <button
             className={activeTab === "partes" ? "active" : ""}
             onClick={() => setActiveTab("partes")}
@@ -48,22 +55,16 @@ function App() {
           >
             Proyectos
           </button>
-          <button
-            className={activeTab === "dashboard" ? "active" : ""}
-            onClick={() => setActiveTab("dashboard")}
-          >
-            Dashboard
-          </button>
         </nav>
         <main>
           {user ? (
             <>
-              {activeTab === "partes" ? (
+              {activeTab === "dashboard" ? (
+                <Dashboard />
+              ) : activeTab === "partes" ? (
                 <DailyReportForm userId={user.uid} />
               ) : activeTab === "informes" ? (
                 <ReportsViewer />
-              ) : activeTab === "dashboard" ? (
-                <DashboardView />
               ) : (
                 <ProjectsViewer />
               )}
