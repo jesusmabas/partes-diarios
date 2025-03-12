@@ -266,32 +266,56 @@ const ReportPDFGenerator = ({ reports, projects }) => {
   const project = projects.find((p) => p.id === firstReport?.projectId) || {};
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // Función para generar el título con soporte para múltiples semanas
+  const renderTitle = () => {
+    if (!reports || reports.length === 0) {
+      return "Acta de obra";
+    }
+    
+    // Obtener todos los números de semana únicos
+    const uniqueWeeks = [...new Set(reports.map(report => report.weekNumber))].sort((a, b) => a - b);
+    const year = new Date(firstReport.reportDate).getFullYear();
+    
+    // Si hay una sola semana
+    if (uniqueWeeks.length === 1) {
+      return `Acta semanal de obra - Semana ${uniqueWeeks[0]} - Año ${year}`;
+    }
+    
+    // Si son semanas consecutivas
+    if (uniqueWeeks.length === uniqueWeeks[uniqueWeeks.length - 1] - uniqueWeeks[0] + 1) {
+      return `Acta semanal de obra - Semanas ${uniqueWeeks[0]} a ${uniqueWeeks[uniqueWeeks.length - 1]} - Año ${year}`;
+    }
+    
+    // Si son semanas no consecutivas
+    return `Acta semanal de obra - Semanas ${uniqueWeeks.join(', ')} - Año ${year}`;
+  };
+
   const renderImage = (src) => {
-  try {
-    if (!src || typeof src !== "string" || !src.startsWith("http")) {
+    try {
+      if (!src || typeof src !== "string" || !src.startsWith("http")) {
+        return (
+          <View style={styles.errorImage}>
+            <Text>Imagen no disponible</Text>
+          </View>
+        );
+      }
+      // Usar el componente CompressedImage en lugar de Image directamente
+      return <CompressedImage 
+              src={src} 
+              style={styles.image} 
+              maxWidth={600} 
+              maxHeight={500} 
+              quality={0.5} // Puedes ajustar la calidad aquí (0.1 a 1)
+            />;
+    } catch (error) {
+      console.error("Error al cargar imagen en PDF:", error);
       return (
         <View style={styles.errorImage}>
           <Text>Imagen no disponible</Text>
         </View>
       );
     }
-    // Usar el componente CompressedImage en lugar de Image directamente
-    return <CompressedImage 
-             src={src} 
-             style={styles.image} 
-             maxWidth={600} 
-             maxHeight={500} 
-             quality={0.5} // Puedes ajustar la calidad aquí (0.1 a 1)
-           />;
-  } catch (error) {
-    console.error("Error al cargar imagen en PDF:", error);
-    return (
-      <View style={styles.errorImage}>
-        <Text>Imagen no disponible</Text>
-      </View>
-    );
-  }
-};
+  };
 
   // Calcular importe facturado total para proyectos "fixed"
   const calculateInvoicedTotal = (projectId) => {
@@ -348,7 +372,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         </View>
         <View style={styles.contentContainer}>
           <Text style={styles.title}>
-            Acta semanal de obra - Semana {firstReport?.weekNumber || 0} - Año {new Date(firstReport?.reportDate).getFullYear() || 2025}
+            {renderTitle()}
           </Text>
           <View style={styles.detailsTable}>
             <View style={styles.detailsRow}>
@@ -542,7 +566,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
             <Text style={styles.detailsColRight}>Tipo: {isHourlyProject ? "Por horas" : "Presupuesto cerrado"}</Text>
           </View>
           <View style={styles.detailsRow}>
-            <Text style={styles.detailsColLeft}>Semana: {firstReport?.weekNumber || 0}</Text>
+            <Text style={styles.detailsColLeft}>Período: {renderTitle().replace('Acta semanal de obra - ', '')}</Text>
             <Text style={styles.detailsColRight}>Total partes: {reports.length}</Text>
           </View>
         </View>
