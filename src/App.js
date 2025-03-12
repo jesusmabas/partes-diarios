@@ -11,7 +11,7 @@ import "./App.css";
 import "./components/Dashboard.css"; // Importar los estilos del Dashboard
 
 function App() {
-  const [activeTab, setActiveTab] = useState("dashboard"); // Cambiado a "dashboard" como tab inicial
+  const [activeTab, setActiveTab] = useState("partes"); // Cambiado a "partes" como tab inicial
   const [user, setUser] = useState(null);
 
   const auth = getAuth(app);
