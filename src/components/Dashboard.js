@@ -485,6 +485,44 @@ const Dashboard = () => {
               </LineChart>
             </ResponsiveContainer>
           )}
+          
+          {chartType === "costes" && (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="period" 
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis 
+                  tickFormatter={(value) => `€${value}`}
+                  width={60}
+                />
+                <Tooltip 
+                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
+                />
+                <Legend />
+                <Bar 
+                  dataKey="costs" 
+                  name="Costes Totales" 
+                  fill="#8D432D" 
+                />
+                <Bar 
+                  dataKey="labor" 
+                  name="Mano de Obra" 
+                  fill="#2c3e50" 
+                />
+                <Bar 
+                  dataKey="materials" 
+                  name="Materiales" 
+                  fill="#7A3624" 
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
       
