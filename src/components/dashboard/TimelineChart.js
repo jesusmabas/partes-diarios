@@ -1,4 +1,4 @@
-// src/components/dashboard/TimelineChart.js - Optimizado
+// src/components/dashboard/TimelineChart.js
 import React, { useState, useCallback } from "react";
 import {
   LineChart,
@@ -20,7 +20,7 @@ import {
  */
 const TimelineChart = ({ data }) => {
   const [chartType, setChartType] = useState("line"); // 'line' o 'area'
-  const [metricType, setMetricType] = useState("cost"); // 'cost' o 'invoiced'
+  const [metricType, setMetricType] = useState("income"); // Cambiado a 'income' por defecto
 
   // Manejadores para cambiar tipo de gráfico y métrica
   const handleChartTypeChange = useCallback((type) => {
@@ -67,6 +67,22 @@ const TimelineChart = ({ data }) => {
     return null;
   };
 
+  // Determinación del dominio del eje Y para mejor visualización
+  const getYAxisDomain = () => {
+    if (metricType === "income") {
+      const maxIncome = Math.max(...data.map(item => item.totalIncome || 0));
+      return [0, maxIncome * 1.1]; // Añadir 10% para mejor visualización
+    } else if (metricType === "cost") {
+      const maxCost = Math.max(
+        ...data.map(item => Math.max(item.totalCost || 0, item.laborCost + item.materialsCost))
+      );
+      return [0, maxCost * 1.1];
+    } else {
+      const maxInvoiced = Math.max(...data.map(item => item.invoicedAmount || 0));
+      return [0, maxInvoiced * 1.1];
+    }
+  };
+
   return (
     <div className="chart-wrapper">
       <div className="chart-controls">
@@ -86,16 +102,16 @@ const TimelineChart = ({ data }) => {
         </div>
         <div className="metric-type-buttons">
           <button
+            className={metricType === "income" ? "active" : ""}
+            onClick={() => handleMetricTypeChange("income")}
+          >
+            Ingresos
+          </button>
+          <button
             className={metricType === "cost" ? "active" : ""}
             onClick={() => handleMetricTypeChange("cost")}
           >
             Costes
-          </button>
-          <button
-            className={metricType === "invoiced" ? "active" : ""}
-            onClick={() => handleMetricTypeChange("invoiced")}
-          >
-            Facturación
           </button>
         </div>
       </div>
@@ -111,11 +127,25 @@ const TimelineChart = ({ data }) => {
             <YAxis
               tickFormatter={(value) => `€${value}`}
               width={70}
+              domain={getYAxisDomain()}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
-            {metricType === "cost" ? (
+            {metricType === "income" ? (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="totalIncome"
+                  name="Ingresos Totales"
+                  stroke="#27AE60"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={true}
+                />
+              </>
+            ) : metricType === "cost" ? (
               <>
                 <Line
                   type="monotone"
@@ -125,6 +155,7 @@ const TimelineChart = ({ data }) => {
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
+                  connectNulls={true}
                 />
                 <Line
                   type="monotone"
@@ -133,6 +164,7 @@ const TimelineChart = ({ data }) => {
                   stroke="#2C3E50"
                   strokeWidth={2}
                   dot={{ r: 4 }}
+                  connectNulls={true}
                 />
                 <Line
                   type="monotone"
@@ -141,6 +173,7 @@ const TimelineChart = ({ data }) => {
                   stroke="#3498DB"
                   strokeWidth={2}
                   dot={{ r: 4 }}
+                  connectNulls={true}
                 />
               </>
             ) : (
@@ -152,6 +185,7 @@ const TimelineChart = ({ data }) => {
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
+                connectNulls={true}
               />
             )}
           </LineChart>
@@ -165,11 +199,21 @@ const TimelineChart = ({ data }) => {
             <YAxis
               tickFormatter={(value) => `€${value}`}
               width={70}
+              domain={getYAxisDomain()}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
-            {metricType === "cost" ? (
+            {metricType === "income" ? (
+              <Area
+                type="monotone"
+                dataKey="totalIncome"
+                name="Ingresos Totales"
+                stroke="#27AE60"
+                fill="#27AE60"
+                connectNulls={true}
+              />
+            ) : metricType === "cost" ? (
               <>
                 <Area
                   type="monotone"
@@ -178,6 +222,7 @@ const TimelineChart = ({ data }) => {
                   stackId="1"
                   stroke="#2C3E50"
                   fill="#2C3E50"
+                  connectNulls={true}
                 />
                 <Area
                   type="monotone"
@@ -186,6 +231,7 @@ const TimelineChart = ({ data }) => {
                   stackId="1"
                   stroke="#3498DB"
                   fill="#3498DB"
+                  connectNulls={true}
                 />
               </>
             ) : (
@@ -195,6 +241,7 @@ const TimelineChart = ({ data }) => {
                 name="Facturado"
                 stroke="#27AE60"
                 fill="#27AE60"
+                connectNulls={true}
               />
             )}
           </AreaChart>

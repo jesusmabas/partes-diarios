@@ -8,7 +8,6 @@ import LoginForm from "./components/LoginForm";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from './firebase';
 import "./App.css";
-import "./components/Dashboard.css"; // Importar los estilos del Dashboard
 
 
 function App() {
