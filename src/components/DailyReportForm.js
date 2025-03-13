@@ -8,7 +8,7 @@ import WorkPerformedForm from "./WorkPerformedForm";
 import FixedReportForm from "./FixedReportForm";
 import { useLabor } from "../hooks/useLabor";
 import { useProjects } from "../hooks/useProjects";
-import { formatNumber, getWeekNumber } from "../utils/formatters";
+import { getWeekNumber } from "../utils/formatters";
 
 const DailyReportForm = ({ userId }) => { // Recibe userId
   const [selectedProject, setSelectedProject] = useState(null);
@@ -48,65 +48,64 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
     }));
   }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedProject || !report.reportDate) {
-            setErrorMessage("Por favor, completa todos los campos requeridos.");
-            setSuccessMessage("");
-            return;
-        }
-
-        setIsSubmitting(true);
-        setErrorMessage("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProject || !report.reportDate) {
+        setErrorMessage("Por favor, completa todos los campos requeridos.");
         setSuccessMessage("");
+        return;
+    }
 
-        // Inicializa reportData con valores comunes:
-        let reportData = {
-            projectId: selectedProject.id,
-            weekNumber: getWeekNumber(report.reportDate),
-            reportDate: report.reportDate,
-            workPerformed: report.workPerformed,
-            userId: userId, // Usa el userId que recibiste como prop
-        };
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-        if (selectedProject.type === "hourly") {
-            // CALCULO DEL TOTAL *ANTES* DE AÑADIRLO AL OBJETO
-            const totalMaterialsCost = report.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
-
-            reportData = {
-                ...reportData, // Incluye los datos comunes
-                labor: { ...report.labor, ...laborData },
-                materials: report.materials,
-                totalMaterialsCost: totalMaterialsCost, // Usa la variable calculada
-                totalCost: laborData.totalLaborCost + totalMaterialsCost,
-            };
-
-
-        } else if (selectedProject.type === "fixed") {
-            reportData = { //MUY IMPORTANTE, ASIGNAR A REPORTDATA
-                ...reportData,
-                invoicedAmount: report.workPerformed.invoicedAmount || 0, // Añadido aquí y se guarda en la BD
-            };
-        }
-
-        try {
-            await addDoc(collection(db, "dailyReports"), reportData);
-            setSuccessMessage("Parte guardado correctamente!");
-            setReport({
-                reportDate: new Date().toISOString().split("T")[0],
-                labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
-                materials: [],
-                workPerformed: { description: "", photos: [], invoicedAmount: 0 }, // Resetear invoicedAmount
-            });
-            setSelectedProject(null);
-
-        } catch (err) {
-            setErrorMessage(`Error al guardar: ${err.message}`);
-        } finally {
-            setIsSubmitting(false);
-        }
+    // Inicializa reportData con valores comunes:
+    let reportData = {
+        projectId: selectedProject.id,
+        weekNumber: getWeekNumber(report.reportDate),
+        reportDate: report.reportDate,
+        workPerformed: report.workPerformed,
+        userId: userId, // Usa el userId que recibiste como prop
     };
 
+    if (selectedProject.type === "hourly") {
+        // CALCULO DEL TOTAL *ANTES* DE AÑADIRLO AL OBJETO
+        const totalMaterialsCost = report.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+
+        reportData = {
+            ...reportData, // Incluye los datos comunes
+            labor: { ...report.labor, ...laborData },
+            materials: report.materials,
+            totalMaterialsCost: totalMaterialsCost, // Usa la variable calculada
+            totalCost: laborData.totalLaborCost + totalMaterialsCost,
+        };
+
+
+    } else if (selectedProject.type === "fixed") {
+        reportData = { //MUY IMPORTANTE, ASIGNAR A REPORTDATA
+            ...reportData,
+            invoicedAmount: report.workPerformed.invoicedAmount || 0, // Añadido aquí y se guarda en la BD
+        };
+    }
+
+    try {
+        await addDoc(collection(db, "dailyReports"), reportData);
+        setSuccessMessage("Parte guardado correctamente!");
+        setReport({
+            reportDate: new Date().toISOString().split("T")[0],
+            labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
+            materials: [],
+            workPerformed: { description: "", photos: [], invoicedAmount: 0 }, // Resetear invoicedAmount
+        });
+        setSelectedProject(null);
+
+    } catch (err) {
+        setErrorMessage(`Error al guardar: ${err.message}`);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
 
   const project = projects.find((p) => p.id === selectedProject?.id);
 
@@ -136,6 +135,12 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
                 projectId={selectedProject.id}
                 reportDate={report.reportDate}
               />
+              <WorkPerformedForm
+                workPerformed={report.workPerformed}
+                onWorkPerformedChange={handleWorkPerformedChange}
+                projectId={selectedProject.id}
+                reportDate={report.reportDate}
+              />
             </>
           ) : (
             <FixedReportForm
@@ -147,12 +152,6 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
               invoicedAmount={report.workPerformed.invoicedAmount}
             />
           )}
-          <WorkPerformedForm
-            workPerformed={report.workPerformed}
-            onWorkPerformedChange={handleWorkPerformedChange}
-            projectId={selectedProject.id}
-            reportDate={report.reportDate}
-          />
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar parte"}
           </button>

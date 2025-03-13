@@ -10,6 +10,7 @@ import { app } from './firebase';
 import "./App.css";
 import "./components/Dashboard.css"; // Importar los estilos del Dashboard
 
+
 function App() {
   const [activeTab, setActiveTab] = useState("partes"); // Cambiado a "partes" como tab inicial
   const [user, setUser] = useState(null);
@@ -30,32 +31,31 @@ function App() {
       </header>
       <div className="app-container">
         <nav className="tab-buttons">
-          {/* Añadido el botón de Dashboard */}
-          <button
-            className={activeTab === "dashboard" ? "active" : ""}
-            onClick={() => setActiveTab("dashboard")}
-          >
-            Dashboard
-          </button>
-          <button
-            className={activeTab === "partes" ? "active" : ""}
-            onClick={() => setActiveTab("partes")}
-          >
-            Partes
-          </button>
-          <button
-            className={activeTab === "informes" ? "active" : ""}
-            onClick={() => setActiveTab("informes")}
-          >
-            Informes
-          </button>
-          <button
-            className={activeTab === "proyectos" ? "active" : ""}
-            onClick={() => setActiveTab("proyectos")}
-          >
-            Proyectos
-          </button>
-        </nav>
+  <button
+    className={activeTab === "partes" ? "active" : ""}
+    onClick={() => setActiveTab("partes")}
+  >
+    Partes
+  </button>
+  <button
+    className={activeTab === "informes" ? "active" : ""}
+    onClick={() => setActiveTab("informes")}
+  >
+    Informes
+  </button>
+  <button
+    className={activeTab === "proyectos" ? "active" : ""}
+    onClick={() => setActiveTab("proyectos")}
+  >
+    Proyectos
+  </button>
+  <button
+    className={activeTab === "dashboard" ? "active" : ""}
+    onClick={() => setActiveTab("dashboard")}
+  >
+    Dashboard
+  </button>
+</nav>
         <main>
           {user ? (
             <>
