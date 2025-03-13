@@ -1,16 +1,30 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useProjects } from "../hooks/useProjects";
 import { formatCurrency } from "../utils/formatters";
-import { useDailyReports } from "../hooks/useDailyReports";
+import useReportActions from "../hooks/reports/useReportActions";
 
 const ProjectsViewer = () => {
   const { projects, loading, error, addProject, updateProject, deleteProject } = useProjects();
-  const { allReports } = useDailyReports(); // Para calcular costes
+  const [reports, setReports] = useState([]);
+  const { fetchReports, loading: reportsLoading, error: reportsError } = useReportActions();
   const [newProject, setNewProject] = useState({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editedProject, setEditedProject] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Cargar reportes al iniciar el componente
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        const fetchedReports = await fetchReports();
+        setReports(fetchedReports || []);
+      } catch (err) {
+        console.error("Error al cargar reportes:", err);
+      }
+    };
+    loadReports();
+  }, [fetchReports]);
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -29,28 +43,28 @@ const ProjectsViewer = () => {
     }
   }, [editingProjectId]);
 
- const handleAddProject = async (e) => {
-  e.preventDefault();
-  if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
-    setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
-    setSuccessMessage("");
-    return;
-  }
+  const handleAddProject = async (e) => {
+    e.preventDefault();
+    if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
+      setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
+      setSuccessMessage("");
+      return;
+    }
 
-  try {
-    // Crear una copia del proyecto con el ID recortado
-    const trimmedProject = {
-      ...newProject,
-      id: newProject.id.trim()
-    };
-    await addProject(trimmedProject);  // Usamos la función del hook
-    setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
-    setSuccessMessage("Proyecto añadido correctamente!");
-    setErrorMessage("");
-  } catch (err) {
-    setErrorMessage(`Error al añadir proyecto: ${err.message}`);
-  }
-};
+    try {
+      // Crear una copia del proyecto con el ID recortado
+      const trimmedProject = {
+        ...newProject,
+        id: newProject.id.trim()
+      };
+      await addProject(trimmedProject);  // Usamos la función del hook
+      setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
+      setSuccessMessage("Proyecto añadido correctamente!");
+      setErrorMessage("");
+    } catch (err) {
+      setErrorMessage(`Error al añadir proyecto: ${err.message}`);
+    }
+  };
 
   const startEditing = (project) => {
     setEditingProjectId(project.id);
@@ -79,7 +93,7 @@ const ProjectsViewer = () => {
     console.log("handleDelete llamado con projectId:", projectId);
     if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
       console.log("Eliminación cancelada por el usuario");
-      return; // <---  IMPORTANTE: Detener la ejecución si el usuario cancela.
+      return;
     }
 
     try {
@@ -96,7 +110,7 @@ const ProjectsViewer = () => {
 
   const calculateProjectCosts = (projectId, projectType) => {
     if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0 };
-    const projectReports = allReports.filter((report) => report.projectId === projectId);
+    const projectReports = reports.filter((report) => report.projectId === projectId);
     let laborCost = 0;
     let materialsCost = 0;
 
@@ -113,12 +127,15 @@ const ProjectsViewer = () => {
   };
 
   const calculateInvoicedTotal = (projectId) => {
-    const projectReports = allReports.filter((report) => report.projectId === projectId && report.invoicedAmount);
+    const projectReports = reports.filter((report) => report.projectId === projectId && report.invoicedAmount);
     return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
   };
 
-  if (loading) return <p>Cargando proyectos...</p>;
-  if (error) return <p className="error-message">Error: {error}</p>;
+  // Mostrar indicador de carga si estamos esperando proyectos o reportes
+  if (loading || (reportsLoading && reports.length === 0)) return <p>Cargando proyectos...</p>;
+  
+  // Mostrar error si hay alguno
+  if (error || reportsError) return <p className="error-message">Error: {error || reportsError}</p>;
 
   return (
     <div className="projects-viewer">
@@ -183,12 +200,12 @@ const ProjectsViewer = () => {
         ) : (
           <input
             type="number"
-              name="budgetAmount"
-              placeholder="Importe presupuestado (€)"
-              value={newProject.budgetAmount}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
+            name="budgetAmount"
+            placeholder="Importe presupuestado (€)"
+            value={newProject.budgetAmount}
+            onChange={handleInputChange}
+            min="0"
+            step="0.01"
           />
         )}
         <button type="submit" disabled={loading}>
@@ -296,11 +313,11 @@ const ProjectsViewer = () => {
                   )}
                   <button onClick={() => startEditing(project)}>Editar</button>
                   <button
-  onClick={() => handleDelete(project.id)}
-  style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
->
-  Eliminar
-</button>
+                    onClick={() => handleDelete(project.id)}
+                    style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
+                  >
+                    Eliminar
+                  </button>
                 </>
               )}
             </div>

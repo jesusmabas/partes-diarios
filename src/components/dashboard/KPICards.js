@@ -1,67 +1,75 @@
-// src/components/dashboard/KPICards.js
+// src/components/dashboard/KPICards.js - Optimizado
 import React from "react";
-import { formatCurrency, formatNumber } from "../../utils/formatters";
 
+/**
+ * Componente que muestra tarjetas de indicadores clave de rendimiento (KPIs)
+ * @param {Object} props - Propiedades del componente
+ * @param {Object} props.kpis - Objeto con los valores de los KPIs
+ */
 const KPICards = ({ kpis }) => {
   const {
-    totalProjects,
-    totalReports,
-    totalLabor,
-    totalMaterials,
-    totalInvoiced,
-    totalHours
+    totalProjects = 0,
+    totalReports = 0,
+    totalLabor = 0,
+    totalMaterials = 0,
+    totalInvoiced = 0,
+    totalHours = 0
   } = kpis;
 
+  // Función auxiliar para formatear valores numéricos
+  const formatNumber = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      maximumFractionDigits: 1
+    }).format(value);
+  };
+
+  // Función auxiliar para formatear moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
   return (
-    <div className="kpi-container">
-      <div className="kpi-card">
-        <div className="kpi-icon">📊</div>
-        <div className="kpi-content">
-          <h3>{totalProjects}</h3>
-          <p>Proyectos</p>
-        </div>
+    <div className="metrics-container">
+      <div className="metric-card">
+        <div className="metric-icon">📊</div>
+        <div className="metric-value">{totalProjects}</div>
+        <div className="metric-label">Proyectos</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">📝</div>
-        <div className="kpi-content">
-          <h3>{totalReports}</h3>
-          <p>Partes</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">📝</div>
+        <div className="metric-value">{totalReports}</div>
+        <div className="metric-label">Partes</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">⏱️</div>
-        <div className="kpi-content">
-          <h3>{formatNumber(totalHours)}</h3>
-          <p>Horas</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">⏱️</div>
+        <div className="metric-value">{formatNumber(totalHours)}</div>
+        <div className="metric-label">Horas</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">💰</div>
-        <div className="kpi-content">
-          <h3>{formatCurrency(totalLabor + totalMaterials)}</h3>
-          <p>Costes</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">💰</div>
+        <div className="metric-value">{formatCurrency(totalLabor + totalMaterials)}</div>
+        <div className="metric-label">Costes</div>
       </div>
       
       {totalInvoiced > 0 && (
-        <div className="kpi-card">
-          <div className="kpi-icon">💼</div>
-          <div className="kpi-content">
-            <h3>{formatCurrency(totalInvoiced)}</h3>
-            <p>Facturado</p>
-          </div>
+        <div className="metric-card">
+          <div className="metric-icon">💼</div>
+          <div className="metric-value">{formatCurrency(totalInvoiced)}</div>
+          <div className="metric-label">Facturado</div>
         </div>
       )}
       
-      <div className="kpi-card">
-        <div className="kpi-icon">🔧</div>
-        <div className="kpi-content">
-          <h3>{formatCurrency(totalMaterials)}</h3>
-          <p>Materiales</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">🔧</div>
+        <div className="metric-value">{formatCurrency(totalMaterials)}</div>
+        <div className="metric-label">Materiales</div>
       </div>
     </div>
   );

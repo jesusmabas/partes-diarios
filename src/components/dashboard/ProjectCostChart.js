@@ -1,5 +1,5 @@
-// src/components/dashboard/ProjectCostChart.js
-import React, { useState } from "react";
+// src/components/dashboard/ProjectCostChart.js - Optimizado
+import React, { useState, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -10,10 +10,19 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
-import { formatCurrency } from "../../utils/formatters";
 
+/**
+ * Componente que muestra gráficos de barras de costes por proyecto
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.data - Datos de los proyectos para mostrar
+ */
 const ProjectCostChart = ({ data }) => {
   const [chartType, setChartType] = useState("cost"); // 'cost' o 'breakdown'
+
+  // Manejador para cambiar el tipo de gráfico
+  const handleChartTypeChange = useCallback((type) => {
+    setChartType(type);
+  }, []);
 
   // Si no hay datos, mostrar mensaje
   if (!data || data.length === 0) {
@@ -25,10 +34,19 @@ const ProjectCostChart = ({ data }) => {
   }
 
   // Ordenar proyectos por costo total (descendente)
-  const sortedData = [...data].sort((a, b) => b.totalCost - a.totalCost);
-  
-  // Limitar a los 10 proyectos más costosos para mejor visualización
-  const topProjects = sortedData.slice(0, 10);
+  const sortedData = [...data]
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .slice(0, 10); // Limitar a los 10 proyectos más costosos
+
+  // Función para formatear valores de moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
@@ -57,13 +75,13 @@ const ProjectCostChart = ({ data }) => {
       <div className="chart-controls">
         <button
           className={chartType === "cost" ? "active" : ""}
-          onClick={() => setChartType("cost")}
+          onClick={() => handleChartTypeChange("cost")}
         >
           Coste Total
         </button>
         <button
           className={chartType === "breakdown" ? "active" : ""}
-          onClick={() => setChartType("breakdown")}
+          onClick={() => handleChartTypeChange("breakdown")}
         >
           Desglose
         </button>
@@ -71,7 +89,7 @@ const ProjectCostChart = ({ data }) => {
 
       <ResponsiveContainer width="100%" height={400}>
         <BarChart
-          data={topProjects}
+          data={sortedData}
           margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
         >
           <CartesianGrid strokeDasharray="3 3" />

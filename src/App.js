@@ -1,7 +1,7 @@
 // src/App.js (Modificado para integrar el Dashboard)
 import React, { useState, useEffect } from "react";
 import DailyReportForm from "./components/DailyReportForm";
-import ReportsViewer from "./components/ReportsViewer";
+import ReportsViewer from "./components/reports/ReportsViewer"; // <-- Ruta actualizada
 import ProjectsViewer from "./components/ProjectsViewer";
 import Dashboard from "./components/Dashboard"; // Importar el nuevo componente
 import LoginForm from "./components/LoginForm";

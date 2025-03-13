@@ -61,6 +61,8 @@ README.md
 src/App.css
 src/App.js
 src/App.test.js
+src/components/common/ConfirmModal.js
+src/components/common/PDFButton.js
 src/components/CompressedImage.js
 src/components/DailyReportForm.js
 src/components/Dashboard.css
@@ -69,23 +71,31 @@ src/components/dashboard/Dashboard.css
 src/components/dashboard/KPICards.js
 src/components/dashboard/ProjectCostChart.js
 src/components/dashboard/TimelineChart.js
-src/components/DashboardView.js
-src/components/DebugFirebase.js
 src/components/FixedReportForm.js
 src/components/ImageUploader.css
 src/components/ImageUploader.js
 src/components/LaborForm.js
 src/components/LoginForm.js
 src/components/MaterialsForm.js
-src/components/PDFExportExample.js
 src/components/ProjectForm.js
 src/components/ProjectSelector.js
 src/components/ProjectsViewer.js
 src/components/ReportPDFGenerator.js
-src/components/ReportsViewer.js
+src/components/reports/MaterialsEditor.js
+src/components/reports/PhotosEditor.js
+src/components/reports/ReportDeleteModal.js
+src/components/reports/ReportEditForm.js
+src/components/reports/ReportFilters.js
+src/components/reports/ReportItem.js
+src/components/reports/Reports.css
+src/components/reports/ReportsList.js
+src/components/reports/ReportSummary.js
+src/components/reports/ReportsViewer.js
 src/components/WorkPerformedForm.js
 src/firebase.js
-src/hooks/useDailyReports.js
+src/hooks/reports/useReportActions.js
+src/hooks/reports/useReportFilters.js
+src/hooks/reports/useReportSummary.js
 src/hooks/useFormValidation.js
 src/hooks/useLabor.js
 src/hooks/useProjects.js
@@ -95,10 +105,8 @@ src/hooks/useStorage.js
 src/index.css
 src/index.js
 src/logo.svg
-src/ReportPDF.js
 src/reportWebVitals.js
 src/setupTests.js
-src/storageService.js
 src/utils/formatters.js
 src/utils/PdfDownload.js
 src/utils/validationSchemas.js
@@ -621,6 +629,7 @@ File: package.json
   "dependencies": {
     "@react-pdf/renderer": "^4.2.2",
     "@tanstack/react-query": "^5.67.3",
+    "buffer": "^6.0.3",
     "file-saver": "^2.0.5",
     "firebase": "^11.4.0",
     "html2canvas": "^1.4.1",
@@ -1256,7 +1265,7 @@ File: src/App.js
 // src/App.js (Modificado para integrar el Dashboard)
 import React, { useState, useEffect } from "react";
 import DailyReportForm from "./components/DailyReportForm";
-import ReportsViewer from "./components/ReportsViewer";
+import ReportsViewer from "./components/reports/ReportsViewer"; // <-- Ruta actualizada
 import ProjectsViewer from "./components/ProjectsViewer";
 import Dashboard from "./components/Dashboard"; // Importar el nuevo componente
 import LoginForm from "./components/LoginForm";
@@ -1264,7 +1273,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from './firebase';
 import "./App.css";
 import "./components/Dashboard.css"; // Importar los estilos del Dashboard
-import DebugFirebase from './components/DebugFirebase';
 
 
 function App() {
@@ -1347,6 +1355,149 @@ test('renders learn react link', () => {
   const linkElement = screen.getByText(/learn react/i);
   expect(linkElement).toBeInTheDocument();
 });
+
+================
+File: src/components/common/ConfirmModal.js
+================
+import React from "react";
+import PropTypes from "prop-types";
+
+/**
+ * Componente modal genérico para confirmaciones
+ * @param {Object} props - Propiedades del componente
+ * @param {string} props.title - Título del modal
+ * @param {string} props.message - Mensaje de confirmación
+ * @param {string} props.confirmText - Texto del botón de confirmación
+ * @param {string} props.cancelText - Texto del botón de cancelación
+ * @param {Function} props.onConfirm - Función a ejecutar al confirmar
+ * @param {Function} props.onCancel - Función a ejecutar al cancelar
+ * @param {string} props.confirmButtonClass - Clase CSS para el botón de confirmación
+ * @param {boolean} props.isDangerous - Si es una acción peligrosa (cambia el estilo)
+ */
+const ConfirmModal = ({ 
+  title = "Confirmar acción",
+  message = "¿Estás seguro de que quieres realizar esta acción?", 
+  confirmText = "Confirmar", 
+  cancelText = "Cancelar",
+  onConfirm,
+  onCancel,
+  confirmButtonClass = "",
+  isDangerous = false
+}) => {
+  const handleConfirm = () => {
+    if (typeof onConfirm === 'function') {
+      onConfirm();
+    }
+  };
+
+  const handleCancel = () => {
+    if (typeof onCancel === 'function') {
+      onCancel();
+    }
+  };
+
+  // Prevenir que clics en el modal se propaguen al overlay
+  const handleModalClick = (e) => {
+    e.stopPropagation();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={handleCancel}>
+      <div className="modal" onClick={handleModalClick}>
+        <h3>{title}</h3>
+        <p>{message}</p>
+        
+        {isDangerous && (
+          <p className="warning">Esta acción no se puede deshacer.</p>
+        )}
+        
+        <div className="modal-actions">
+          <button 
+            onClick={handleConfirm} 
+            className={`confirm-button ${isDangerous ? 'dangerous' : ''} ${confirmButtonClass}`}
+          >
+            {confirmText}
+          </button>
+          <button 
+            onClick={handleCancel} 
+            className="cancel-button"
+          >
+            {cancelText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ConfirmModal.propTypes = {
+  title: PropTypes.string,
+  message: PropTypes.string,
+  confirmText: PropTypes.string,
+  cancelText: PropTypes.string,
+  onConfirm: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  confirmButtonClass: PropTypes.string,
+  isDangerous: PropTypes.bool
+};
+
+export default React.memo(ConfirmModal);
+
+================
+File: src/components/common/PDFButton.js
+================
+// src/components/common/PDFButton.js
+import React from "react";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import ReportPDFGenerator from "../ReportPDFGenerator";
+
+const PDFButton = ({ 
+  reports, 
+  projects, 
+  selectedProjectId, 
+  dateRange,
+  disabled 
+}) => {
+  if (disabled) {
+    return (
+      <p className="pdf-disabled-message">
+        Para generar un PDF, selecciona un proyecto y asegúrate de que haya reportes disponibles.
+      </p>
+    );
+  }
+
+  return (
+    <div className="pdf-button-container">
+      <PDFDownloadLink
+        document={
+          <ReportPDFGenerator 
+            reports={reports.map(r => ({...r}))} 
+            projects={projects.map(p => ({...p}))} 
+          />
+        }
+        fileName={`informe_${selectedProjectId || 'todos'}_${dateRange.startDate || 'inicio'}_${dateRange.endDate || 'fin'}.pdf`}
+      >
+        {({ blob, url, loading, error }) => {
+          if (error) {
+            console.error("Error en PDFDownloadLink:", error);
+            return (
+              <button className="pdf-button error-button">
+                Error al generar PDF
+              </button>
+            );
+          }
+          return (
+            <button className="pdf-button">
+              {loading ? "Preparando PDF..." : "Descargar Informe en PDF"}
+            </button>
+          );
+        }}
+      </PDFDownloadLink>
+    </div>
+  );
+};
+
+export default React.memo(PDFButton);
 
 ================
 File: src/components/CompressedImage.js
@@ -1442,7 +1593,7 @@ import WorkPerformedForm from "./WorkPerformedForm";
 import FixedReportForm from "./FixedReportForm";
 import { useLabor } from "../hooks/useLabor";
 import { useProjects } from "../hooks/useProjects";
-import { formatNumber, getWeekNumber } from "../utils/formatters";
+import { getWeekNumber } from "../utils/formatters";
 
 const DailyReportForm = ({ userId }) => { // Recibe userId
   const [selectedProject, setSelectedProject] = useState(null);
@@ -1482,65 +1633,64 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
     }));
   }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedProject || !report.reportDate) {
-            setErrorMessage("Por favor, completa todos los campos requeridos.");
-            setSuccessMessage("");
-            return;
-        }
-
-        setIsSubmitting(true);
-        setErrorMessage("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProject || !report.reportDate) {
+        setErrorMessage("Por favor, completa todos los campos requeridos.");
         setSuccessMessage("");
+        return;
+    }
 
-        // Inicializa reportData con valores comunes:
-        let reportData = {
-            projectId: selectedProject.id,
-            weekNumber: getWeekNumber(report.reportDate),
-            reportDate: report.reportDate,
-            workPerformed: report.workPerformed,
-            userId: userId, // Usa el userId que recibiste como prop
-        };
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-        if (selectedProject.type === "hourly") {
-            // CALCULO DEL TOTAL *ANTES* DE AÑADIRLO AL OBJETO
-            const totalMaterialsCost = report.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
-
-            reportData = {
-                ...reportData, // Incluye los datos comunes
-                labor: { ...report.labor, ...laborData },
-                materials: report.materials,
-                totalMaterialsCost: totalMaterialsCost, // Usa la variable calculada
-                totalCost: laborData.totalLaborCost + totalMaterialsCost,
-            };
-
-
-        } else if (selectedProject.type === "fixed") {
-            reportData = { //MUY IMPORTANTE, ASIGNAR A REPORTDATA
-                ...reportData,
-                invoicedAmount: report.workPerformed.invoicedAmount || 0, // Añadido aquí y se guarda en la BD
-            };
-        }
-
-        try {
-            await addDoc(collection(db, "dailyReports"), reportData);
-            setSuccessMessage("Parte guardado correctamente!");
-            setReport({
-                reportDate: new Date().toISOString().split("T")[0],
-                labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
-                materials: [],
-                workPerformed: { description: "", photos: [], invoicedAmount: 0 }, // Resetear invoicedAmount
-            });
-            setSelectedProject(null);
-
-        } catch (err) {
-            setErrorMessage(`Error al guardar: ${err.message}`);
-        } finally {
-            setIsSubmitting(false);
-        }
+    // Inicializa reportData con valores comunes:
+    let reportData = {
+        projectId: selectedProject.id,
+        weekNumber: getWeekNumber(report.reportDate),
+        reportDate: report.reportDate,
+        workPerformed: report.workPerformed,
+        userId: userId, // Usa el userId que recibiste como prop
     };
 
+    if (selectedProject.type === "hourly") {
+        // CALCULO DEL TOTAL *ANTES* DE AÑADIRLO AL OBJETO
+        const totalMaterialsCost = report.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+
+        reportData = {
+            ...reportData, // Incluye los datos comunes
+            labor: { ...report.labor, ...laborData },
+            materials: report.materials,
+            totalMaterialsCost: totalMaterialsCost, // Usa la variable calculada
+            totalCost: laborData.totalLaborCost + totalMaterialsCost,
+        };
+
+
+    } else if (selectedProject.type === "fixed") {
+        reportData = { //MUY IMPORTANTE, ASIGNAR A REPORTDATA
+            ...reportData,
+            invoicedAmount: report.workPerformed.invoicedAmount || 0, // Añadido aquí y se guarda en la BD
+        };
+    }
+
+    try {
+        await addDoc(collection(db, "dailyReports"), reportData);
+        setSuccessMessage("Parte guardado correctamente!");
+        setReport({
+            reportDate: new Date().toISOString().split("T")[0],
+            labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
+            materials: [],
+            workPerformed: { description: "", photos: [], invoicedAmount: 0 }, // Resetear invoicedAmount
+        });
+        setSelectedProject(null);
+
+    } catch (err) {
+        setErrorMessage(`Error al guardar: ${err.message}`);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
 
   const project = projects.find((p) => p.id === selectedProject?.id);
 
@@ -1570,6 +1720,12 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
                 projectId={selectedProject.id}
                 reportDate={report.reportDate}
               />
+              <WorkPerformedForm
+                workPerformed={report.workPerformed}
+                onWorkPerformedChange={handleWorkPerformedChange}
+                projectId={selectedProject.id}
+                reportDate={report.reportDate}
+              />
             </>
           ) : (
             <FixedReportForm
@@ -1581,12 +1737,6 @@ const DailyReportForm = ({ userId }) => { // Recibe userId
               invoicedAmount={report.workPerformed.invoicedAmount}
             />
           )}
-          <WorkPerformedForm
-            workPerformed={report.workPerformed}
-            onWorkPerformedChange={handleWorkPerformedChange}
-            projectId={selectedProject.id}
-            reportDate={report.reportDate}
-          />
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar parte"}
           </button>
@@ -1875,234 +2025,277 @@ File: src/components/Dashboard.css
 ================
 File: src/components/Dashboard.js
 ================
-// src/components/Dashboard.js
-import React, { useState, useEffect, useMemo } from "react";
-import { useDailyReports } from "../hooks/useDailyReports";
+// src/components/Dashboard.js - Versión refactorizada
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useProjects } from "../hooks/useProjects";
-import { formatCurrency, formatNumber } from "../utils/formatters";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area
-} from "recharts";
+import useReportActions from "../hooks/reports/useReportActions";
+import useReportFilters from "../hooks/reports/useReportFilters";
+import useReportSummary from "../hooks/reports/useReportSummary";
+
+// Importar componentes modulares
+import KPICards from "./dashboard/KPICards";
+import ProjectCostChart from "./dashboard/ProjectCostChart";
+import TimelineChart from "./dashboard/TimelineChart";
+
+// Estilos
+import "./Dashboard.css";
+import "./dashboard/Dashboard.css";
 
 /**
- * Dashboard optimizado para móviles que muestra métricas y gráficos de proyectos
+ * Dashboard principal de la aplicación
+ * Muestra métricas clave, gráficos y resúmenes de proyectos/reportes
  */
 const Dashboard = () => {
-  const { allReports } = useDailyReports();
-  const { projects } = useProjects();
+  // Estados locales
+  const [reports, setReports] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState("");
-  const [chartType, setChartType] = useState("costes"); // costes, lineas, area, facturacion
-  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ 
     startDate: "", 
     endDate: new Date().toISOString().split("T")[0] // Fecha actual como fecha final por defecto
   });
+  const [activeView, setActiveView] = useState("costes"); // Estado para controlar la vista activa
 
-  // Establecer el primer proyecto como seleccionado por defecto cuando se cargan
+  // Hooks de datos
+  const { projects } = useProjects();
+  const { fetchReports, error: actionError } = useReportActions();
+  
+  // Hook de filtros
+  const { 
+    updateFilters, 
+    filters: _filters, 
+    filterReports 
+  } = useReportFilters({
+    projectId: selectedProject,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate
+  });
+
+  // Cargar reportes al iniciar
+  useEffect(() => {
+    const loadReports = async () => {
+      setIsLoading(true);
+      try {
+        const allReports = await fetchReports();
+        setReports(allReports || []);
+      } catch (err) {
+        console.error("Error al cargar reportes:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadReports();
+  }, [fetchReports]);
+
+  // Establecer proyecto por defecto cuando se cargan los datos
   useEffect(() => {
     if (projects.length > 0 && !selectedProject) {
       setSelectedProject(projects[0]?.id || "");
     }
-    if (projects.length > 0 && allReports.length > 0) {
-      setLoading(false);
-    }
-  }, [projects, allReports, selectedProject]);
+  }, [projects, selectedProject]);
 
-  // Calcular métricas generales
-  const dashboardMetrics = useMemo(() => {
-    const totalProjects = projects.length;
-    
-    let totalReports = 0;
-    let totalHours = 0;
-    let totalCosts = 0;
-    let totalMaterials = 0;
-    
-    // Filtrar informes por fecha si están establecidas
-    let filteredReports = [...allReports];
-    
-    if (dateRange.startDate && dateRange.endDate) {
-      const startDate = new Date(dateRange.startDate);
-      const endDate = new Date(dateRange.endDate);
-      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
-      
-      filteredReports = filteredReports.filter(report => {
-        const reportDate = new Date(report.reportDate);
-        return reportDate >= startDate && reportDate <= endDate;
-      });
-    }
+  // Filtrar reportes basados en los filtros actuales
+  const filteredReports = useMemo(() => {
+    return filterReports(reports);
+  }, [filterReports, reports]);
 
-    filteredReports.forEach(report => {
-      totalReports++;
-      
-      // Sumar horas (solo si existen)
-      if (report.labor) {
-        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
-      }
-      
-      // Sumar costes
-      if (report.totalCost) {
-        totalCosts += report.totalCost;
-      } else if (report.labor) {
-        totalCosts += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-      
-      // Sumar materiales
-      totalMaterials += report.totalMaterialsCost || 0;
-    });
+  // Usar hook de resumen para obtener métricas calculadas
+  const { totals: dashboardMetrics } = useReportSummary(
+    filteredReports,
+    projects,
+    selectedProject
+  );
 
-    return {
-      totalProjects,
-      totalReports,
-      totalHours,
-      totalCosts,
-      totalMaterials
-    };
-  }, [allReports, projects, dateRange]);
+  // Manejadores de eventos
+  const handleProjectChange = useCallback((e) => {
+    const newProjectId = e.target.value;
+    setSelectedProject(newProjectId);
+    updateFilters({ projectId: newProjectId });
+  }, [updateFilters]);
+  
+  const handleDateRangeChange = useCallback((e) => {
+    const { name, value } = e.target;
+    const newDateRange = { ...dateRange, [name]: value };
+    setDateRange(newDateRange);
+    updateFilters({ [name]: value });
+  }, [dateRange, updateFilters]);
 
-  // Preparar datos para gráficos por proyecto
-  const chartData = useMemo(() => {
-    if (!selectedProject) return [];
+  const handleViewChange = useCallback((view) => {
+    setActiveView(view);
+  }, []);
 
-    // Filtrar reportes del proyecto seleccionado y por fecha
-    let projectReports = allReports.filter(
-      report => report.projectId === selectedProject
-    );
-    
-    // Aplicar filtro de fechas si están definidas
-    if (dateRange.startDate && dateRange.endDate) {
-      const startDate = new Date(dateRange.startDate);
-      const endDate = new Date(dateRange.endDate);
-      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
-      
-      projectReports = projectReports.filter(report => {
-        const reportDate = new Date(report.reportDate);
-        return reportDate >= startDate && reportDate <= endDate;
-      });
-    }
-
-    // Agrupar por fecha (semana o mes)
-    const grouped = projectReports.reduce((acc, report) => {
-      const date = new Date(report.reportDate);
-      const weekKey = `Sem ${report.weekNumber}/${date.getFullYear()}`;
-      
-      if (!acc[weekKey]) {
-        acc[weekKey] = {
-          period: weekKey,
-          costs: 0,
-          materials: 0,
-          labor: 0,
-          invoiced: 0
-        };
-      }
-      
-      // Sumar costes para cada categoría
-      const reportCost = report.totalCost || 
-        ((report.labor?.totalLaborCost || 0) + (report.totalMaterialsCost || 0));
-      
-      acc[weekKey].costs += reportCost;
-      acc[weekKey].materials += report.totalMaterialsCost || 0;
-      acc[weekKey].labor += report.labor?.totalLaborCost || 0;
-      acc[weekKey].invoiced += report.invoicedAmount || 0;
-      
-      return acc;
-    }, {});
-
-    // Convertir a array y ordenar por fecha
-    return Object.values(grouped).sort((a, b) => {
-      const aNum = parseInt(a.period.split(' ')[1].split('/')[0]);
-      const bNum = parseInt(b.period.split(' ')[1].split('/')[0]);
-      return aNum - bNum;
-    });
-  }, [allReports, selectedProject, dateRange]);
-
-  // Preparar datos para el gráfico de proyectos
-  const projectCostData = useMemo(() => {
-    // Aplicar filtro de fecha a todos los reportes
-    let filteredReports = [...allReports];
-    
-    if (dateRange.startDate && dateRange.endDate) {
-      const startDate = new Date(dateRange.startDate);
-      const endDate = new Date(dateRange.endDate);
-      endDate.setHours(23, 59, 59, 999); // Incluir todo el día final
-      
-      filteredReports = filteredReports.filter(report => {
-        const reportDate = new Date(report.reportDate);
-        return reportDate >= startDate && reportDate <= endDate;
-      });
-    }
-    
+  // Preparar datos para gráficos de proyectos
+  const projectsData = useMemo(() => {
     return projects.map(project => {
-      const projectReports = filteredReports.filter(
+      const projectReports = filterReports(reports.filter(
         report => report.projectId === project.id
-      );
+      ));
       
+      let laborCost = 0;
+      let materialsCost = 0;
       let totalCost = 0;
+      let invoicedAmount = 0;
+      
       projectReports.forEach(report => {
+        if (report.labor) {
+          laborCost += report.labor.totalLaborCost || 0;
+        }
+        materialsCost += report.totalMaterialsCost || 0;
+        
         if (report.totalCost) {
           totalCost += report.totalCost;
         } else if (report.labor) {
           totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-        } else if (report.invoicedAmount) {
-          totalCost += report.invoicedAmount || 0;
+        }
+        
+        if (report.invoicedAmount) {
+          invoicedAmount += report.invoicedAmount;
         }
       });
       
       return {
-        name: project.id,
-        value: totalCost
+        id: project.id,
+        client: project.client,
+        laborCost,
+        materialsCost,
+        totalCost,
+        invoicedAmount,
+        reports: projectReports.length
       };
-    }).sort((a, b) => b.value - a.value).slice(0, 5); // Top 5 proyectos
-  }, [allReports, projects, dateRange]);
+    }).filter(project => project.totalCost > 0 || project.invoicedAmount > 0);
+  }, [projects, reports, filterReports]);
 
-  const handleProjectChange = (e) => {
-    setSelectedProject(e.target.value);
-  };
-  
-  const handleDateRangeChange = (e) => {
-    setDateRange((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  // Preparar datos para gráficos de línea temporal
+  const timelineData = useMemo(() => {
+    if (!selectedProject) return [];
+    
+    // Agrupar reportes por semana
+    const groupedByWeek = {};
+    
+    filteredReports.forEach(report => {
+      const weekKey = `Sem ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`;
+      
+      if (!groupedByWeek[weekKey]) {
+        groupedByWeek[weekKey] = {
+          weekLabel: weekKey,
+          laborCost: 0,
+          materialsCost: 0,
+          totalCost: 0,
+          invoicedAmount: 0,
+          count: 0
+        };
+      }
+      
+      groupedByWeek[weekKey].count++;
+      
+      if (report.labor) {
+        groupedByWeek[weekKey].laborCost += report.labor.totalLaborCost || 0;
+      }
+      
+      groupedByWeek[weekKey].materialsCost += report.totalMaterialsCost || 0;
+      
+      if (report.totalCost) {
+        groupedByWeek[weekKey].totalCost += report.totalCost;
+      } else if (report.labor) {
+        groupedByWeek[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+      
+      if (report.invoicedAmount) {
+        groupedByWeek[weekKey].invoicedAmount += report.invoicedAmount;
+      }
+    });
+    
+    // Convertir a array y ordenar por semana
+    return Object.values(groupedByWeek).sort((a, b) => {
+      const aWeek = parseInt(a.weekLabel.split(' ')[1].split('/')[0]);
+      const aYear = parseInt(a.weekLabel.split('/')[1]);
+      const bWeek = parseInt(b.weekLabel.split(' ')[1].split('/')[0]);
+      const bYear = parseInt(b.weekLabel.split('/')[1]);
+      
+      if (aYear !== bYear) return aYear - bYear;
+      return aWeek - bWeek;
+    });
+  }, [filteredReports, selectedProject]);
 
-  if (loading) {
-    return <div className="dashboard-loading">Cargando datos...</div>;
+  // Renderizar estados de carga y error
+  if (isLoading && reports.length === 0) {
+    return <div className="dashboard-loading">Cargando datos del dashboard...</div>;
   }
+  
+  if (actionError) {
+    return <div className="error-message">Error al cargar datos: {actionError}</div>;
+  }
+
+  // Tabla de resumen para los datos más recientes
+  const renderSummaryTable = () => {
+    // Obtener los 5 registros más recientes
+    const recentData = [...timelineData].slice(-5);
+    
+    if (recentData.length === 0) {
+      return <p>No hay datos suficientes para mostrar el resumen.</p>;
+    }
+    
+    // Calcular totales
+    const totalLabor = timelineData.reduce((sum, item) => sum + item.laborCost, 0);
+    const totalMaterials = timelineData.reduce((sum, item) => sum + item.materialsCost, 0);
+    const totalCost = timelineData.reduce((sum, item) => sum + item.totalCost, 0);
+    
+    return (
+      <table className="data-summary-table">
+        <thead>
+          <tr>
+            <th>Periodo</th>
+            <th>Mano de Obra</th>
+            <th>Materiales</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recentData.map((item, index) => (
+            <tr key={index}>
+              <td>{item.weekLabel}</td>
+              <td>{formatCurrency(item.laborCost)}</td>
+              <td>{formatCurrency(item.materialsCost)}</td>
+              <td>{formatCurrency(item.totalCost)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td>{formatCurrency(totalLabor)}</td>
+            <td>{formatCurrency(totalMaterials)}</td>
+            <td>{formatCurrency(totalCost)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    );
+  };
+
+  // Función auxiliar para formatear moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   return (
     <div className="dashboard">
       <h2 className="section-title">Dashboard</h2>
       
-      {/* Tarjetas de métricas */}
-      <div className="metrics-container">
-        <div className="metric-card">
-          <div className="metric-icon">📊</div>
-          <div className="metric-value">{dashboardMetrics.totalProjects}</div>
-          <div className="metric-label">Proyectos</div>
-        </div>
-        
-        <div className="metric-card">
-          <div className="metric-icon">📝</div>
-          <div className="metric-value">{dashboardMetrics.totalReports}</div>
-          <div className="metric-label">Partes</div>
-        </div>
-        
-        <div className="metric-card">
-          <div className="metric-icon">⏱️</div>
-          <div className="metric-value">{formatNumber(dashboardMetrics.totalHours)}</div>
-          <div className="metric-label">Horas</div>
-        </div>
-        
-        <div className="metric-card">
-          <div className="metric-icon">💰</div>
-          <div className="metric-value">€{formatNumber(dashboardMetrics.totalCosts)}</div>
-          <div className="metric-label">Costes</div>
-        </div>
-        
-        <div className="metric-card">
-          <div className="metric-icon">🔧</div>
-          <div className="metric-value">€{formatNumber(dashboardMetrics.totalMaterials)}</div>
-          <div className="metric-label">Materiales</div>
-        </div>
-      </div>
+      {/* Tarjetas de métricas clave (KPIs) */}
+      <KPICards kpis={{
+        totalProjects: projects.length,
+        totalReports: filteredReports.length,
+        totalLabor: dashboardMetrics.totalLabor,
+        totalMaterials: dashboardMetrics.totalMaterials,
+        totalInvoiced: dashboardMetrics.totalInvoiced,
+        totalHours: dashboardMetrics.totalHours
+      }} />
       
       {/* Filtros - Proyecto y Fechas */}
       <div className="dashboard-filter">
@@ -2150,255 +2343,28 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {/* Gráfico de barras del proyecto seleccionado */}
+      {/* Sección de gráficos */}
       <div className="chart-container">
         <div className="chart-tab-buttons">
           <button 
-            className={chartType === "costes" ? "active" : ""}
-            onClick={() => setChartType("costes")}
+            className={activeView === "costes" ? "active" : ""}
+            onClick={() => handleViewChange("costes")}
           >
-            Coste Total
+            Costes por Proyecto
           </button>
           <button 
-            className={chartType === "desglose" ? "active" : ""}
-            onClick={() => setChartType("desglose")}
+            className={activeView === "timeline" ? "active" : ""}
+            onClick={() => handleViewChange("timeline")}
           >
-            Desglose
+            Evolución Temporal
           </button>
         </div>
         
         <div className="chart-wrapper">
-          {chartType === "costes" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={projectCostData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 60 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45} 
-                  textAnchor="end"
-                  height={60}
-                  interval={0}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, "Coste Total"]}
-                  labelFormatter={(value) => `Proyecto: ${value}`}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="#8D432D" 
-                  name="Coste Total" 
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          
-          {chartType === "desglose" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 30 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  interval={0}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
-                />
-                <Legend />
-                <Bar dataKey="labor" name="Mano de Obra" fill="#2c3e50" />
-                <Bar dataKey="materials" name="Materiales" fill="#8D432D" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-      
-      {/* Tendencias temporales */}
-      <div className="dashboard-section">
-        <h3>Tendencias Temporales</h3>
-        <div className="chart-tab-buttons">
-          <button 
-            className={chartType === "lineas" ? "active" : ""}
-            onClick={() => setChartType("lineas")}
-          >
-            Líneas
-          </button>
-          <button 
-            className={chartType === "area" ? "active" : ""}
-            onClick={() => setChartType("area")}
-          >
-            Área
-          </button>
-          <button 
-            className={chartType === "facturacion" ? "active" : ""}
-            onClick={() => setChartType("facturacion")}
-          >
-            Facturación
-          </button>
-          <button 
-            className={chartType === "costes" ? "active" : ""}
-            onClick={() => setChartType("costes")}
-          >
-            Costes
-          </button>
-        </div>
-        
-        <div className="chart-wrapper">
-          {chartType === "lineas" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="costs" 
-                  name="Costes Totales" 
-                  stroke="#8D432D" 
-                  activeDot={{ r: 8 }} 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="labor" 
-                  name="Mano de Obra" 
-                  stroke="#2c3e50" 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="materials" 
-                  name="Materiales" 
-                  stroke="#7A3624" 
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-          
-          {chartType === "area" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
-                />
-                <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="costs" 
-                  name="Costes Totales" 
-                  stroke="#8D432D" 
-                  fill="#8D432D" 
-                  fillOpacity={0.3} 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-          
-          {chartType === "facturacion" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="invoiced" 
-                  name="Facturado" 
-                  stroke="#27ae60" 
-                  strokeWidth={2}
-                  activeDot={{ r: 8 }} 
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-          
-          {chartType === "costes" && (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `€${value}`}
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value) => [`€${formatNumber(value)}`, ""]}
-                />
-                <Legend />
-                <Bar 
-                  dataKey="costs" 
-                  name="Costes Totales" 
-                  fill="#8D432D" 
-                />
-                <Bar 
-                  dataKey="labor" 
-                  name="Mano de Obra" 
-                  fill="#2c3e50" 
-                />
-                <Bar 
-                  dataKey="materials" 
-                  name="Materiales" 
-                  fill="#7A3624" 
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          {activeView === "costes" ? (
+            <ProjectCostChart data={projectsData} />
+          ) : (
+            <TimelineChart data={timelineData} />
           )}
         </div>
       </div>
@@ -2406,34 +2372,7 @@ const Dashboard = () => {
       {/* Resumen de datos */}
       <div className="dashboard-section">
         <h3>Resumen de Datos</h3>
-        <table className="data-summary-table">
-          <thead>
-            <tr>
-              <th>Periodo</th>
-              <th>Mano de Obra</th>
-              <th>Materiales</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chartData.slice(-5).map((item, index) => (
-              <tr key={index}>
-                <td>{item.period}</td>
-                <td>{formatCurrency(item.labor)}</td>
-                <td>{formatCurrency(item.materials)}</td>
-                <td>{formatCurrency(item.costs)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>TOTAL</td>
-              <td>{formatCurrency(chartData.reduce((sum, item) => sum + item.labor, 0))}</td>
-              <td>{formatCurrency(chartData.reduce((sum, item) => sum + item.materials, 0))}</td>
-              <td>{formatCurrency(chartData.reduce((sum, item) => sum + item.costs, 0))}</td>
-            </tr>
-          </tfoot>
-        </table>
+        {renderSummaryTable()}
       </div>
     </div>
   );
@@ -2658,70 +2597,78 @@ File: src/components/dashboard/Dashboard.css
 ================
 File: src/components/dashboard/KPICards.js
 ================
-// src/components/dashboard/KPICards.js
+// src/components/dashboard/KPICards.js - Optimizado
 import React from "react";
-import { formatCurrency, formatNumber } from "../../utils/formatters";
 
+/**
+ * Componente que muestra tarjetas de indicadores clave de rendimiento (KPIs)
+ * @param {Object} props - Propiedades del componente
+ * @param {Object} props.kpis - Objeto con los valores de los KPIs
+ */
 const KPICards = ({ kpis }) => {
   const {
-    totalProjects,
-    totalReports,
-    totalLabor,
-    totalMaterials,
-    totalInvoiced,
-    totalHours
+    totalProjects = 0,
+    totalReports = 0,
+    totalLabor = 0,
+    totalMaterials = 0,
+    totalInvoiced = 0,
+    totalHours = 0
   } = kpis;
 
+  // Función auxiliar para formatear valores numéricos
+  const formatNumber = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      maximumFractionDigits: 1
+    }).format(value);
+  };
+
+  // Función auxiliar para formatear moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
   return (
-    <div className="kpi-container">
-      <div className="kpi-card">
-        <div className="kpi-icon">📊</div>
-        <div className="kpi-content">
-          <h3>{totalProjects}</h3>
-          <p>Proyectos</p>
-        </div>
+    <div className="metrics-container">
+      <div className="metric-card">
+        <div className="metric-icon">📊</div>
+        <div className="metric-value">{totalProjects}</div>
+        <div className="metric-label">Proyectos</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">📝</div>
-        <div className="kpi-content">
-          <h3>{totalReports}</h3>
-          <p>Partes</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">📝</div>
+        <div className="metric-value">{totalReports}</div>
+        <div className="metric-label">Partes</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">⏱️</div>
-        <div className="kpi-content">
-          <h3>{formatNumber(totalHours)}</h3>
-          <p>Horas</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">⏱️</div>
+        <div className="metric-value">{formatNumber(totalHours)}</div>
+        <div className="metric-label">Horas</div>
       </div>
       
-      <div className="kpi-card">
-        <div className="kpi-icon">💰</div>
-        <div className="kpi-content">
-          <h3>{formatCurrency(totalLabor + totalMaterials)}</h3>
-          <p>Costes</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">💰</div>
+        <div className="metric-value">{formatCurrency(totalLabor + totalMaterials)}</div>
+        <div className="metric-label">Costes</div>
       </div>
       
       {totalInvoiced > 0 && (
-        <div className="kpi-card">
-          <div className="kpi-icon">💼</div>
-          <div className="kpi-content">
-            <h3>{formatCurrency(totalInvoiced)}</h3>
-            <p>Facturado</p>
-          </div>
+        <div className="metric-card">
+          <div className="metric-icon">💼</div>
+          <div className="metric-value">{formatCurrency(totalInvoiced)}</div>
+          <div className="metric-label">Facturado</div>
         </div>
       )}
       
-      <div className="kpi-card">
-        <div className="kpi-icon">🔧</div>
-        <div className="kpi-content">
-          <h3>{formatCurrency(totalMaterials)}</h3>
-          <p>Materiales</p>
-        </div>
+      <div className="metric-card">
+        <div className="metric-icon">🔧</div>
+        <div className="metric-value">{formatCurrency(totalMaterials)}</div>
+        <div className="metric-label">Materiales</div>
       </div>
     </div>
   );
@@ -2732,8 +2679,8 @@ export default React.memo(KPICards);
 ================
 File: src/components/dashboard/ProjectCostChart.js
 ================
-// src/components/dashboard/ProjectCostChart.js
-import React, { useState } from "react";
+// src/components/dashboard/ProjectCostChart.js - Optimizado
+import React, { useState, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -2744,10 +2691,19 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
-import { formatCurrency } from "../../utils/formatters";
 
+/**
+ * Componente que muestra gráficos de barras de costes por proyecto
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.data - Datos de los proyectos para mostrar
+ */
 const ProjectCostChart = ({ data }) => {
   const [chartType, setChartType] = useState("cost"); // 'cost' o 'breakdown'
+
+  // Manejador para cambiar el tipo de gráfico
+  const handleChartTypeChange = useCallback((type) => {
+    setChartType(type);
+  }, []);
 
   // Si no hay datos, mostrar mensaje
   if (!data || data.length === 0) {
@@ -2759,10 +2715,19 @@ const ProjectCostChart = ({ data }) => {
   }
 
   // Ordenar proyectos por costo total (descendente)
-  const sortedData = [...data].sort((a, b) => b.totalCost - a.totalCost);
-  
-  // Limitar a los 10 proyectos más costosos para mejor visualización
-  const topProjects = sortedData.slice(0, 10);
+  const sortedData = [...data]
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .slice(0, 10); // Limitar a los 10 proyectos más costosos
+
+  // Función para formatear valores de moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
@@ -2791,13 +2756,13 @@ const ProjectCostChart = ({ data }) => {
       <div className="chart-controls">
         <button
           className={chartType === "cost" ? "active" : ""}
-          onClick={() => setChartType("cost")}
+          onClick={() => handleChartTypeChange("cost")}
         >
           Coste Total
         </button>
         <button
           className={chartType === "breakdown" ? "active" : ""}
-          onClick={() => setChartType("breakdown")}
+          onClick={() => handleChartTypeChange("breakdown")}
         >
           Desglose
         </button>
@@ -2805,7 +2770,7 @@ const ProjectCostChart = ({ data }) => {
 
       <ResponsiveContainer width="100%" height={400}>
         <BarChart
-          data={topProjects}
+          data={sortedData}
           margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
@@ -2863,8 +2828,8 @@ export default React.memo(ProjectCostChart);
 ================
 File: src/components/dashboard/TimelineChart.js
 ================
-// src/components/dashboard/TimelineChart.js
-import React, { useState } from "react";
+// src/components/dashboard/TimelineChart.js - Optimizado
+import React, { useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -2877,11 +2842,24 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
-import { formatCurrency } from "../../utils/formatters";
 
+/**
+ * Componente que muestra gráficos de línea temporal para datos de proyectos
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.data - Datos temporales para visualizar
+ */
 const TimelineChart = ({ data }) => {
   const [chartType, setChartType] = useState("line"); // 'line' o 'area'
   const [metricType, setMetricType] = useState("cost"); // 'cost' o 'invoiced'
+
+  // Manejadores para cambiar tipo de gráfico y métrica
+  const handleChartTypeChange = useCallback((type) => {
+    setChartType(type);
+  }, []);
+
+  const handleMetricTypeChange = useCallback((type) => {
+    setMetricType(type);
+  }, []);
 
   // Si no hay datos, mostrar mensaje
   if (!data || data.length === 0) {
@@ -2891,6 +2869,16 @@ const TimelineChart = ({ data }) => {
       </div>
     );
   }
+
+  // Función para formatear valores de moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
@@ -2915,13 +2903,13 @@ const TimelineChart = ({ data }) => {
         <div className="chart-type-buttons">
           <button
             className={chartType === "line" ? "active" : ""}
-            onClick={() => setChartType("line")}
+            onClick={() => handleChartTypeChange("line")}
           >
             Líneas
           </button>
           <button
             className={chartType === "area" ? "active" : ""}
-            onClick={() => setChartType("area")}
+            onClick={() => handleChartTypeChange("area")}
           >
             Área
           </button>
@@ -2929,13 +2917,13 @@ const TimelineChart = ({ data }) => {
         <div className="metric-type-buttons">
           <button
             className={metricType === "cost" ? "active" : ""}
-            onClick={() => setMetricType("cost")}
+            onClick={() => handleMetricTypeChange("cost")}
           >
             Costes
           </button>
           <button
             className={metricType === "invoiced" ? "active" : ""}
-            onClick={() => setMetricType("invoiced")}
+            onClick={() => handleMetricTypeChange("invoiced")}
           >
             Facturación
           </button>
@@ -3047,497 +3035,6 @@ const TimelineChart = ({ data }) => {
 };
 
 export default React.memo(TimelineChart);
-
-================
-File: src/components/DashboardView.js
-================
-// src/components/DashboardView.js
-import React, { useState, useMemo } from "react";
-import { useDailyReports } from "../hooks/useDailyReports";
-import { useProjects } from "../hooks/useProjects";
-import ProjectCostChart from "./dashboard/ProjectCostChart";
-import TimelineChart from "./dashboard/TimelineChart";
-import KPICards from "./dashboard/KPICards";
-import ProjectSelector from "./ProjectSelector";
-import { formatCurrency } from "../utils/formatters";
-
-const DashboardView = () => {
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split("T")[0],
-    endDate: new Date().toISOString().split("T")[0]
-  });
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  
-  const { allReports, loading: reportsLoading, error: reportsError } = useDailyReports();
-  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
-
-  // Manejar cambios en el rango de fechas
-  const handleDateRangeChange = (e) => {
-    const { name, value } = e.target;
-    setDateRange((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Manejar cambio de proyecto seleccionado
-  const handleProjectSelect = (project) => {
-    setSelectedProjectId(project?.id || "");
-  };
-
-  // Filtrar reportes por fecha y/o proyecto
-  const filteredReports = useMemo(() => {
-    let filtered = allReports;
-
-    // Filtrar por fecha
-    if (dateRange.startDate && dateRange.endDate) {
-      const start = new Date(dateRange.startDate);
-      const end = new Date(dateRange.endDate);
-      end.setHours(23, 59, 59, 999); // Incluir todo el día final
-
-      filtered = filtered.filter((report) => {
-        const reportDate = new Date(report.reportDate);
-        return reportDate >= start && reportDate <= end;
-      });
-    }
-
-    // Filtrar por proyecto si hay uno seleccionado
-    if (selectedProjectId) {
-      filtered = filtered.filter((report) => report.projectId === selectedProjectId);
-    }
-
-    return filtered;
-  }, [allReports, dateRange, selectedProjectId]);
-
-  // Calcular KPIs
-  const kpis = useMemo(() => {
-    const totalProjects = selectedProjectId 
-      ? 1 
-      : [...new Set(filteredReports.map(r => r.projectId))].length;
-
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalInvoiced = 0;
-    let totalHours = 0;
-
-    filteredReports.forEach(report => {
-      // Sumar mano de obra para proyectos por hora
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
-      }
-      
-      // Sumar materiales
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // Sumar facturado para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    // Total general (labor + materiales o facturación)
-    const totalCost = totalLabor + totalMaterials;
-    const totalReports = filteredReports.length;
-
-    return {
-      totalProjects,
-      totalReports,
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced,
-      totalHours
-    };
-  }, [filteredReports, selectedProjectId]);
-
-  // Datos para el gráfico de costos por proyecto
-  const projectCostData = useMemo(() => {
-    if (selectedProjectId) return [];
-    
-    const projectCosts = {};
-    
-    // Inicializar todos los proyectos con valores a cero
-    projects.forEach(project => {
-      projectCosts[project.id] = {
-        id: project.id,
-        client: project.client,
-        type: project.type,
-        laborCost: 0,
-        materialsCost: 0,
-        invoicedAmount: 0,
-        totalCost: 0
-      };
-    });
-    
-    // Sumar costos por proyecto
-    filteredReports.forEach(report => {
-      const projectId = report.projectId;
-      if (!projectCosts[projectId]) return;
-      
-      if (report.labor) {
-        projectCosts[projectId].laborCost += report.labor.totalLaborCost || 0;
-      }
-      
-      projectCosts[projectId].materialsCost += report.totalMaterialsCost || 0;
-      
-      if (report.invoicedAmount) {
-        projectCosts[projectId].invoicedAmount += report.invoicedAmount;
-      }
-      
-      // Calcular costo total dependiendo del tipo de proyecto
-      if (projectCosts[projectId].type === "hourly") {
-        projectCosts[projectId].totalCost = 
-          projectCosts[projectId].laborCost + projectCosts[projectId].materialsCost;
-      } else {
-        projectCosts[projectId].totalCost = projectCosts[projectId].invoicedAmount;
-      }
-    });
-    
-    // Convertir a array y filtrar proyectos sin datos
-    return Object.values(projectCosts)
-      .filter(project => project.totalCost > 0 || project.invoicedAmount > 0);
-  }, [filteredReports, projects, selectedProjectId]);
-
-  // Datos para el gráfico de tendencias temporales
-  const timelineData = useMemo(() => {
-    if (filteredReports.length === 0) return [];
-    
-    // Agrupar reportes por semana
-    const weeklyData = {};
-    
-    filteredReports.forEach(report => {
-      const date = new Date(report.reportDate);
-      // Crear clave para la semana (año-semana)
-      const weekKey = `${date.getFullYear()}-W${report.weekNumber}`;
-      
-      if (!weeklyData[weekKey]) {
-        weeklyData[weekKey] = {
-          weekLabel: `Sem ${report.weekNumber}/${date.getFullYear()}`,
-          laborCost: 0,
-          materialsCost: 0,
-          invoicedAmount: 0,
-          date: date, // Para ordenar cronológicamente
-        };
-      }
-      
-      // Sumar costos por semana
-      if (report.labor) {
-        weeklyData[weekKey].laborCost += report.labor.totalLaborCost || 0;
-      }
-      
-      weeklyData[weekKey].materialsCost += report.totalMaterialsCost || 0;
-      
-      if (report.invoicedAmount) {
-        weeklyData[weekKey].invoicedAmount += report.invoicedAmount;
-      }
-    });
-    
-    // Convertir a array y ordenar por fecha
-    return Object.values(weeklyData)
-      .sort((a, b) => a.date - b.date)
-      .map(item => ({
-        ...item,
-        totalCost: item.laborCost + item.materialsCost
-      }));
-  }, [filteredReports]);
-
-  // Si hay errores, mostrarlos
-  if (reportsError || projectsError) {
-    return (
-      <div className="error-message">
-        {reportsError && <p>Error al cargar reportes: {reportsError}</p>}
-        {projectsError && <p>Error al cargar proyectos: {projectsError}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div className="dashboard-view">
-      <h2>Dashboard Analítico</h2>
-      
-      {/* Filtros */}
-      <div className="filter-section">
-        <div className="project-filter">
-          <ProjectSelector 
-            onProjectSelect={handleProjectSelect} 
-            selectedProject={projects.find(p => p.id === selectedProjectId)}
-          />
-        </div>
-        
-        <div className="date-range">
-          <div className="date-field">
-            <label>Fecha de inicio:</label>
-            <input 
-              type="date" 
-              name="startDate" 
-              value={dateRange.startDate} 
-              onChange={handleDateRangeChange} 
-            />
-          </div>
-          <div className="date-field">
-            <label>Fecha de fin:</label>
-            <input 
-              type="date" 
-              name="endDate" 
-              value={dateRange.endDate} 
-              onChange={handleDateRangeChange} 
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Indicadores de carga */}
-      {(reportsLoading || projectsLoading) && <p>Cargando datos del dashboard...</p>}
-      
-      {/* KPIs */}
-      <KPICards kpis={kpis} />
-      
-      {/* Gráficos */}
-      <div className="dashboard-charts">
-        {/* Gráfico de costos por proyecto (solo visible cuando no hay proyecto seleccionado) */}
-        {!selectedProjectId && (
-          <div className="chart-container">
-            <h3 className="section-title">Costos por Proyecto</h3>
-            <ProjectCostChart data={projectCostData} />
-          </div>
-        )}
-        
-        {/* Gráfico de tendencias temporales */}
-        <div className="chart-container">
-          <h3 className="section-title">Tendencias Temporales</h3>
-          <TimelineChart data={timelineData} />
-        </div>
-      </div>
-      
-      {/* Resumen de datos */}
-      <div className="summary-section">
-        <h3 className="section-title">Resumen de Datos</h3>
-        <div className="summary-content">
-          <p><strong>Período:</strong> {new Date(dateRange.startDate).toLocaleDateString()} - {new Date(dateRange.endDate).toLocaleDateString()}</p>
-          <p><strong>Proyectos analizados:</strong> {kpis.totalProjects}</p>
-          <p><strong>Partes diarios:</strong> {kpis.totalReports}</p>
-          
-          {kpis.totalLabor > 0 && (
-            <p><strong>Coste mano de obra:</strong> {formatCurrency(kpis.totalLabor)}</p>
-          )}
-          
-          {kpis.totalMaterials > 0 && (
-            <p><strong>Coste materiales:</strong> {formatCurrency(kpis.totalMaterials)}</p>
-          )}
-          
-          {kpis.totalInvoiced > 0 && (
-            <p><strong>Total facturado:</strong> {formatCurrency(kpis.totalInvoiced)}</p>
-          )}
-          
-          {selectedProjectId && (
-            <p><strong>Proyecto seleccionado:</strong> {selectedProjectId}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default React.memo(DashboardView);
-
-================
-File: src/components/DebugFirebase.js
-================
-// src/components/DebugFirebase.js
-import React, { useState } from 'react';
-import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
-
-const DebugFirebase = () => {
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [testMode, setTestMode] = useState('direct'); // 'direct' o 'function'
-
-  // Prueba de la conexión directa a Firestore
-  const testDirectFirestore = async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    
-    try {
-      // 1. Obtener estado de autenticación
-      const auth = getAuth();
-      const user = auth.currentUser;
-      
-      if (!user) {
-        throw new Error("No hay usuario autenticado. Inicia sesión primero.");
-      }
-      
-      console.log("Usuario autenticado:", {
-        uid: user.uid,
-        email: user.email,
-        isAnonymous: user.isAnonymous
-      });
-      
-      // 2. Intentar escritura directa
-      const docRef = await addDoc(collection(db, "debug_collection"), {
-        testField: "Esto es una prueba directa a Firestore",
-        timestamp: new Date(),
-        userId: user.uid
-      });
-      
-      console.log("Documento escrito con ID:", docRef.id);
-      
-      // 3. Intentar lectura
-      const querySnapshot = await getDocs(collection(db, "debug_collection"));
-      const docs = [];
-      querySnapshot.forEach((doc) => {
-        docs.push({ id: doc.id, ...doc.data() });
-      });
-      
-      setResult({
-        writeSuccessful: true,
-        documentId: docRef.id,
-        readSuccessful: true,
-        readResults: docs,
-        user: {
-          uid: user.uid,
-          email: user.email
-        }
-      });
-      
-    } catch (err) {
-      console.error("Error en prueba directa:", err);
-      setError(err.toString());
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Prueba de Cloud Functions
-  const testCloudFunction = async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    
-    try {
-      // 1. Obtener estado de autenticación
-      const auth = getAuth();
-      const user = auth.currentUser;
-      
-      if (!user) {
-        throw new Error("No hay usuario autenticado. Inicia sesión primero.");
-      }
-      
-      // 2. Probar Cloud Function createProject
-      const functions = getFunctions();
-      const createProject = httpsCallable(functions, 'createProject');
-      
-      const testProject = {
-        id: `test-${Date.now()}`,
-        client: "Cliente de Prueba",
-        address: "Dirección de Prueba",
-        nifNie: "12345678Z",
-        type: "hourly",
-        officialPrice: 20,
-        workerPrice: 15
-      };
-      
-      const result = await createProject(testProject);
-      
-      setResult({
-        functionCallSuccessful: true,
-        functionResult: result.data,
-        user: {
-          uid: user.uid,
-          email: user.email
-        }
-      });
-      
-    } catch (err) {
-      console.error("Error en prueba de Cloud Function:", err);
-      setError(err.toString());
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleTest = () => {
-    if (testMode === 'direct') {
-      testDirectFirestore();
-    } else {
-      testCloudFunction();
-    }
-  };
-  
-  return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h2>Depuración de Firebase</h2>
-      
-      <div style={{ marginBottom: '20px' }}>
-        <label>
-          <input 
-            type="radio"
-            value="direct"
-            checked={testMode === 'direct'}
-            onChange={() => setTestMode('direct')}
-          /> 
-          Prueba directa a Firestore
-        </label>
-        <label style={{ marginLeft: '20px' }}>
-          <input 
-            type="radio"
-            value="function"
-            checked={testMode === 'function'}
-            onChange={() => setTestMode('function')}
-          /> 
-          Prueba de Cloud Function
-        </label>
-      </div>
-      
-      <button 
-        onClick={handleTest}
-        disabled={loading}
-        style={{ 
-          padding: '10px 20px',
-          backgroundColor: '#4CAF50',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer'
-        }}
-      >
-        {loading ? 'Ejecutando prueba...' : 'Ejecutar prueba'}
-      </button>
-      
-      {error && (
-        <div style={{ 
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#ffebee',
-          border: '1px solid #ffcdd2',
-          borderRadius: '4px',
-          color: '#c62828'
-        }}>
-          <h3>Error:</h3>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>{error}</pre>
-        </div>
-      )}
-      
-      {result && (
-        <div style={{ 
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#e8f5e9',
-          border: '1px solid #c8e6c9',
-          borderRadius: '4px',
-          color: '#2e7d32'
-        }}>
-          <h3>Resultado:</h3>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(result, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default DebugFirebase;
 
 ================
 File: src/components/FixedReportForm.js
@@ -4337,163 +3834,6 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
 export default React.memo(MaterialsForm);
 
 ================
-File: src/components/PDFExportExample.js
-================
-// src/components/PDFExportExample.js
-import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import PDFDownloadButton from '../utils/PdfDownload';
-
-// Definir estilos para el PDF
-const styles = StyleSheet.create({
-  page: {
-    flexDirection: 'column',
-    backgroundColor: '#FFFFFF',
-    padding: 30,
-  },
-  section: {
-    margin: 10,
-    padding: 10,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 24,
-    textAlign: 'center',
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 20,
-  },
-  text: {
-    fontSize: 12,
-    fontFamily: 'Helvetica',
-    marginBottom: 10,
-  },
-  table: {
-    display: 'table',
-    width: 'auto',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-    marginTop: 20,
-  },
-  tableRow: {
-    flexDirection: 'row',
-  },
-  tableColHeader: {
-    width: '25%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    backgroundColor: '#f0f0f0',
-    padding: 5,
-  },
-  tableCol: {
-    width: '25%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    padding: 5,
-  },
-  tableCellHeader: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
-  },
-  tableCell: {
-    fontSize: 10,
-  },
-});
-
-// Componente PDF Document
-const MyDocument = ({ data = {}, title = 'Reporte' }) => (
-  <Document>
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.text}>Fecha: {new Date().toLocaleDateString()}</Text>
-        <Text style={styles.text}>Generado por: {data.author || 'Usuario'}</Text>
-        
-        {data.items && data.items.length > 0 && (
-          <View style={styles.table}>
-            {/* Encabezados de tabla */}
-            <View style={styles.tableRow}>
-              <View style={styles.tableColHeader}>
-                <Text style={styles.tableCellHeader}>ID</Text>
-              </View>
-              <View style={styles.tableColHeader}>
-                <Text style={styles.tableCellHeader}>Nombre</Text>
-              </View>
-              <View style={styles.tableColHeader}>
-                <Text style={styles.tableCellHeader}>Cantidad</Text>
-              </View>
-              <View style={styles.tableColHeader}>
-                <Text style={styles.tableCellHeader}>Precio</Text>
-              </View>
-            </View>
-            
-            {/* Filas de datos */}
-            {data.items.map((item, index) => (
-              <View style={styles.tableRow} key={index}>
-                <View style={styles.tableCol}>
-                  <Text style={styles.tableCell}>{item.id}</Text>
-                </View>
-                <View style={styles.tableCol}>
-                  <Text style={styles.tableCell}>{item.name}</Text>
-                </View>
-                <View style={styles.tableCol}>
-                  <Text style={styles.tableCell}>{item.quantity}</Text>
-                </View>
-                <View style={styles.tableCol}>
-                  <Text style={styles.tableCell}>{item.price}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-        
-        <Text style={[styles.text, { marginTop: 30 }]}>
-          {data.summary || 'Este es un PDF de ejemplo generado con @react-pdf/renderer.'}
-        </Text>
-      </View>
-    </Page>
-  </Document>
-);
-
-// Componente de ejemplo que utiliza el botón de descarga
-const PDFExportExample = () => {
-  // Datos de ejemplo para el PDF
-  const exampleData = {
-    author: 'Administrador',
-    items: [
-      { id: '001', name: 'Item 1', quantity: 5, price: '€100.00' },
-      { id: '002', name: 'Item 2', quantity: 3, price: '€75.50' },
-      { id: '003', name: 'Item 3', quantity: 8, price: '€45.00' },
-    ],
-    summary: 'Este reporte muestra los items seleccionados con sus cantidades y precios.'
-  };
-
-  return (
-    <div className="pdf-export-example">
-      <h2>Exportar a PDF</h2>
-      <p>Haga clic en el botón de abajo para generar y descargar un PDF de ejemplo:</p>
-      
-      <PDFDownloadButton
-        Document={MyDocument}
-        documentProps={{ data: exampleData, title: 'Reporte de Items' }}
-        fileName="reporte-ejemplo.pdf"
-        buttonProps={{ className: 'pdf-button' }}
-      >
-        Descargar Reporte PDF
-      </PDFDownloadButton>
-    </div>
-  );
-};
-
-export default PDFExportExample;
-export { MyDocument }; // Exportamos el componente Document para reutilizarlo
-
-================
 File: src/components/ProjectForm.js
 ================
 // src/components/ProjectForm.js
@@ -4785,19 +4125,33 @@ export default React.memo(ProjectSelector);
 ================
 File: src/components/ProjectsViewer.js
 ================
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useProjects } from "../hooks/useProjects";
 import { formatCurrency } from "../utils/formatters";
-import { useDailyReports } from "../hooks/useDailyReports";
+import useReportActions from "../hooks/reports/useReportActions";
 
 const ProjectsViewer = () => {
   const { projects, loading, error, addProject, updateProject, deleteProject } = useProjects();
-  const { allReports } = useDailyReports(); // Para calcular costes
+  const [reports, setReports] = useState([]);
+  const { fetchReports, loading: reportsLoading, error: reportsError } = useReportActions();
   const [newProject, setNewProject] = useState({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editedProject, setEditedProject] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Cargar reportes al iniciar el componente
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        const fetchedReports = await fetchReports();
+        setReports(fetchedReports || []);
+      } catch (err) {
+        console.error("Error al cargar reportes:", err);
+      }
+    };
+    loadReports();
+  }, [fetchReports]);
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -4816,28 +4170,28 @@ const ProjectsViewer = () => {
     }
   }, [editingProjectId]);
 
- const handleAddProject = async (e) => {
-  e.preventDefault();
-  if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
-    setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
-    setSuccessMessage("");
-    return;
-  }
+  const handleAddProject = async (e) => {
+    e.preventDefault();
+    if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
+      setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
+      setSuccessMessage("");
+      return;
+    }
 
-  try {
-    // Crear una copia del proyecto con el ID recortado
-    const trimmedProject = {
-      ...newProject,
-      id: newProject.id.trim()
-    };
-    await addProject(trimmedProject);  // Usamos la función del hook
-    setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
-    setSuccessMessage("Proyecto añadido correctamente!");
-    setErrorMessage("");
-  } catch (err) {
-    setErrorMessage(`Error al añadir proyecto: ${err.message}`);
-  }
-};
+    try {
+      // Crear una copia del proyecto con el ID recortado
+      const trimmedProject = {
+        ...newProject,
+        id: newProject.id.trim()
+      };
+      await addProject(trimmedProject);  // Usamos la función del hook
+      setNewProject({ id: "", client: "", address: "", nifNie: "", officialPrice: 0, workerPrice: 0, type: "hourly", budgetAmount: 0 });
+      setSuccessMessage("Proyecto añadido correctamente!");
+      setErrorMessage("");
+    } catch (err) {
+      setErrorMessage(`Error al añadir proyecto: ${err.message}`);
+    }
+  };
 
   const startEditing = (project) => {
     setEditingProjectId(project.id);
@@ -4866,7 +4220,7 @@ const ProjectsViewer = () => {
     console.log("handleDelete llamado con projectId:", projectId);
     if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
       console.log("Eliminación cancelada por el usuario");
-      return; // <---  IMPORTANTE: Detener la ejecución si el usuario cancela.
+      return;
     }
 
     try {
@@ -4883,7 +4237,7 @@ const ProjectsViewer = () => {
 
   const calculateProjectCosts = (projectId, projectType) => {
     if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0 };
-    const projectReports = allReports.filter((report) => report.projectId === projectId);
+    const projectReports = reports.filter((report) => report.projectId === projectId);
     let laborCost = 0;
     let materialsCost = 0;
 
@@ -4900,12 +4254,15 @@ const ProjectsViewer = () => {
   };
 
   const calculateInvoicedTotal = (projectId) => {
-    const projectReports = allReports.filter((report) => report.projectId === projectId && report.invoicedAmount);
+    const projectReports = reports.filter((report) => report.projectId === projectId && report.invoicedAmount);
     return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
   };
 
-  if (loading) return <p>Cargando proyectos...</p>;
-  if (error) return <p className="error-message">Error: {error}</p>;
+  // Mostrar indicador de carga si estamos esperando proyectos o reportes
+  if (loading || (reportsLoading && reports.length === 0)) return <p>Cargando proyectos...</p>;
+  
+  // Mostrar error si hay alguno
+  if (error || reportsError) return <p className="error-message">Error: {error || reportsError}</p>;
 
   return (
     <div className="projects-viewer">
@@ -4970,12 +4327,12 @@ const ProjectsViewer = () => {
         ) : (
           <input
             type="number"
-              name="budgetAmount"
-              placeholder="Importe presupuestado (€)"
-              value={newProject.budgetAmount}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
+            name="budgetAmount"
+            placeholder="Importe presupuestado (€)"
+            value={newProject.budgetAmount}
+            onChange={handleInputChange}
+            min="0"
+            step="0.01"
           />
         )}
         <button type="submit" disabled={loading}>
@@ -5083,11 +4440,11 @@ const ProjectsViewer = () => {
                   )}
                   <button onClick={() => startEditing(project)}>Editar</button>
                   <button
-  onClick={() => handleDelete(project.id)}
-  style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
->
-  Eliminar
-</button>
+                    onClick={() => handleDelete(project.id)}
+                    style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
+                  >
+                    Eliminar
+                  </button>
                 </>
               )}
             </div>
@@ -5727,195 +5084,305 @@ const ReportPDFGenerator = ({ reports, projects }) => {
 export default ReportPDFGenerator;
 
 ================
-File: src/components/ReportsViewer.js
+File: src/components/reports/MaterialsEditor.js
 ================
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { useDailyReports } from "../hooks/useDailyReports";
-import { formatCurrency, formatNumber, getWeekNumber } from "../utils/formatters";
-import ReportPDFGenerator from "./ReportPDFGenerator";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import { useProjects } from "../hooks/useProjects";
-import { updateDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
-import { useStorage } from "../hooks/useStorage";
+import React, { useState } from "react";
+import { formatCurrency } from "../../utils/formatters";
 
-const ReportsViewer = () => {
-  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [showPDFLink, setShowPDFLink] = useState(false);
-  const [reportToDelete, setReportToDelete] = useState(null);
-  const [editingReportId, setEditingReportId] = useState(null);
+const MaterialsEditor = ({ 
+  materials, 
+  onMaterialsChange, 
+  projectId, 
+  reportDate,
+  uploadFile 
+}) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const handleAddMaterial = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const description = prompt("Descripción del material:") || "";
+    const costText = prompt("Coste del material (€):") || "0";
+    const cost = parseFloat(costText) || 0;
+
+    if (!description || isNaN(cost) || cost < 0) {
+      alert("Por favor, completa la descripción y un coste válido (numérico y positivo).");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+      
+      const url = await uploadFile(file, "invoices", `${projectId}_${reportDate}`);
+      
+      if (url) {
+        const newMaterial = { id: Date.now(), description, cost, invoiceUrl: url };
+        onMaterialsChange([...materials, newMaterial]);
+      }
+    } catch (err) {
+      setUploadError(`Error al subir material: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveMaterial = (id) => {
+    onMaterialsChange(materials.filter(m => m.id !== id));
+  };
+
+  return (
+    <div className="materials-editor">
+      <h4>Materiales</h4>
+      
+      {uploadError && <p className="error-message">{uploadError}</p>}
+      
+      <div className="materials-list">
+        {materials.map(material => (
+          <div key={material.id} className="material-item">
+            <div className="material-info">
+              <input
+                type="text"
+                value={material.description || ""}
+                onChange={(e) => {
+                  const updatedMaterials = materials.map(m => 
+                    m.id === material.id 
+                      ? { ...m, description: e.target.value } 
+                      : m
+                  );
+                  onMaterialsChange(updatedMaterials);
+                }}
+                placeholder="Descripción"
+              />
+              
+              <input
+                type="number"
+                value={material.cost || 0}
+                onChange={(e) => {
+                  const updatedMaterials = materials.map(m => 
+                    m.id === material.id 
+                      ? { ...m, cost: parseFloat(e.target.value) || 0 } 
+                      : m
+                  );
+                  onMaterialsChange(updatedMaterials);
+                }}
+                min="0"
+                step="0.01"
+                placeholder="Coste (€)"
+              />
+            </div>
+            
+            <div className="material-actions">
+              <a 
+                href={material.invoiceUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="invoice-link"
+              >
+                Ver factura
+              </a>
+              
+              <button 
+                type="button" 
+                onClick={() => handleRemoveMaterial(material.id)}
+                className="remove-button"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="upload-container">
+        <input 
+          type="file" 
+          accept=".pdf" 
+          onChange={handleAddMaterial} 
+          disabled={uploading} 
+          id="material-upload"
+          className="file-input"
+        />
+        <label htmlFor="material-upload" className="upload-label">
+          {uploading ? "Subiendo..." : "Añadir material con factura"}
+        </label>
+      </div>
+    </div>
+  );
+};
+
+export default React.memo(MaterialsEditor);
+
+================
+File: src/components/reports/PhotosEditor.js
+================
+import React, { useState } from "react";
+
+const PhotosEditor = ({ 
+  photos, 
+  onPhotosChange, 
+  projectId, 
+  reportDate,
+  uploadFile 
+}) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const handleAddPhoto = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Verificar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      setUploadError("Por favor, selecciona un archivo de imagen válido.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+      
+      const url = await uploadFile(file, "photos", `${projectId}_${reportDate}`);
+      
+      if (url) {
+        const newPhoto = { id: Date.now(), url };
+        onPhotosChange([...photos, newPhoto]);
+      }
+    } catch (err) {
+      setUploadError(`Error al subir foto: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = (id) => {
+    onPhotosChange(photos.filter(p => p.id !== id));
+  };
+
+  return (
+    <div className="photos-editor">
+      <h4>Fotografías</h4>
+      
+      {uploadError && <p className="error-message">{uploadError}</p>}
+      
+      <div className="photos-container">
+        {photos.map(photo => (
+          <div key={photo.id} className="photo-container">
+            <img 
+              src={photo.url} 
+              alt="Foto" 
+              className="photo-thumbnail" 
+            />
+            <button 
+              type="button" 
+              onClick={() => handleRemovePhoto(photo.id)}
+              className="remove-photo-button"
+            >
+              Eliminar
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="upload-container">
+        <input 
+          type="file" 
+          accept="image/*" 
+          onChange={handleAddPhoto} 
+          disabled={uploading} 
+          id="photo-upload"
+          className="file-input"
+        />
+        <label htmlFor="photo-upload" className="upload-label">
+          {uploading ? "Subiendo..." : "Añadir fotografía"}
+        </label>
+      </div>
+    </div>
+  );
+};
+
+export default React.memo(PhotosEditor);
+
+================
+File: src/components/reports/ReportDeleteModal.js
+================
+import React from "react";
+
+const ReportDeleteModal = ({ onConfirm, onCancel }) => {
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <h3>Confirmar eliminación</h3>
+        <p>¿Estás seguro de que quieres eliminar este parte diario?</p>
+        <p className="warning">Esta acción no se puede deshacer.</p>
+        
+        <div className="modal-actions">
+          <button 
+            onClick={onConfirm} 
+            className="confirm-button"
+          >
+            Sí, eliminar
+          </button>
+          <button 
+            onClick={onCancel} 
+            className="cancel-button"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default React.memo(ReportDeleteModal);
+
+================
+File: src/components/reports/ReportEditForm.js
+================
+import React, { useState, useEffect, useCallback } from "react";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { getWeekNumber } from "../../utils/formatters";
+import { useStorage } from "../../hooks/useStorage";
+import MaterialsEditor from "./MaterialsEditor";
+import PhotosEditor from "./PhotosEditor";
+
+const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
   const [editedReport, setEditedReport] = useState(null);
-  const [pdfDisabledReason, setPdfDisabledReason] = useState("Selecciona un proyecto para generar el PDF.");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { uploadFile } = useStorage();
 
-  // Obtener datos sin filtros iniciales
-  const { reports, loading, error, deleteReport, fetchReports } = useDailyReports();
-  const { projects } = useProjects();
-  const { uploadFile, uploading: storageUploading, error: storageError } = useStorage();
-
-  // Diagnosticar el contenido de reports
+  // Cargar datos del reporte
   useEffect(() => {
-    console.log("Reports actualizados:", {
-      length: reports?.length || 0,
-      isArray: Array.isArray(reports),
-      reports: reports
-    });
-  }, [reports]);
-  
-  // Filtrar reportes basado en criterios locales (en memoria)
-  const filteredReports = useMemo(() => {
-    console.log("Calculando filteredReports, total reports:", reports?.length || 0);
-    
-    // Verifica que reports existe y es un array
-    if (!Array.isArray(reports)) {
-      console.error("reports no es un array:", reports);
-      return [];
-    }
-    
-    let result = [...reports]; // Clonar array para evitar mutaciones
-
-    // Filtrar por proyecto si hay seleccionado
-    if (selectedProjectId) {
-      console.log(`Filtrando por proyecto: ${selectedProjectId}`);
-      result = result.filter((report) => report.projectId === selectedProjectId);
-      console.log(`Después de filtrar por proyecto: ${result.length} reportes`);
-    }
-
-    // Filtrar por fecha si hay rango definido
-    if (dateRange.startDate && dateRange.endDate) {
-      const start = new Date(dateRange.startDate);
-      const end = new Date(dateRange.endDate);
-      end.setHours(23, 59, 59, 999); // Incluir todo el día final
-
-      console.log(`Filtrando por fecha: ${start.toISOString()} - ${end.toISOString()}`);
-      result = result.filter((report) => {
-        if (!report.reportDate) {
-          console.warn("Reporte sin fecha:", report);
-          return false;
+    const loadReport = async () => {
+      try {
+        setLoading(true);
+        const reportRef = doc(db, "dailyReports", reportId);
+        const reportSnap = await getDoc(reportRef);
+        
+        if (reportSnap.exists()) {
+          setEditedReport({ id: reportSnap.id, ...reportSnap.data() });
+        } else {
+          setError("El reporte no existe");
         }
-        const reportDate = new Date(report.reportDate);
-        return reportDate >= start && reportDate <= end;
-      });
-      console.log(`Después de filtrar por fecha: ${result.length} reportes`);
-    }
-
-    // Ordenar por fecha (más reciente primero)
-    result = result.sort((a, b) => {
-      if (!a.reportDate) return 1;
-      if (!b.reportDate) return -1;
-      return new Date(b.reportDate) - new Date(a.reportDate);
-    });
-
-    console.log(`Total de reportes filtrados: ${result.length}`);
-    return result;
-  }, [reports, selectedProjectId, dateRange.startDate, dateRange.endDate]);
-
-  // Efecto para actualizar el estado de showPDFLink cuando cambian los filteredReports
-  useEffect(() => {
-    console.log("Verificando disponibilidad para PDF:", {
-      reportes: filteredReports.length,
-      proyecto: selectedProjectId
-    });
-    
-    if (filteredReports.length > 0 && selectedProjectId) {
-      setShowPDFLink(true);
-      setPdfDisabledReason(null);
-    } else {
-      setShowPDFLink(false);
-      if (!selectedProjectId) {
-        setPdfDisabledReason("Selecciona un proyecto para generar el PDF.");
-      } else if (filteredReports.length === 0) {
-        setPdfDisabledReason("No hay reportes que coincidan con los criterios de búsqueda.");
+      } catch (err) {
+        setError(`Error al cargar el reporte: ${err.message}`);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [filteredReports, selectedProjectId]);
-
-  const calculateTotals = useCallback((reportsArray) => {
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalCost = 0;
-    let totalInvoiced = 0;
-
-    reportsArray.forEach((report) => {
-      // Para proyectos por horas
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-      }
-      
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // El coste total puede venir directamente o calcularse
-      if (report.totalCost) {
-        totalCost += report.totalCost;
-      } else if (report.labor) {
-        // Si no existe totalCost pero sí labor, calculamos la suma
-        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    return {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced
     };
-  }, []);
+    
+    loadReport();
+  }, [reportId]);
 
-  // Calcular totales (memoizado para evitar recálculos innecesarios)
-  const totals = useMemo(() => calculateTotals(filteredReports), [filteredReports, calculateTotals]);
-  
-  const handleDateRangeChange = useCallback((e) => {
-    setDateRange((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  }, []);
-
-  const handleProjectChange = useCallback((e) => {
-    setSelectedProjectId(e.target.value);
-    if (e.target.value === "") {
-      setPdfDisabledReason("Selecciona un proyecto para generar el PDF.");
-    } else {
-      setPdfDisabledReason(null);
-    }
-  }, []);
-
-  const handleGeneratePDF = useCallback(() => {
-    console.log("Intentando generar PDF con reportes:", filteredReports.length);
-    if (filteredReports.length > 0 && selectedProjectId) {
-      console.log("Condiciones satisfechas, mostrando link de PDF");
-      setShowPDFLink(true);
-    } else {
-      console.log("No se puede generar PDF:", {
-        reportes: filteredReports.length,
-        proyecto: selectedProjectId
-      });
-    }
-  }, [filteredReports, selectedProjectId]);
-
-  const confirmDelete = useCallback((reportId) => {
-    setReportToDelete(reportId);
-  }, []);
-
-  const handleDelete = useCallback(async () => {
-    if (reportToDelete) {
-      const success = await deleteReport(reportToDelete);
-      if (success) {
-        setReportToDelete(null);
-      }
-    }
-  }, [reportToDelete, deleteReport]);
-
-  const startEditing = useCallback((report) => {
-    setEditingReportId(report.id);
-    setEditedReport({ ...report });
-  }, []);
-
-  const handleEditChange = useCallback((e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    setEditedReport((prev) => {
+    
+    setEditedReport(prev => {
       if (!prev) return prev;
       
       if (name.includes(".")) {
@@ -5927,82 +5394,20 @@ const ReportsViewer = () => {
           return { ...prev, workPerformed: { ...prev.workPerformed, [field]: updatedValue } };
         }
       }
+      
       return { ...prev, [name]: value };
     });
   }, []);
 
-  const handleAddMaterial = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (!file || !editedReport) return;
-
-    const description = prompt("Descripción del material:") || "";
-    const costText = prompt("Coste del material (€):") || "0";
-    const cost = parseFloat(costText) || 0;
-
-    if (!description || isNaN(cost) || cost < 0) {
-      alert("Por favor, completa la descripción y un coste válido (numérico y positivo) antes de subir el archivo.");
-      return;
-    }
-
-    try {
-      const url = await uploadFile(file, "invoices", `${editedReport.projectId}_${editedReport.reportDate}`);
-      if (url) {
-        const newMaterial = { id: Date.now(), description, cost, invoiceUrl: url };
-        setEditedReport((prev) => ({
-          ...prev,
-          materials: [...(prev.materials || []), newMaterial],
-        }));
-      }
-    } catch (err) {
-      console.error("Error al subir material:", err);
-    }
-  }, [editedReport, uploadFile]);
-
-  const handleRemoveMaterial = useCallback((id) => {
-    setEditedReport((prev) => ({
-      ...prev,
-      materials: prev.materials.filter((m) => m.id !== id),
-    }));
-  }, []);
-
-  const handleAddPhoto = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (!file || !editedReport) return;
-
-    try {
-      const url = await uploadFile(file, "photos", `${editedReport.projectId}_${editedReport.reportDate}`);
-      if (url) {
-        setEditedReport((prev) => ({
-          ...prev,
-          workPerformed: {
-            ...prev.workPerformed,
-            photos: [...(prev.workPerformed.photos || []), { id: Date.now(), url }],
-          },
-        }));
-      }
-    } catch (err) {
-      console.error("Error al subir foto:", err);
-    }
-  }, [editedReport, uploadFile]);
-
-  const handleRemovePhoto = useCallback((id) => {
-    setEditedReport((prev) => ({
-      ...prev,
-      workPerformed: {
-        ...prev.workPerformed,
-        photos: prev.workPerformed.photos.filter((p) => p.id !== id),
-      },
-    }));
-  }, []);
-
-  const handleEditSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!editedReport) return;
     
     try {
-      const reportRef = doc(db, "dailyReports", editingReportId);
+      setLoading(true);
+      const reportRef = doc(db, "dailyReports", reportId);
 
-      // Preparar los datos a actualizar
+      // Preparar los datos a actualizar (código similar al original)
       const updatedData = {
         reportDate: editedReport.reportDate,
         weekNumber: getWeekNumber(editedReport.reportDate),
@@ -6014,20 +5419,21 @@ const ReportsViewer = () => {
         },
       };
 
-      // Si el proyecto es por horas, incluir los datos de labor
+      // Lógica específica por tipo de proyecto
+      const project = projects.find((p) => p.id === editedReport.projectId);
+      
       if (editedReport.labor) {
         updatedData.labor = editedReport.labor;
       }
 
-      // Si el proyecto es de presupuesto cerrado, incluir 'invoicedAmount'
-      if(editedReport.workPerformed?.invoicedAmount !== undefined) {
+      if (editedReport.workPerformed?.invoicedAmount !== undefined) {
         updatedData.invoicedAmount = editedReport.workPerformed.invoicedAmount;
       }
 
-      // Calcular costos (solo si es por horas)
-      const project = projects.find((p) => p.id === editedReport.projectId);
       if (project && project.type === "hourly") {
-        const totalMaterialsCost = editedReport.materials.reduce((sum, m) => sum + (m.cost || 0), 0);
+        const totalMaterialsCost = editedReport.materials.reduce(
+          (sum, m) => sum + (m.cost || 0), 0
+        );
         updatedData.totalMaterialsCost = totalMaterialsCost;
 
         if (editedReport.labor && 
@@ -6038,387 +5444,706 @@ const ReportsViewer = () => {
       }
 
       await updateDoc(reportRef, updatedData);
-      setEditingReportId(null);
-      setEditedReport(null);
-      await fetchReports();
+      onComplete();
     } catch (err) {
-      console.error("Error al guardar cambios:", err);
+      setError(`Error al guardar cambios: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Cargar reportes solo al montar el componente
-  useEffect(() => {
-    console.log("ReportsViewer montado - cargando reportes");
-    fetchReports();
+  // Manejadores para materiales y fotos
+  const handleMaterialsChange = useCallback((materials) => {
+    setEditedReport(prev => ({
+      ...prev,
+      materials
+    }));
   }, []);
 
-  // Componente de Debug (útil durante el desarrollo, puedes quitarlo en producción)
-  const DebugInfo = () => (
-    <div style={{ margin: '20px 0', padding: '10px', background: '#f5f5f5', border: '1px solid #ddd', fontSize: '12px' }}>
-      <h4>Información de Debug:</h4>
-      <pre>
-        {JSON.stringify({
-          reportsTotales: reports?.length || 0,
-          reportesFiltrados: filteredReports?.length || 0,
-          proyectoSeleccionado: selectedProjectId,
-          mostrarPDF: showPDFLink,
-          razonDeshabilitado: pdfDisabledReason,
-          cargando: loading,
-          error: error || 'ninguno'
-        }, null, 2)}
-      </pre>
+  const handlePhotosChange = useCallback((photos) => {
+    setEditedReport(prev => ({
+      ...prev,
+      workPerformed: {
+        ...prev.workPerformed,
+        photos
+      }
+    }));
+  }, []);
+
+  if (loading && !editedReport) return <p>Cargando reporte...</p>;
+  if (error) return <p className="error-message">{error}</p>;
+  if (!editedReport) return <p>No se encontró el reporte</p>;
+
+  const project = projects.find(p => p.id === editedReport.projectId) || {};
+  const isHourlyProject = project.type === "hourly";
+
+  return (
+    <form onSubmit={handleSubmit} className="edit-form">
+      <h3>Editar Parte</h3>
+      
+      {error && <p className="error-message">{error}</p>}
+      
+      <label>Fecha del parte:</label>
+      <input
+        type="date"
+        name="reportDate"
+        value={editedReport.reportDate}
+        onChange={handleInputChange}
+        required
+      />
+
+      {isHourlyProject ? (
+        <>
+          <h4>Mano de obra</h4>
+          <div className="labor-row">
+            <div className="labor-field">
+              <label>Hora entrada oficial</label>
+              <input
+                type="time"
+                name="labor.officialEntry"
+                value={editedReport.labor?.officialEntry || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+            <div className="labor-field">
+              <label>Hora salida oficial</label>
+              <input
+                type="time"
+                name="labor.officialExit"
+                value={editedReport.labor?.officialExit || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+          </div>
+
+          <div className="labor-row">
+            <div className="labor-field">
+              <label>Hora entrada peón</label>
+              <input
+                type="time"
+                name="labor.workerEntry"
+                value={editedReport.labor?.workerEntry || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+            <div className="labor-field">
+              <label>Hora salida peón</label>
+              <input
+                type="time"
+                name="labor.workerExit"
+                value={editedReport.labor?.workerExit || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <h4>Descripción de trabajos</h4>
+      <textarea
+        name="workPerformed.description"
+        value={editedReport.workPerformed?.description || ""}
+        onChange={handleInputChange}
+        placeholder="Descripción de los trabajos realizados"
+      />
+
+      {!isHourlyProject && (
+        <>
+          <label>Importe Facturado (€)</label>
+          <input
+            type="number"
+            name="workPerformed.invoicedAmount"
+            min="0"
+            step="0.01"
+            value={editedReport.workPerformed?.invoicedAmount || 0}
+            onChange={handleInputChange}
+          />
+        </>
+      )}
+
+      {/* Editor de materiales (componente separado) */}
+      {isHourlyProject && (
+        <MaterialsEditor 
+          materials={editedReport.materials || []}
+          onMaterialsChange={handleMaterialsChange}
+          projectId={editedReport.projectId}
+          reportDate={editedReport.reportDate}
+          uploadFile={uploadFile}
+        />
+      )}
+
+      {/* Editor de fotos (componente separado) */}
+      <PhotosEditor
+        photos={editedReport.workPerformed?.photos || []}
+        onPhotosChange={handlePhotosChange}
+        projectId={editedReport.projectId}
+        reportDate={editedReport.reportDate}
+        uploadFile={uploadFile}
+      />
+
+      <div className="form-actions">
+        <button type="submit" disabled={loading}>
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
+        <button 
+          type="button" 
+          onClick={onCancel}
+          disabled={loading}
+          className="cancel-button"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default React.memo(ReportEditForm);
+
+================
+File: src/components/reports/ReportFilters.js
+================
+import React, { useCallback } from "react";
+
+const ReportFilters = ({ 
+  projects, 
+  selectedProjectId, 
+  dateRange,
+  onProjectChange,
+  onDateRangeChange
+}) => {
+  const handleProjectSelect = useCallback((e) => {
+    onProjectChange(e.target.value);
+  }, [onProjectChange]);
+
+  const handleDateChange = useCallback((e) => {
+    const { name, value } = e.target;
+    onDateRangeChange({
+      ...dateRange,
+      [name]: value
+    });
+  }, [dateRange, onDateRangeChange]);
+
+  return (
+    <div className="filter-section">
+      <label>Filtrar por Proyecto: </label>
+      <select value={selectedProjectId} onChange={handleProjectSelect}>
+        <option value="">Todos los proyectos</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.id} - {project.client}
+          </option>
+        ))}
+      </select>
+
+      <div className="date-range">
+        <div className="date-field">
+          <label>Fecha de inicio:</label>
+          <input 
+            type="date" 
+            name="startDate" 
+            value={dateRange.startDate} 
+            onChange={handleDateChange} 
+          />
+        </div>
+        <div className="date-field">
+          <label>Fecha de fin:</label>
+          <input 
+            type="date" 
+            name="endDate" 
+            value={dateRange.endDate} 
+            onChange={handleDateChange} 
+          />
+        </div>
+      </div>
     </div>
   );
+};
 
-  if (loading && reports.length === 0) return <p>Cargando reportes...</p>;
-  if (error) return <p className="error-message">Error: {error}</p>;
+export default React.memo(ReportFilters);
+
+================
+File: src/components/reports/ReportItem.js
+================
+import React from "react";
+import { formatCurrency, formatNumber } from "../../utils/formatters";
+
+const ReportItem = ({ report, project, onEdit, onDelete }) => {
+  const isHourlyProject = project.type === "hourly";
+  const reportDate = new Date(report.reportDate).toLocaleDateString();
+
+  return (
+    <div className="report-card">
+      <h4>Parte del {reportDate}</h4>
+      
+      <div className="report-details">
+        <p><strong>Semana:</strong> {report.weekNumber}</p>
+        <p><strong>Proyecto:</strong> {report.projectId}</p>
+        <p><strong>Cliente:</strong> {project.client || "No disponible"}</p>
+        <p><strong>Dirección:</strong> {project.address || "No disponible"}</p>
+      </div>
+
+      {isHourlyProject ? (
+        <div className="labor-details">
+          <h5>Mano de obra</h5>
+          <p>Oficial: {formatNumber(report.labor?.officialHours || 0)} h - {formatCurrency(report.labor?.officialCost || 0)}</p>
+          <p>Peón: {formatNumber(report.labor?.workerHours || 0)} h - {formatCurrency(report.labor?.workerCost || 0)}</p>
+          <p>Total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</p>
+          
+          <h5>Materiales</h5>
+          {renderMaterials(report.materials)}
+          <p>Total materiales: {formatCurrency(report.totalMaterialsCost || 0)}</p>
+        </div>
+      ) : (
+        <div className="fixed-budget-details">
+          <p><strong>Importe facturado:</strong> {formatCurrency(report.invoicedAmount || 0)}</p>
+        </div>
+      )}
+
+      <div className="work-details">
+        <h5>Trabajos realizados</h5>
+        <p>{report.workPerformed?.description || "Sin descripción"}</p>
+        
+        {renderPhotos(report.workPerformed?.photos)}
+      </div>
+
+      {isHourlyProject && (
+        <p className="report-total">
+          <strong>Total:</strong> {formatCurrency(report.totalCost || 0)}
+        </p>
+      )}
+
+      <div className="report-actions">
+        <button onClick={onEdit}>Editar</button>
+        <button 
+          onClick={onDelete} 
+          className="delete-button"
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Funciones auxiliares para renderizado
+function renderMaterials(materials = []) {
+  if (!materials || materials.length === 0) {
+    return <p>No hay materiales registrados.</p>;
+  }
+  
+  return (
+    <div className="materials-list">
+      {materials.map((material, index) => (
+        <p key={material.id || index}>
+          {material.description} - {formatCurrency(material.cost)} (
+          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
+            Ver factura
+          </a>
+          )
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function renderPhotos(photos = []) {
+  if (!photos || photos.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="photos-container">
+      {photos.map((photo, index) => (
+        <img
+          key={photo.id || index}
+          src={photo.url}
+          alt={`Foto ${index + 1}`}
+          style={{ width: "100px", marginRight: "10px" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default React.memo(ReportItem);
+
+================
+File: src/components/reports/Reports.css
+================
+/* Estilos para la tabla de resumen */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.summary-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-table td.amount {
+  text-align: right;
+  font-weight: 500;
+}
+
+.summary-table tr.total-row {
+  border-top: 2px solid #ddd;
+  font-weight: bold;
+  color: #333;
+}
+
+.summary-table tr.total-row td {
+  padding-top: 12px;
+}
+
+/* Estilos para el botón PDF */
+.pdf-button-container {
+  margin-bottom: 20px;
+}
+
+.pdf-button {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background-color: #8D432D; /* El color de acento que mencionaste */
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.pdf-button:hover {
+  background-color: #7A3624; /* Versión más oscura del color de acento */
+}
+
+.pdf-button.error-button {
+  background-color: #e74c3c;
+}
+
+.pdf-disabled-message {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 20px;
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+================
+File: src/components/reports/ReportsList.js
+================
+import React from "react";
+import ReportItem from "./ReportItem";
+
+const ReportsList = ({ reports, projects, onEdit, onDelete }) => {
+  if (reports.length === 0) {
+    return <p>No hay partes que coincidan con los criterios de búsqueda.</p>;
+  }
+
+  return (
+    <div className="reports-list">
+      {reports.map((report) => (
+        <ReportItem
+          key={report.id}
+          report={report}
+          project={projects.find(p => p.id === report.projectId) || {}}
+          onEdit={() => onEdit(report.id)}
+          onDelete={() => onDelete(report.id)}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default React.memo(ReportsList);
+
+================
+File: src/components/reports/ReportSummary.js
+================
+// src/components/reports/ReportSummary.js
+import React, { useMemo } from "react";
+import { formatCurrency } from "../../utils/formatters";
+
+const ReportSummary = ({ reports, projects, selectedProjectId }) => {
+  const totals = useMemo(() => {
+    // El cálculo de totales permanece igual
+    let totalLabor = 0;
+    let totalMaterials = 0;
+    let totalCost = 0;
+    let totalInvoiced = 0;
+
+    reports.forEach(report => {
+      if (report.labor) {
+        totalLabor += report.labor.totalLaborCost || 0;
+      }
+      
+      totalMaterials += report.totalMaterialsCost || 0;
+      
+      if (report.totalCost) {
+        totalCost += report.totalCost;
+      } else if (report.labor) {
+        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+
+      if (report.invoicedAmount) {
+        totalInvoiced += report.invoicedAmount;
+      }
+    });
+
+    return {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced
+    };
+  }, [reports]);
+
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const isHourlyProject = selectedProject?.type === "hourly";
+
+  return (
+    <div className="totals-summary">
+      <h3>Resumen de totales</h3>
+      
+      {isHourlyProject ? (
+        // Usamos estructura de tabla para proyectos por horas
+        <table className="summary-table">
+          <tbody>
+            <tr>
+              <td><strong>Total mano de obra:</strong></td>
+              <td className="amount">{formatCurrency(totals.totalLabor)}</td>
+            </tr>
+            <tr>
+              <td><strong>Total materiales:</strong></td>
+              <td className="amount">{formatCurrency(totals.totalMaterials)}</td>
+            </tr>
+            <tr className="total-row">
+              <td><strong>TOTAL GENERAL:</strong></td>
+              <td className="amount">{formatCurrency(totals.totalCost)}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <table className="summary-table">
+          <tbody>
+            <tr>
+              <td><strong>Total facturado:</strong></td>
+              <td className="amount">{formatCurrency(totals.totalInvoiced)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
+export default React.memo(ReportSummary);
+
+================
+File: src/components/reports/ReportsViewer.js
+================
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import useReportActions from "../../hooks/reports/useReportActions";
+import useReportFilters from "../../hooks/reports/useReportFilters";
+import useReportSummary from "../../hooks/reports/useReportSummary";
+import { useProjects } from "../../hooks/useProjects";
+import ReportFilters from "./ReportFilters";
+import ReportsList from "./ReportsList";
+import ReportEditForm from "./ReportEditForm";
+import ReportDeleteModal from "./ReportDeleteModal";
+import ReportSummary from "./ReportSummary";
+import PDFButton from "../common/PDFButton";
+
+const ReportsViewer = () => {
+  // Estados locales
+  const [reports, setReports] = useState([]);
+  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [editingReportId, setEditingReportId] = useState(null);
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [pdfKey, setPdfKey] = useState(Date.now());
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Hooks modulares
+  const { 
+    deleteReport, 
+    updateReport,
+    loading: actionLoading, 
+    error: actionError,
+    fetchReports: fetchReportsAction 
+  } = useReportActions();
+  
+  const {
+    filters,
+    updateFilter,
+    updateFilters,
+    filterReports,
+    hasActiveFilters
+  } = useReportFilters({
+    projectId: selectedProjectId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate
+  });
+  
+  // useProjects se mantiene igual
+  const { projects } = useProjects();
+
+  // Efecto para cargar reportes al inicio
+  useEffect(() => {
+    const loadReports = async () => {
+      setIsLoading(true);
+      try {
+        const allReports = await fetchReportsAction();
+        setReports(allReports || []);
+      } catch (error) {
+        console.error("Error al cargar reportes:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadReports();
+  }, [fetchReportsAction]);
+
+  // Filtrar reportes basados en los filtros actuales
+  const filteredReports = useMemo(() => {
+    return filterReports(reports);
+  }, [filterReports, reports, filters]);
+
+  // Usar hook de resumen para calcular totales
+  const { totals } = useReportSummary(
+    filteredReports, 
+    projects, 
+    selectedProjectId
+  );
+
+  // Manejador para cambio de filtro de proyecto
+  const handleProjectChange = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+    updateFilter("projectId", projectId);
+    setPdfKey(Date.now()); 
+  }, [updateFilter]);
+
+  // Manejador para cambios en el rango de fechas
+  const handleDateRangeChange = useCallback((newDateRange) => {
+    setDateRange(newDateRange);
+    updateFilters(newDateRange);
+  }, [updateFilters]);
+
+  const handleEditReport = useCallback((reportId) => {
+    setEditingReportId(reportId);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingReportId(null);
+  }, []);
+
+  const handleDeleteConfirm = useCallback((reportId) => {
+    setReportToDelete(reportId);
+  }, []);
+
+  const handleDeleteCancel = useCallback(() => {
+    setReportToDelete(null);
+  }, []);
+
+  const handleDeleteReport = useCallback(async () => {
+    if (reportToDelete) {
+      setIsLoading(true);
+      try {
+        const success = await deleteReport(reportToDelete);
+        if (success) {
+          setReportToDelete(null);
+          // Recargar los reportes después de eliminar
+          const updatedReports = await fetchReportsAction();
+          setReports(updatedReports || []);
+        }
+      } catch (error) {
+        console.error("Error al eliminar reporte:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [reportToDelete, deleteReport, fetchReportsAction]);
+
+  const handleEditComplete = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const updatedReports = await fetchReportsAction();
+      setReports(updatedReports || []);
+      setEditingReportId(null);
+    } catch (error) {
+      console.error("Error al actualizar reportes:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchReportsAction]);
+
+  if (isLoading && reports.length === 0) return <p>Cargando reportes...</p>;
+  if (actionError) return <p className="error-message">Error: {actionError}</p>;
 
   return (
     <div className="reports-viewer">
       <h2>Informes</h2>
 
-      {/* Selector de Proyecto */}
-      <div className="filter-section">
-        <label>Filtrar por Proyecto: </label>
-        <select value={selectedProjectId} onChange={handleProjectChange}>
-          <option value="">Todos los proyectos</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.id} - {project.client}
-            </option>
-          ))}
-        </select>
+      <ReportFilters
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        dateRange={dateRange}
+        onProjectChange={handleProjectChange}
+        onDateRangeChange={handleDateRangeChange}
+      />
 
-        {/* Selectores de Fecha */}
-        <div className="date-range">
-          <div className="date-field">
-            <label>Fecha de inicio:</label>
-            <input type="date" name="startDate" value={dateRange.startDate} onChange={handleDateRangeChange} />
-          </div>
-          <div className="date-field">
-            <label>Fecha de fin:</label>
-            <input type="date" name="endDate" value={dateRange.endDate} onChange={handleDateRangeChange} />
-          </div>
-        </div>
-      </div>
-
-      {/* Resumen de totales */}
       {filteredReports.length > 0 && selectedProjectId && (
-        <div className="totals-summary" style={{
-          backgroundColor: "#f5f7fa",
-          padding: "15px",
-          borderRadius: "8px",
-          marginTop: "20px",
-          marginBottom: "20px",
-          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
-        }}>
-          <h3 style={{ marginTop: "0", marginBottom: "10px" }}>Resumen de totales</h3>
-          
-          {projects.find(p => p.id === selectedProjectId)?.type === "hourly" ? (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <strong>Total mano de obra:</strong>
-                <span>{formatCurrency(totals.totalLabor)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <strong>Total materiales:</strong>
-                <span>{formatCurrency(totals.totalMaterials)}</span>
-              </div>
-              <div style={{ 
-                display: "flex", 
-                justifyContent: "space-between",
-                borderTop: "1px solid #ddd",
-                paddingTop: "10px",
-                fontWeight: "bold"
-              }}>
-                <strong>TOTAL GENERAL:</strong>
-                <span>{formatCurrency(totals.totalCost)}</span>
-              </div>
-            </>
-          ) : (
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <strong>Total facturado:</strong>
-              <span>{formatCurrency(totals.totalInvoiced)}</span>
-            </div>
-          )}
-        </div>
+        <ReportSummary 
+          reports={filteredReports} 
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+        />
       )}
 
-      {/* Botón y enlace de descarga */}
-      <button 
-        onClick={handleGeneratePDF} 
+      <PDFButton 
+        key={pdfKey}
+        reports={filteredReports}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        dateRange={dateRange}
         disabled={!selectedProjectId || filteredReports.length === 0}
-      >
-        Generar PDF
-      </button>
-      
-      {!showPDFLink && (
-        <p style={{ color: "#666", fontStyle: "italic" }}>
-          {pdfDisabledReason || "Para generar un PDF, selecciona un proyecto y asegúrate de que haya reportes disponibles."}
-        </p>
-      )}
-
-      {showPDFLink && filteredReports.length > 0 && (
-        <PDFDownloadLink
-          document={<ReportPDFGenerator reports={filteredReports} projects={projects} />}
-          fileName={`informe_${selectedProjectId || 'todos'}_${dateRange.startDate || 'inicio'}_${dateRange.endDate || 'fin'}.pdf`}
-          style={{
-            display: "block",
-            margin: "10px 0",
-            padding: "10px",
-            backgroundColor: "#4CAF50",
-            color: "white",
-            textDecoration: "none",
-            textAlign: "center",
-            borderRadius: "4px"
-          }}
-        >
-          {({ loading: pdfLoading, error: pdfError }) => {
-            console.log("Estado de PDFDownloadLink:", { loading: pdfLoading, error: pdfError });
-            if (pdfError) {
-              console.error("Error en PDFDownloadLink:", pdfError);
-              return "Error al generar PDF";
-            }
-            return (pdfLoading ? "Generando PDF..." : "Descargar Informe en PDF");
-          }}
-        </PDFDownloadLink>
-      )}
-
-      {/* Añadir componente de Debug durante desarrollo (comentar o eliminar en producción) */}
-      {/* <DebugInfo /> */}
+      />
 
       <h3 className="section-title">Partes en el rango seleccionado:</h3>
 
-      {filteredReports.length === 0 ? (
-        <p>No hay partes que coincidan con los criterios de búsqueda.</p>
-      ) : (
-        filteredReports.map((report) => {
-          const project = projects.find((p) => p.id === report.projectId) || {};
-          const isEditing = editingReportId === report.id;
-
-          return (
-            <div key={report.id} className="report-card">
-              {isEditing ? (
-                <form onSubmit={handleEditSubmit} className="edit-form">
-                  <label>Fecha del parte:</label>
-                  <input
-                    type="date"
-                    name="reportDate"
-                    value={editedReport.reportDate}
-                    onChange={handleEditChange}
-                  />
-
-                  {project.type === 'hourly' && <>
-                    <h4>Mano de obra</h4>
-                    <div className="labor-row">
-                      <div className="labor-field">
-                        <label>Hora entrada oficial</label>
-                        <input
-                          type="time"
-                          name="labor.officialEntry"
-                          value={editedReport.labor?.officialEntry || ""}
-                          onChange={handleEditChange}
-                          className="time-input"
-                        />
-                      </div>
-                      <div className="labor-field">
-                        <label>Hora salida oficial</label>
-                        <input
-                          type="time"
-                          name="labor.officialExit"
-                          value={editedReport.labor?.officialExit || ""}
-                          onChange={handleEditChange}
-                          className="time-input"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="labor-row">
-                      <div className="labor-field">
-                        <label>Hora entrada peón</label>
-                        <input
-                          type="time"
-                          name="labor.workerEntry"
-                          value={editedReport.labor?.workerEntry || ""}
-                          onChange={handleEditChange}
-                          className="time-input"
-                        />
-                      </div>
-                      <div className="labor-field">
-                        <label>Hora salida peón</label>
-                        <input
-                          type="time"
-                          name="labor.workerExit"
-                          value={editedReport.labor?.workerExit || ""}
-                          onChange={handleEditChange}
-                          className="time-input"
-                        />
-                      </div>
-                    </div>
-                  </>}
-                  <label>Descripción trabajos:</label>
-                  <textarea
-                    name="workPerformed.description"
-                    value={editedReport.workPerformed?.description || ""}
-                    onChange={handleEditChange}
-                  />
-                  {project.type === 'fixed' && (
-                    <>
-                      <label>Importe Facturado (€)</label>
-                      <input
-                        type="number"
-                        name="workPerformed.invoicedAmount"
-                        min="0"
-                        step="0.01"
-                        value={editedReport.workPerformed?.invoicedAmount || 0}
-                        onChange={handleEditChange}
-                      />
-                    </>
-                  )}
-
-                  <h4>Materiales</h4>
-                  {editedReport.materials?.map((m) => (
-                    <div key={m.id} className="material-item">
-                      <input
-                        type="text"
-                        value={m.description || ""}
-                        onChange={(e) =>
-                          setEditedReport((prev) => ({
-                            ...prev,
-                            materials: prev.materials.map((item) =>
-                              item.id === m.id ? { ...item, description: e.target.value } : item
-                            ),
-                          }))
-                        }
-                      />
-                      <input
-                        type="number"
-                        value={m.cost || 0}
-                        onChange={(e) =>
-                          setEditedReport((prev) => ({
-                            ...prev,
-                            materials: prev.materials.map((item) =>
-                              item.id === m.id ? { ...item, cost: parseFloat(e.target.value) || 0 } : item
-                            ),
-                          }))
-                        }
-                        min="0"
-                        step="0.01"
-                      />
-                      <a href={m.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                        Ver factura
-                      </a>
-                      <button onClick={() => handleRemoveMaterial(m.id)} type="button">Eliminar</button>
-                    </div>
-                  ))}
-                  <input type="file" accept=".pdf" onChange={handleAddMaterial} disabled={storageUploading} />
-                  {storageUploading && <p>Subiendo material...</p>}
-                  {storageError && <p className="error-message">Error: {storageError}</p>}
-                  <h4>Fotografías</h4>
-                  <div className="photos-container">
-                    {editedReport.workPerformed?.photos?.map((photo) => (
-                      <div key={photo.id} className="photo-container">
-                        <img src={photo.url} alt="Foto" style={{ width: "100px" }} />
-                        <button onClick={() => handleRemovePhoto(photo.id)} type="button">Eliminar</button>
-                      </div>
-                    ))}
-                  </div>
-                  <input type="file" accept="image/*" onChange={handleAddPhoto} disabled={storageUploading} />
-                  {storageUploading && <p>Subiendo foto...</p>}
-                  {storageError && <p className="error-message">Error: {storageError}</p>}
-                  <button type="submit">Guardar cambios</button>
-                  <button type="button" onClick={() => setEditingReportId(null)}>
-                    Cancelar
-                  </button>
-                </form>
-              ) : (
-                <>
-                  <h4>Parte del {new Date(report.reportDate).toLocaleDateString()}</h4>
-                  <p>
-                    <strong>Semana:</strong> {report.weekNumber}
-                  </p>
-                  <p>
-                    <strong>Proyecto:</strong> {report.projectId}
-                  </p>
-                  <p>
-                    <strong>Cliente:</strong> {project.client || "No disponible"}
-                  </p>
-                  <p>
-                    <strong>Dirección:</strong> {project.address || "No disponible"}
-                  </p>
-
-                  {project.type === "hourly" ? (
-                    <>
-                      <h5>Mano de obra</h5>
-                      <p>Oficial: {formatNumber(report.labor?.officialHours || 0)} h - {formatCurrency(report.labor?.officialCost || 0)}</p>
-                      <p>Peón: {formatNumber(report.labor?.workerHours || 0)} h - {formatCurrency(report.labor?.workerCost || 0)}</p>
-                      <p>Total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</p>
-                      <h5>Materiales</h5>
-                      {report.materials && report.materials.length > 0 ? (
-                        report.materials.map((m, i) => (
-                          <p key={i}>
-                            {m.description} - {formatCurrency(m.cost)} (
-                            <a href={m.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                              Ver factura
-                            </a>
-                            )
-                          </p>
-                        ))
-                      ) : (
-                        <p>No hay materiales registrados.</p>
-                      )}
-                      <p>Total materiales: {formatCurrency(report.totalMaterialsCost || 0)}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p>
-                        <strong>Importe facturado:</strong>{" "}
-                        {formatCurrency(report.invoicedAmount || 0)}
-                      </p>
-                    </>
-                  )}
-
-                  <h5>Trabajos realizados</h5>
-                  <p>{report.workPerformed?.description || "Sin descripción"}</p>
-                  <div className="photos-container">
-                    {report.workPerformed?.photos?.map((photo, i) => (
-                      <img
-                        key={i}
-                        src={photo.url}
-                        alt={`Foto ${i + 1}`}
-                        style={{ width: "100px", marginRight: "10px" }}
-                      />
-                    ))}
-                  </div>
-
-                  {project.type === "hourly" && (
-                    <p>
-                      <strong>Total:</strong> {formatCurrency(report.totalCost || 0)}
-                    </p>
-                  )}
-
-                  <button onClick={() => startEditing(report)}>Editar</button>
-                  <button
-                    onClick={() => confirmDelete(report.id)}
-                    style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
-                  >
-                    Eliminar
-                  </button>
-                </>
-              )}
-            </div>
-          );
-        })
+      <ReportsList
+        reports={filteredReports}
+        projects={projects}
+        onEdit={handleEditReport}
+        onDelete={handleDeleteConfirm}
+      />
+      
+      {editingReportId && (
+        <ReportEditForm
+          reportId={editingReportId}
+          projects={projects}
+          onCancel={handleCancelEdit}
+          onComplete={handleEditComplete}
+        />
       )}
       
       {reportToDelete && (
-        <div className="modal">
-          <p>¿Seguro que quieres eliminar este parte?</p>
-          <button onClick={handleDelete} style={{ marginRight: "10px" }}>
-            Sí
-          </button>
-          <button onClick={() => setReportToDelete(null)}>No</button>
-        </div>
+        <ReportDeleteModal
+          onConfirm={handleDeleteReport}
+          onCancel={handleDeleteCancel}
+        />
       )}
     </div>
   );
@@ -6508,283 +6233,552 @@ export const storage = getStorage(app);
 export { app }; // Exporta la instancia de la app
 
 ================
-File: src/hooks/useDailyReports.js
+File: src/hooks/reports/useReportActions.js
 ================
-// src/hooks/useDailyReports.js - Versión corregida
-
-import { useState, useEffect, useCallback, useRef } from "react";
+// src/hooks/reports/useReportActions.js
+import { useCallback, useState } from "react";
 import { 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc, 
   collection, 
+  getDoc, 
+  getDocs, 
   query, 
   orderBy, 
-  where, 
-  limit, 
-  startAfter, 
-  getDocs, 
-  deleteDoc, 
-  doc, 
-  getDoc 
+  where 
 } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db, storage } from "../../firebase";
+import { getWeekNumber } from "../../utils/formatters";
 
-export const useDailyReports = (initialFilters = {}) => {
-  const [reports, setReports] = useState([]);
+/**
+ * Hook personalizado para gestionar acciones CRUD de reportes
+ * @returns {Object} - Objeto con funciones y estados para gestionar reportes
+ */
+export const useReportActions = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState(initialFilters);
-  
-  // Estado para paginación
-  const [lastVisible, setLastVisible] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [pageSize, setPageSize] = useState(50); // Aumentado para cargar más reportes de una vez
-  
-  // Referencia para cache de reportes por ID
-  const reportsCache = useRef(new Map());
+  const [success, setSuccess] = useState(null);
 
-  // Función para construir la consulta con filtros
-  const buildQuery = useCallback((lastDoc = null) => {
-    console.log("Construyendo query con filtros:", filters);
-    let q = collection(db, "dailyReports");
-    const conditions = [];
-    
-    // Filtro por fecha de inicio
-    if (filters.startDate) {
-      conditions.push(where("reportDate", ">=", filters.startDate));
-    }
-    
-    // Filtro por fecha final
-    if (filters.endDate) {
-      conditions.push(where("reportDate", "<=", filters.endDate));
-    }
-    
-    // Filtro por proyecto
-    if (filters.projectId) {
-      conditions.push(where("projectId", "==", filters.projectId));
-    }
-    
-    // Filtro por usuario
-    if (filters.userId) {
-      conditions.push(where("userId", "==", filters.userId));
-    }
-    
-    // Filtro por semana
-    if (filters.weekNumber) {
-      conditions.push(where("weekNumber", "==", filters.weekNumber));
-    }
-    
-    // Aplicar ordenamiento
-    const orderByField = filters.orderBy || "reportDate";
-    const orderDirection = filters.orderDirection || "desc";
-    
-    // Construir la consulta con condiciones
-    if (conditions.length > 0) {
-      q = query(q, ...conditions, orderBy(orderByField, orderDirection));
-    } else {
-      q = query(q, orderBy(orderByField, orderDirection));
-    }
-    
-    // Aplicar paginación
-    if (pageSize > 0) {
-      q = query(q, limit(pageSize));
-    }
-    
-    // Si hay un documento de inicio para paginación
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc));
-    }
-    
-    return q;
-  }, [filters, pageSize]);
-
-  // Función para cargar reportes
-  const fetchReports = useCallback(async (resetPagination = true) => {
-    console.log("Iniciando fetchReports, resetPagination:", resetPagination);
-    setLoading(true);
+  // Función para borrar mensajes de estado
+  const clearMessages = useCallback(() => {
     setError(null);
-    
+    setSuccess(null);
+  }, []);
+
+  // Función para obtener todos los reportes (NUEVA)
+  const fetchReports = useCallback(async (filters = {}) => {
+    setLoading(true);
+    clearMessages();
+
     try {
-      if (resetPagination) {
-        setReports([]);
-        setLastVisible(null);
+      let reportsQuery = collection(db, "dailyReports");
+      const queryFilters = [];
+      
+      // Aplicar filtros si se proporcionan
+      if (filters.projectId) {
+        queryFilters.push(where("projectId", "==", filters.projectId));
       }
       
-      const q = buildQuery(resetPagination ? null : lastVisible);
-      console.log("Ejecutando consulta a Firestore");
-      const querySnapshot = await getDocs(q);
-      console.log(`Obtenidos ${querySnapshot.docs.length} documentos de Firestore`);
+      if (filters.userId) {
+        queryFilters.push(where("userId", "==", filters.userId));
+      }
       
-      // Actualizar estado de paginación
-      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-      setLastVisible(lastDoc || null);
-      setHasMore(querySnapshot.docs.length === pageSize);
+      if (filters.startDate) {
+        queryFilters.push(where("reportDate", ">=", filters.startDate));
+      }
       
-      // Procesar resultados
-      const reportsData = querySnapshot.docs.map((doc) => {
-        const data = { id: doc.id, ...doc.data() };
-        
-        // Actualizar caché
-        reportsCache.current.set(doc.id, data);
-        
-        return data;
-      });
+      if (filters.endDate) {
+        queryFilters.push(where("reportDate", "<=", filters.endDate));
+      }
       
-      // Actualizar lista de reportes (paginación)
-      setReports((prev) => {
-        const newReports = resetPagination ? reportsData : [...prev, ...reportsData];
-        console.log(`Total de reportes cargados: ${newReports.length}`);
-        return newReports;
-      });
+      // Construir la consulta con filtros y ordenamiento
+      if (queryFilters.length > 0) {
+        reportsQuery = query(
+          reportsQuery,
+          ...queryFilters,
+          orderBy("reportDate", "desc")
+        );
+      } else {
+        reportsQuery = query(
+          reportsQuery,
+          orderBy("reportDate", "desc")
+        );
+      }
+      
+      const querySnapshot = await getDocs(reportsQuery);
+      const reportsList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setSuccess("Reportes obtenidos correctamente");
+      return reportsList;
     } catch (err) {
-      console.error("Error al cargar reportes:", err);
-      setError(err.message);
+      console.error("Error al obtener reportes:", err);
+      setError(`Error al obtener reportes: ${err.message}`);
+      return [];
     } finally {
       setLoading(false);
     }
-  }, [buildQuery, lastVisible, pageSize]);
+  }, [clearMessages]);
 
-  // Cargar más reportes (paginación)
-  const loadMore = useCallback(() => {
-    if (hasMore && !loading) {
-      return fetchReports(false);
-    }
-  }, [fetchReports, hasMore, loading]);
-
-  // Actualizar filtros
-  const updateFilters = useCallback((newFilters) => {
-    console.log("Actualizando filtros:", newFilters);
-    setFilters((prev) => ({ ...prev, ...newFilters }));
-  }, []);
-
-  // Obtener un reporte por ID (usando caché)
-  const getReportById = useCallback(async (reportId) => {
-    // Verificar caché primero
-    if (reportsCache.current.has(reportId)) {
-      return reportsCache.current.get(reportId);
-    }
-    
-    try {
-      setLoading(true);
-      const reportDoc = await getDoc(doc(db, "dailyReports", reportId));
-      
-      if (reportDoc.exists()) {
-        const reportData = { id: reportDoc.id, ...reportDoc.data() };
-        // Actualizar caché
-        reportsCache.current.set(reportId, reportData);
-        return reportData;
-      }
-      
+  // Función para crear un nuevo reporte
+  const createReport = useCallback(async (reportData, userId) => {
+    if (!reportData || !userId) {
+      setError("Datos de reporte o ID de usuario no proporcionados");
       return null;
+    }
+
+    setLoading(true);
+    clearMessages();
+
+    try {
+      // Asegurar que tiene una fecha y calcular semana
+      if (!reportData.reportDate) {
+        reportData.reportDate = new Date().toISOString().split("T")[0];
+      }
+      
+      const weekNumber = getWeekNumber(reportData.reportDate);
+
+      // Preparar datos para guardar
+      const newReportData = {
+        ...reportData,
+        weekNumber,
+        userId,
+        createdAt: new Date(),
+      };
+
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, "dailyReports"), newReportData);
+      
+      setSuccess("Reporte creado correctamente");
+      return { id: docRef.id, ...newReportData };
     } catch (err) {
-      console.error(`Error al obtener reporte ${reportId}:`, err);
-      throw err;
+      console.error("Error al crear reporte:", err);
+      setError(`Error al crear reporte: ${err.message}`);
+      return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearMessages]);
 
-  // Eliminar un reporte y sus archivos asociados
-  const deleteReport = useCallback(async (reportId) => {
+  // Función para actualizar un reporte existente
+  const updateReport = useCallback(async (reportId, updatedData) => {
+    if (!reportId || !updatedData) {
+      setError("ID de reporte o datos actualizados no proporcionados");
+      return false;
+    }
+
+    setLoading(true);
+    clearMessages();
+
     try {
-      console.log("Iniciando eliminación de reporte:", reportId);
-      setLoading(true);
+      // Obtener el reporte actual primero
       const reportRef = doc(db, "dailyReports", reportId);
       const reportSnap = await getDoc(reportRef);
       
       if (!reportSnap.exists()) {
-        throw new Error("Reporte no encontrado");
+        throw new Error("El reporte no existe");
       }
       
-      const report = reportSnap.data();
-      console.log("Datos del reporte a eliminar:", report);
-
-      // Función auxiliar para eliminar archivos de Storage
-      const deleteFileFromStorage = async (url) => {
-        if (!url) return;
-        try {
-          // Extraer la ruta de la URL
-          const path = decodeURIComponent(url.split('/').slice(3).join('/').split('?')[0]);
-          console.log("Intentando eliminar archivo:", path);
-          const fileRef = ref(storage, path);
-          await deleteObject(fileRef);
-          console.log("Archivo eliminado con éxito:", path);
-        } catch (err) {
-          console.error(`Error eliminando archivo ${url}:`, err);
-        }
-      };
-
-      // Eliminar facturas de materiales
-      if (report.materials?.length > 0) {
-        console.log("Eliminando facturas de materiales:", report.materials.length);
-        for (const material of report.materials) {
-          if (material.invoiceUrl) {
-            await deleteFileFromStorage(material.invoiceUrl);
-          }
-        }
+      // Si hay una fecha nueva, recalcular el número de semana
+      if (updatedData.reportDate && updatedData.reportDate !== reportSnap.data().reportDate) {
+        updatedData.weekNumber = getWeekNumber(updatedData.reportDate);
       }
       
-      // Eliminar fotos
-      if (report.workPerformed?.photos?.length > 0) {
-        console.log("Eliminando fotos:", report.workPerformed.photos.length);
-        for (const photo of report.workPerformed.photos) {
-          if (photo.url) {
-            await deleteFileFromStorage(photo.url);
-          }
-        }
-      }
-
-      // Eliminar el documento de Firestore
-      console.log("Eliminando documento de Firestore:", reportId);
-      await deleteDoc(reportRef);
+      // Actualizar timestamp
+      updatedData.updatedAt = new Date();
       
-      // Actualizar estado local y caché
-      setReports((prev) => prev.filter((r) => r.id !== reportId));
-      reportsCache.current.delete(reportId);
+      // Actualizar en Firestore
+      await updateDoc(reportRef, updatedData);
       
-      console.log("Reporte eliminado con éxito:", reportId);
+      setSuccess("Reporte actualizado correctamente");
       return true;
     } catch (err) {
-      console.error("Error al eliminar reporte:", err);
-      setError(err.message);
+      console.error("Error al actualizar reporte:", err);
+      setError(`Error al actualizar reporte: ${err.message}`);
       return false;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearMessages]);
 
-  // Cargar reportes al cambiar los filtros
-  useEffect(() => {
-    console.log("useEffect en useDailyReports - cargando reportes por cambio de filtros");
-    fetchReports();
-  }, [filters]);
+  // Función para eliminar un reporte y sus archivos asociados
+  const deleteReport = useCallback(async (reportId) => {
+    if (!reportId) {
+      setError("ID de reporte no proporcionado");
+      return false;
+    }
 
-  // Crear objeto para retornar
-  const returnObj = {
-    reports,
-    allReports: reports, // Para compatibilidad con código antiguo
+    setLoading(true);
+    clearMessages();
+
+    try {
+      // Obtener el reporte primero para saber qué archivos eliminar
+      const reportRef = doc(db, "dailyReports", reportId);
+      const reportSnap = await getDoc(reportRef);
+      
+      if (!reportSnap.exists()) {
+        throw new Error("El reporte no existe");
+      }
+      
+      const reportData = reportSnap.data();
+      
+      // Función auxiliar para eliminar archivos de Storage
+      const deleteFileFromStorage = async (url) => {
+        if (!url) return;
+        
+        try {
+          // Extraer la ruta de la URL
+          const path = decodeURIComponent(url.split('/').slice(3).join('/').split('?')[0]);
+          const fileRef = ref(storage, path);
+          await deleteObject(fileRef);
+        } catch (err) {
+          console.error(`Error al eliminar archivo ${url}:`, err);
+          // Continuamos con la eliminación aunque falle un archivo
+        }
+      };
+      
+      // Eliminar facturas de materiales
+      if (reportData.materials && reportData.materials.length > 0) {
+        await Promise.all(
+          reportData.materials
+            .filter(m => m.invoiceUrl)
+            .map(m => deleteFileFromStorage(m.invoiceUrl))
+        );
+      }
+      
+      // Eliminar fotos
+      if (reportData.workPerformed && reportData.workPerformed.photos) {
+        await Promise.all(
+          reportData.workPerformed.photos
+            .filter(p => p.url)
+            .map(p => deleteFileFromStorage(p.url))
+        );
+      }
+      
+      // Eliminar el documento de Firestore
+      await deleteDoc(reportRef);
+      
+      setSuccess("Reporte eliminado correctamente");
+      return true;
+    } catch (err) {
+      console.error("Error al eliminar reporte:", err);
+      setError(`Error al eliminar reporte: ${err.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [clearMessages]);
+
+  // Obtener un reporte específico por ID
+  const getReportById = useCallback(async (reportId) => {
+    if (!reportId) {
+      setError("ID de reporte no proporcionado");
+      return null;
+    }
+
+    setLoading(true);
+    clearMessages();
+
+    try {
+      const reportRef = doc(db, "dailyReports", reportId);
+      const reportSnap = await getDoc(reportRef);
+      
+      if (!reportSnap.exists()) {
+        throw new Error("El reporte no existe");
+      }
+      
+      return { id: reportSnap.id, ...reportSnap.data() };
+    } catch (err) {
+      console.error(`Error al obtener reporte ${reportId}:`, err);
+      setError(`Error al obtener reporte: ${err.message}`);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [clearMessages]);
+
+  return {
+    createReport,
+    updateReport,
+    deleteReport,
+    fetchReports,
+    getReportById,
     loading,
     error,
-    fetchReports,
-    deleteReport,
-    getReportById,
-    updateFilters,
-    filters,
-    loadMore,
-    hasMore,
-    setPageSize
+    success,
+    clearMessages
   };
-
-  // Log de depuración
-  console.log("useDailyReports retornando:", {
-    reportsLength: reports.length,
-    loading,
-    error
-  });
-
-  return returnObj;
 };
 
-export default useDailyReports;
+export default useReportActions;
+
+================
+File: src/hooks/reports/useReportFilters.js
+================
+import { useState, useCallback, useMemo } from "react";
+
+/**
+ * Hook personalizado para la gestión de filtros de reportes
+ * @param {Object} initialFilters - Filtros iniciales
+ * @returns {Object} - Objeto con estados y funciones para gestionar filtros
+ */
+export const useReportFilters = (initialFilters = {}) => {
+  const [filters, setFilters] = useState({
+    projectId: "",
+    startDate: "",
+    endDate: "",
+    ...initialFilters
+  });
+
+  // Actualizar un filtro específico
+  const updateFilter = useCallback((key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  }, []);
+
+  // Actualizar múltiples filtros a la vez
+  const updateFilters = useCallback((newFilters) => {
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters
+    }));
+  }, []);
+
+  // Restablecer todos los filtros
+  const resetFilters = useCallback(() => {
+    setFilters({
+      projectId: "",
+      startDate: "",
+      endDate: "",
+    });
+  }, []);
+
+  // Filtrar una lista de reportes basándose en los filtros actuales
+  const filterReports = useCallback((reports) => {
+    if (!Array.isArray(reports)) return [];
+    
+    return reports.filter(report => {
+      // Filtro por proyecto
+      if (filters.projectId && report.projectId !== filters.projectId) {
+        return false;
+      }
+      
+      // Filtro por fecha de inicio
+      if (filters.startDate && report.reportDate) {
+        const startDate = new Date(filters.startDate);
+        const reportDate = new Date(report.reportDate);
+        if (reportDate < startDate) {
+          return false;
+        }
+      }
+      
+      // Filtro por fecha final
+      if (filters.endDate && report.reportDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999); // Incluir todo el día
+        const reportDate = new Date(report.reportDate);
+        if (reportDate > endDate) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [filters]);
+
+  // Verifica si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return filters.projectId !== "" || filters.startDate !== "" || filters.endDate !== "";
+  }, [filters.projectId, filters.startDate, filters.endDate]);
+
+  // Crear una cadena de texto que describa los filtros actuales (para uso en mensajes o títulos)
+  const filtersDescription = useMemo(() => {
+    const parts = [];
+    
+    if (filters.projectId) {
+      parts.push(`Proyecto: ${filters.projectId}`);
+    }
+    
+    if (filters.startDate) {
+      parts.push(`Desde: ${new Date(filters.startDate).toLocaleDateString()}`);
+    }
+    
+    if (filters.endDate) {
+      parts.push(`Hasta: ${new Date(filters.endDate).toLocaleDateString()}`);
+    }
+    
+    return parts.join(' - ') || 'Sin filtros aplicados';
+  }, [filters]);
+
+  return {
+    filters,
+    updateFilter,
+    updateFilters,
+    resetFilters,
+    filterReports,
+    hasActiveFilters,
+    filtersDescription
+  };
+};
+
+export default useReportFilters;
+
+================
+File: src/hooks/reports/useReportSummary.js
+================
+import { useMemo } from "react";
+
+/**
+ * Hook personalizado para calcular resúmenes y estadísticas de reportes
+ * @param {Array} reports - Lista de reportes
+ * @param {Array} projects - Lista de proyectos
+ * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
+ * @returns {Object} - Objeto con cálculos y estadísticas
+ */
+export const useReportSummary = (reports = [], projects = [], selectedProjectId = "") => {
+  // Filtrar por proyecto si es necesario
+  const filteredReports = useMemo(() => {
+    if (!selectedProjectId) return reports;
+    return reports.filter(report => report.projectId === selectedProjectId);
+  }, [reports, selectedProjectId]);
+
+  // Obtener tipo de proyecto
+  const projectType = useMemo(() => {
+    if (!selectedProjectId) return null;
+    const project = projects.find(p => p.id === selectedProjectId);
+    return project?.type || null;
+  }, [projects, selectedProjectId]);
+
+  // Calcular totales generales
+  const totals = useMemo(() => {
+    let totalLabor = 0;
+    let totalMaterials = 0;
+    let totalCost = 0;
+    let totalInvoiced = 0;
+    let totalHours = 0;
+
+    filteredReports.forEach(report => {
+      // Costos de mano de obra (proyectos por hora)
+      if (report.labor) {
+        totalLabor += report.labor.totalLaborCost || 0;
+        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
+      }
+      
+      // Costos de materiales
+      totalMaterials += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        totalCost += report.totalCost;
+      } else if (report.labor) {
+        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        totalInvoiced += report.invoicedAmount;
+      }
+    });
+
+    return {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced,
+      totalHours
+    };
+  }, [filteredReports]);
+
+  // Calcular resumen por semanas
+  const weeklySummary = useMemo(() => {
+    if (filteredReports.length === 0) return [];
+
+    const weekMap = {};
+    
+    filteredReports.forEach(report => {
+      const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
+      
+      if (!weekMap[weekKey]) {
+        weekMap[weekKey] = {
+          weekNumber: report.weekNumber,
+          year: new Date(report.reportDate).getFullYear(),
+          label: `Semana ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
+          laborCost: 0,
+          materialsCost: 0,
+          totalCost: 0,
+          invoicedAmount: 0,
+          reports: 0
+        };
+      }
+      
+      // Incrementar contadores
+      weekMap[weekKey].reports += 1;
+      
+      // Para proyectos por hora
+      if (report.labor) {
+        weekMap[weekKey].laborCost += report.labor.totalLaborCost || 0;
+      }
+      
+      weekMap[weekKey].materialsCost += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        weekMap[weekKey].totalCost += report.totalCost;
+      } else if (report.labor) {
+        weekMap[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+      
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        weekMap[weekKey].invoicedAmount += report.invoicedAmount;
+      }
+    });
+
+    // Convertir a array y ordenar por semana/año
+    return Object.values(weekMap).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.weekNumber - b.weekNumber;
+    });
+  }, [filteredReports]);
+
+  // Calcular presupuesto restante para proyectos de presupuesto cerrado
+  const budgetSummary = useMemo(() => {
+    if (projectType !== 'fixed' || !selectedProjectId) return null;
+    
+    const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return null;
+    
+    const budgetAmount = project.budgetAmount || 0;
+    const invoicedTotal = totals.totalInvoiced;
+    const remainingBudget = budgetAmount - invoicedTotal;
+    const progressPercentage = budgetAmount > 0 ? (invoicedTotal / budgetAmount) * 100 : 0;
+    
+    return {
+      budgetAmount,
+      invoicedTotal,
+      remainingBudget,
+      progressPercentage: Math.min(progressPercentage, 100), // Limitar a 100%
+      isOverBudget: remainingBudget < 0
+    };
+  }, [projectType, selectedProjectId, projects, totals.totalInvoiced]);
+
+  return {
+    totals,
+    weeklySummary,
+    budgetSummary,
+    projectType,
+    reportCount: filteredReports.length
+  };
+};
+
+export default useReportSummary;
 
 ================
 File: src/hooks/useFormValidation.js
@@ -7671,6 +7665,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
 
 // Crear cliente de React Query con configuración óptima
 const queryClient = new QueryClient({
@@ -7701,55 +7697,6 @@ File: src/logo.svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 841.9 595.3"><g fill="#61DAFB"><path d="M666.3 296.5c0-32.5-40.7-63.3-103.1-82.4 14.4-63.6 8-114.2-20.2-130.4-6.5-3.8-14.1-5.6-22.4-5.6v22.3c4.6 0 8.3.9 11.4 2.6 13.6 7.8 19.5 37.5 14.9 75.7-1.1 9.4-2.9 19.3-5.1 29.4-19.6-4.8-41-8.5-63.5-10.9-13.5-18.5-27.5-35.3-41.6-50 32.6-30.3 63.2-46.9 84-46.9V78c-27.5 0-63.5 19.6-99.9 53.6-36.4-33.8-72.4-53.2-99.9-53.2v22.3c20.7 0 51.4 16.5 84 46.6-14 14.7-28 31.4-41.3 49.9-22.6 2.4-44 6.1-63.6 11-2.3-10-4-19.7-5.2-29-4.7-38.2 1.1-67.9 14.6-75.8 3-1.8 6.9-2.6 11.5-2.6V78.5c-8.4 0-16 1.8-22.6 5.6-28.1 16.2-34.4 66.7-19.9 130.1-62.2 19.2-102.7 49.9-102.7 82.3 0 32.5 40.7 63.3 103.1 82.4-14.4 63.6-8 114.2 20.2 130.4 6.5 3.8 14.1 5.6 22.5 5.6 27.5 0 63.5-19.6 99.9-53.6 36.4 33.8 72.4 53.2 99.9 53.2 8.4 0 16-1.8 22.6-5.6 28.1-16.2 34.4-66.7 19.9-130.1 62-19.1 102.5-49.9 102.5-82.3zm-130.2-66.7c-3.7 12.9-8.3 26.2-13.5 39.5-4.1-8-8.4-16-13.1-24-4.6-8-9.5-15.8-14.4-23.4 14.2 2.1 27.9 4.7 41 7.9zm-45.8 106.5c-7.8 13.5-15.8 26.3-24.1 38.2-14.9 1.3-30 2-45.2 2-15.1 0-30.2-.7-45-1.9-8.3-11.9-16.4-24.6-24.2-38-7.6-13.1-14.5-26.4-20.8-39.8 6.2-13.4 13.2-26.8 20.7-39.9 7.8-13.5 15.8-26.3 24.1-38.2 14.9-1.3 30-2 45.2-2 15.1 0 30.2.7 45 1.9 8.3 11.9 16.4 24.6 24.2 38 7.6 13.1 14.5 26.4 20.8 39.8-6.3 13.4-13.2 26.8-20.7 39.9zm32.3-13c5.4 13.4 10 26.8 13.8 39.8-13.1 3.2-26.9 5.9-41.2 8 4.9-7.7 9.8-15.6 14.4-23.7 4.6-8 8.9-16.1 13-24.1zM421.2 430c-9.3-9.6-18.6-20.3-27.8-32 9 .4 18.2.7 27.5.7 9.4 0 18.7-.2 27.8-.7-9 11.7-18.3 22.4-27.5 32zm-74.4-58.9c-14.2-2.1-27.9-4.7-41-7.9 3.7-12.9 8.3-26.2 13.5-39.5 4.1 8 8.4 16 13.1 24 4.7 8 9.5 15.8 14.4 23.4zM420.7 163c9.3 9.6 18.6 20.3 27.8 32-9-.4-18.2-.7-27.5-.7-9.4 0-18.7.2-27.8.7 9-11.7 18.3-22.4 27.5-32zm-74 58.9c-4.9 7.7-9.8 15.6-14.4 23.7-4.6 8-8.9 16-13 24-5.4-13.4-10-26.8-13.8-39.8 13.1-3.1 26.9-5.8 41.2-7.9zm-90.5 125.2c-35.4-15.1-58.3-34.9-58.3-50.6 0-15.7 22.9-35.6 58.3-50.6 8.6-3.7 18-7 27.7-10.1 5.7 19.6 13.2 40 22.5 60.9-9.2 20.8-16.6 41.1-22.2 60.6-9.9-3.1-19.3-6.5-28-10.2zM310 490c-13.6-7.8-19.5-37.5-14.9-75.7 1.1-9.4 2.9-19.3 5.1-29.4 19.6 4.8 41 8.5 63.5 10.9 13.5 18.5 27.5 35.3 41.6 50-32.6 30.3-63.2 46.9-84 46.9-4.5-.1-8.3-1-11.3-2.7zm237.2-76.2c4.7 38.2-1.1 67.9-14.6 75.8-3 1.8-6.9 2.6-11.5 2.6-20.7 0-51.4-16.5-84-46.6 14-14.7 28-31.4 41.3-49.9 22.6-2.4 44-6.1 63.6-11 2.3 10.1 4.1 19.8 5.2 29.1zm38.5-66.7c-8.6 3.7-18 7-27.7 10.1-5.7-19.6-13.2-40-22.5-60.9 9.2-20.8 16.6-41.1 22.2-60.6 9.9 3.1 19.3 6.5 28.1 10.2 35.4 15.1 58.3 34.9 58.3 50.6-.1 15.7-23 35.6-58.4 50.6zM320.8 78.4z"/><circle cx="420.9" cy="296.5" r="45.7"/><path d="M520.5 78.1z"/></g></svg>
 
 ================
-File: src/ReportPDF.js
-================
-import React from "react";
-import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer";
-
-const styles = StyleSheet.create({
-  page: { padding: 20, fontSize: 12 },
-  title: { fontSize: 14, fontWeight: "bold", marginBottom: 10 },
-  text: { marginBottom: 5 },
-  table: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1 },
-  tableRow: { flexDirection: "row", borderBottomWidth: 1 },
-  tableCol: { width: "25%", borderRightWidth: 1, padding: 5 },
-  tableColLast: { width: "25%", padding: 5 },
-  image: { width: 200, height: 150, marginVertical: 10 }
-});
-
-const ReportPDF = ({ reports }) => (
-  <Document>
-    {reports.map((report, index) => (
-      <Page key={index} size="A4" style={styles.page}>
-        <Text style={styles.title}>Parte del {new Date(report.reportDate).toLocaleDateString()}</Text>
-        <Text>Proyecto: {report.projectId}</Text>
-        <Text>Cliente: {report.client || "No disponible"}</Text>
-
-        <Text style={styles.title}>Mano de obra</Text>
-        <View style={styles.table}>
-          <View style={styles.tableRow}>
-            <Text style={styles.tableCol}>Horas trabajadas</Text>
-            <Text style={styles.tableColLast}>{report.labor.officialHours} (Oficial) / {report.labor.workerHours} (Peón)</Text>
-          </View>
-          <View style={styles.tableRow}>
-            <Text style={styles.tableCol}>Coste total</Text>
-            <Text style={styles.tableColLast}>{report.totalCost}€</Text>
-          </View>
-        </View>
-
-        <Text style={styles.title}>Trabajos realizados</Text>
-        <Text>{report.workPerformed.description}</Text>
-        {report.workPerformed.photos.map((photo, i) => (
-          <Image key={i} src={photo} style={styles.image} />
-        ))}
-      </Page>
-    ))}
-  </Document>
-);
-
-export default ReportPDF;
-
-================
 File: src/reportWebVitals.js
 ================
 const reportWebVitals = onPerfEntry => {
@@ -7774,20 +7721,6 @@ File: src/setupTests.js
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
-
-================
-File: src/storageService.js
-================
-import { storage } from "./firebaseConfig";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
-export const subirArchivo = async (file, folder, projectId, reportDate) => {
-  const fileName = `${projectId}_${reportDate}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-  const storageRef = ref(storage, `${folder}/${fileName}`);
-
-  await uploadBytes(storageRef, file);
-  return getDownloadURL(storageRef);
-};
 
 ================
 File: src/utils/formatters.js

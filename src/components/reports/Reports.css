@@ -1,0 +1,64 @@
+/* Estilos para la tabla de resumen */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.summary-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-table td.amount {
+  text-align: right;
+  font-weight: 500;
+}
+
+.summary-table tr.total-row {
+  border-top: 2px solid #ddd;
+  font-weight: bold;
+  color: #333;
+}
+
+.summary-table tr.total-row td {
+  padding-top: 12px;
+}
+
+/* Estilos para el botón PDF */
+.pdf-button-container {
+  margin-bottom: 20px;
+}
+
+.pdf-button {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background-color: #8D432D; /* El color de acento que mencionaste */
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.pdf-button:hover {
+  background-color: #7A3624; /* Versión más oscura del color de acento */
+}
+
+.pdf-button.error-button {
+  background-color: #e74c3c;
+}
+
+.pdf-disabled-message {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 20px;
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}

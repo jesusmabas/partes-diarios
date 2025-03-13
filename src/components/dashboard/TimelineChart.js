@@ -1,5 +1,5 @@
-// src/components/dashboard/TimelineChart.js
-import React, { useState } from "react";
+// src/components/dashboard/TimelineChart.js - Optimizado
+import React, { useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -12,11 +12,24 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
-import { formatCurrency } from "../../utils/formatters";
 
+/**
+ * Componente que muestra gráficos de línea temporal para datos de proyectos
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.data - Datos temporales para visualizar
+ */
 const TimelineChart = ({ data }) => {
   const [chartType, setChartType] = useState("line"); // 'line' o 'area'
   const [metricType, setMetricType] = useState("cost"); // 'cost' o 'invoiced'
+
+  // Manejadores para cambiar tipo de gráfico y métrica
+  const handleChartTypeChange = useCallback((type) => {
+    setChartType(type);
+  }, []);
+
+  const handleMetricTypeChange = useCallback((type) => {
+    setMetricType(type);
+  }, []);
 
   // Si no hay datos, mostrar mensaje
   if (!data || data.length === 0) {
@@ -26,6 +39,16 @@ const TimelineChart = ({ data }) => {
       </div>
     );
   }
+
+  // Función para formatear valores de moneda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-ES', { 
+      style: 'currency', 
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
@@ -50,13 +73,13 @@ const TimelineChart = ({ data }) => {
         <div className="chart-type-buttons">
           <button
             className={chartType === "line" ? "active" : ""}
-            onClick={() => setChartType("line")}
+            onClick={() => handleChartTypeChange("line")}
           >
             Líneas
           </button>
           <button
             className={chartType === "area" ? "active" : ""}
-            onClick={() => setChartType("area")}
+            onClick={() => handleChartTypeChange("area")}
           >
             Área
           </button>
@@ -64,13 +87,13 @@ const TimelineChart = ({ data }) => {
         <div className="metric-type-buttons">
           <button
             className={metricType === "cost" ? "active" : ""}
-            onClick={() => setMetricType("cost")}
+            onClick={() => handleMetricTypeChange("cost")}
           >
             Costes
           </button>
           <button
             className={metricType === "invoiced" ? "active" : ""}
-            onClick={() => setMetricType("invoiced")}
+            onClick={() => handleMetricTypeChange("invoiced")}
           >
             Facturación
           </button>
