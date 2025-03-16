@@ -34,7 +34,7 @@
   display: block;
   width: 100%;
   padding: 12px 20px;
-  background-color: #8D432D; /* El color de acento que mencionaste */
+  background-color: #8D432D;
   color: white;
   text-align: center;
   border-radius: 4px;
@@ -46,7 +46,7 @@
 }
 
 .pdf-button:hover {
-  background-color: #7A3624; /* Versión más oscura del color de acento */
+  background-color: #7A3624;
 }
 
 .pdf-button.error-button {
@@ -61,4 +61,332 @@
   padding: 10px;
   background-color: #f5f5f5;
   border-radius: 4px;
+}
+
+/* CREANDO CLASES ESPECÍFICAS PARA EVITAR CONFLICTOS CON APP.CSS */
+/* Estilo para el overlay del modal */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 1000 !important;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Estilo para nuestro modal personalizado (usando una clase diferente) */
+.custom-modal {
+  position: relative !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
+  width: 90% !important;
+  max-width: 800px !important;
+  height: auto !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  padding: 30px !important;
+  margin: 0 auto !important;
+  animation: slideIn 0.3s ease;
+  
+  /* Aseguramos que no herede los estilos problemáticos del .modal en App.css */
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+}
+
+/* Mantenemos la clase edit-modal para aplicar estilos específicos del formulario de edición */
+.edit-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 #f5f5f5;
+}
+
+/* Para Chrome, Safari, y Edge: estilizar la barra de desplazamiento */
+.edit-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.edit-modal::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.edit-modal::-webkit-scrollbar-thumb {
+  background-color: #d4d4d4;
+  border-radius: 4px;
+}
+
+/* Título del modal */
+.custom-modal h3 {
+  margin-top: 0 !important;
+  margin-bottom: 20px !important;
+  border-bottom: 1px solid #ddd !important;
+  padding-bottom: 10px !important;
+  font-family: "Cormorant", serif !important;
+  color: #2c3e50 !important;
+  position: sticky !important;
+  top: 0 !important;
+  background-color: white !important;
+  z-index: 1 !important;
+  padding-top: 5px !important;
+}
+
+/* Botón de cerrar en la esquina superior derecha */
+.custom-modal .close-button {
+  position: absolute !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: none !important;
+  border: none !important;
+  font-size: 24px !important;
+  cursor: pointer !important;
+  color: #7f8c8d !important;
+  padding: 5px !important;
+  transition: color 0.3s ease !important;
+  z-index: 2 !important;
+}
+
+.custom-modal .close-button:hover {
+  color: #e74c3c !important;
+}
+
+/* Ajustar botones del formulario */
+.custom-modal .form-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  margin-top: 20px !important;
+  padding-top: 15px !important;
+  border-top: 1px solid #eee !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  background-color: white !important;
+  padding-bottom: 5px !important;
+  z-index: 1 !important;
+}
+
+/* Estilo para prevenir el scroll en el body cuando el modal está abierto */
+.body-no-scroll {
+  overflow: hidden !important;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Estilos para el interior del formulario */
+.edit-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  padding-bottom: 20px !important;
+}
+
+.edit-form label {
+  font-weight: 500 !important;
+  display: block !important;
+  margin-bottom: 5px !important;
+}
+
+.edit-form input,
+.edit-form textarea,
+.edit-form select {
+  padding: 10px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  width: 100% !important;
+}
+
+.edit-form textarea {
+  min-height: 100px !important;
+  resize: vertical !important;
+}
+
+.edit-form h4 {
+  margin-top: 15px !important;
+  margin-bottom: 8px !important;
+  color: #2c3e50 !important;
+  font-family: "Cormorant", serif !important;
+}
+
+/* Estilos responsivos para el modal */
+@media (max-width: 768px) {
+  .custom-modal {
+    width: 95% !important;
+    max-height: 85vh !important;
+    padding: 20px 15px !important;
+  }
+  
+  .custom-modal .form-actions {
+    flex-direction: column !important;
+  }
+  
+  .custom-modal .form-actions button {
+    width: 100% !important;
+  }
+}
+
+/* Estilos para controlar el tamaño de las imágenes en el modal de edición */
+
+/* Contenedor de fotos con grid responsivo */
+.photos-container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 15px !important;
+  width: 100% !important;
+}
+
+/* Contenedor individual de cada foto */
+.photo-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 120px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+}
+
+/* Estilos para las imágenes dentro de los contenedores */
+.photo-container img,
+.photo-thumbnail {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.2s ease !important;
+}
+
+.photo-container:hover img {
+  transform: scale(1.05) !important;
+}
+
+/* Botón para eliminar foto */
+.remove-photo-button {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 25px !important;
+  height: 25px !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.3s ease !important;
+}
+
+.remove-photo-button:hover {
+  opacity: 1 !important;
+}
+
+/* Estilos para el contenedor de imágenes existentes */
+.existing-images {
+  margin-top: 20px !important;
+}
+
+/* Estilos para vista previa de imágenes */
+.preview-item {
+  position: relative !important;
+  width: 140px !important;
+  height: 120px !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  background-color: white !important;
+}
+
+.preview-item img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* Estilos responsivos para pantallas pequeñas */
+@media (max-width: 768px) {
+  .photos-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Vista más limpia para muchas imágenes */
+.photos-editor {
+  margin-bottom: 20px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid #eee !important;
+}
+
+/* Estilos específicos para el ImageUploader */
+.image-uploader .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 10px !important;
+  margin-bottom: 15px !important;
+}
+
+.image-uploader .existing-images .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+}
+
+/* Añadir estos estilos a src/components/reports/Reports.css */
+
+/* Espaciado para los botones de acción en los partes diarios */
+.report-actions {
+  display: flex;
+  gap: 10px; /* Espacio entre los botones */
+  margin-top: 15px;
+}
+
+.report-actions button {
+  padding: 8px 15px;
+  min-width: 100px;
+  border: none;
+  border-radius: 0px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.report-actions .edit-button {
+  background-color: #8D432D;
+  color: white;
+}
+
+.report-actions .edit-button:hover {
+  background-color: #7A3624;
+}
+
+.report-actions .delete-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.report-actions .delete-button:hover {
+  background-color: #c0392b;
+}
+
+/* Eliminar subrayado del enlace de descarga PDF */
+.pdf-button-container a {
+  text-decoration: none;
 }

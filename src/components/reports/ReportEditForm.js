@@ -12,6 +12,28 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
   const [error, setError] = useState(null);
   const { uploadFile } = useStorage();
 
+  // Efecto para bloquear scroll cuando el modal está abierto
+  useEffect(() => {
+    // Función para manejar la tecla Escape
+    const handleEscKey = (e) => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    // Bloquear scroll cuando el modal se abre
+    document.body.classList.add('body-no-scroll');
+    
+    // Añadir event listener para la tecla Escape
+    document.addEventListener('keydown', handleEscKey);
+    
+    // Limpiar al desmontar
+    return () => {
+      document.body.classList.remove('body-no-scroll');
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [onCancel]);
+
   // Cargar datos del reporte
   useEffect(() => {
     const loadReport = async () => {
@@ -135,8 +157,6 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
 
   return (
     <form onSubmit={handleSubmit} className="edit-form">
-      <h3>Editar Parte</h3>
-      
       {error && <p className="error-message">{error}</p>}
       
       <label>Fecha del parte:</label>

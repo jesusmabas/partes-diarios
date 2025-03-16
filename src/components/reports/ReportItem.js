@@ -47,14 +47,19 @@ const ReportItem = ({ report, project, onEdit, onDelete }) => {
       )}
 
       <div className="report-actions">
-        <button onClick={onEdit}>Editar</button>
-        <button 
-          onClick={onDelete} 
-          className="delete-button"
-        >
-          Eliminar
-        </button>
-      </div>
+  <button 
+    onClick={onEdit}
+    className="edit-button"
+  >
+    Editar
+  </button>
+  <button 
+    onClick={onDelete} 
+    className="delete-button"
+  >
+    Eliminar
+  </button>
+</div>
     </div>
   );
 };

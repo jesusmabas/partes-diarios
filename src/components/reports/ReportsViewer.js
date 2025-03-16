@@ -9,6 +9,7 @@ import ReportEditForm from "./ReportEditForm";
 import ReportDeleteModal from "./ReportDeleteModal";
 import ReportSummary from "./ReportSummary";
 import PDFButton from "../common/PDFButton";
+import './Reports.css';
 
 const ReportsViewer = () => {
   // Estados locales
@@ -82,9 +83,10 @@ const ReportsViewer = () => {
 
   // Manejador para cambios en el rango de fechas
   const handleDateRangeChange = useCallback((newDateRange) => {
-    setDateRange(newDateRange);
-    updateFilters(newDateRange);
-  }, [updateFilters]);
+  setDateRange(newDateRange);
+  updateFilters(newDateRange);
+  setPdfKey(Date.now()); // Añade esta línea para actualizar la clave cuando cambian las fechas
+}, [updateFilters]);
 
   const handleEditReport = useCallback((reportId) => {
     setEditingReportId(reportId);
@@ -101,6 +103,14 @@ const ReportsViewer = () => {
   const handleDeleteCancel = useCallback(() => {
     setReportToDelete(null);
   }, []);
+
+  // Función para cerrar el modal al hacer clic en el overlay
+  const handleModalOverlayClick = useCallback((e) => {
+    // Cerrar solo si se hace clic en el overlay, no en el contenido
+    if (e.target.className === 'modal-overlay') {
+      handleCancelEdit();
+    }
+  }, [handleCancelEdit]);
 
   const handleDeleteReport = useCallback(async () => {
     if (reportToDelete) {
@@ -175,14 +185,28 @@ const ReportsViewer = () => {
         onDelete={handleDeleteConfirm}
       />
       
+      {/* Modal de edición de reportes */}
       {editingReportId && (
-        <ReportEditForm
-          reportId={editingReportId}
-          projects={projects}
-          onCancel={handleCancelEdit}
-          onComplete={handleEditComplete}
-        />
-      )}
+  <div className="modal-overlay" onClick={handleModalOverlayClick}>
+    <div className="custom-modal edit-modal">
+      <h3>Editar Parte</h3>
+      <button 
+        type="button" 
+        className="close-button" 
+        onClick={handleCancelEdit}
+        aria-label="Cerrar formulario"
+      >
+        ×
+      </button>
+      <ReportEditForm
+        reportId={editingReportId}
+        projects={projects}
+        onCancel={handleCancelEdit}
+        onComplete={handleEditComplete}
+      />
+    </div>
+  </div>
+)}
       
       {reportToDelete && (
         <ReportDeleteModal
