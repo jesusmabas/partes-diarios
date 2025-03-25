@@ -9,6 +9,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from './firebase';
 import "./components/ExtraWork.css"; // Importar archivo CSS de trabajos extra
 import "./App.css";
+import "./components/ProjectForm.css";  
 
 
 function App() {

@@ -70,15 +70,18 @@ const ReportItem = ({ report, project, onEdit, onDelete }) => {
         <p><strong>Dirección:</strong> {project.address || "No disponible"}</p>
         <p><strong>Tipo:</strong> {renderWorkType()}</p>
         {/* Checkbox de facturación */}
-        <label>
-          <input
-            type="checkbox"
-            checked={report.isBilled || false}
-            onChange={handleBilledChange}
-            disabled={updateReportMutation.isPending} // Deshabilitar durante la mutación
-          />
-          Facturado
-        </label>
+        <div className="billing-checkbox-container">
+  <label className="billing-checkbox-label">
+    <input
+      type="checkbox"
+      className="billing-checkbox"
+      checked={report.isBilled || false}
+      onChange={handleBilledChange}
+      disabled={updateReportMutation.isPending}
+    />
+    <span className="billing-checkbox-text">Facturado</span>
+  </label>
+</div>
       </div>
 
       {isHourlyProject || (isExtraWork && extraWorkType === "hourly") ? (

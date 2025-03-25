@@ -109,7 +109,8 @@ const DailyReportForm = ({ userId }) => {
     try {
       // Datos base del parte diario
       let reportData = {
-        projectId: selectedProject.id,
+        // MODIFICADO: Usar el campo id personalizado del proyecto, no firestoreId
+        projectId: selectedProject.id, // Importante: debe coincidir con el campo 'id' en Firestore
         weekNumber: getWeekNumber(report.reportDate),
         reportDate: report.reportDate,
         workPerformed: report.workPerformed,
@@ -180,6 +181,7 @@ const DailyReportForm = ({ userId }) => {
       
       setSelectedProject(null);
     } catch (err) {
+      console.error("Error al guardar parte:", err);
       setErrorMessage(`Error al guardar: ${err.message}`);
     }
   };

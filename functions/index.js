@@ -33,18 +33,61 @@ const isOwner = async (userId, resourcePath) => {
   }
 };
 
+// Función mejorada para buscar proyecto por ID personalizado
+const findProjectById = async (projectId) => {
+  console.log(`Buscando proyecto con ID personalizado: '${projectId}'`);
+  
+  if (!projectId) {
+    console.log("ID de proyecto no proporcionado");
+    return null;
+  }
+  
+  try {
+    // Normalizar el ID para la búsqueda (trim y to string)
+    const normalizedId = String(projectId).trim();
+    console.log(`ID de proyecto normalizado: '${normalizedId}'`);
+    
+    // Buscar con consulta case-sensitive
+    const projectQuery = await db.collection('projects')
+      .where('id', '==', normalizedId)
+      .get();
+    
+    if (projectQuery.empty) {
+      console.log(`No se encontró ningún proyecto con ID '${normalizedId}' (búsqueda case-sensitive)`);
+      
+      // Intentar listar todos los proyectos para diagnóstico
+      const allProjects = await db.collection('projects').get();
+      console.log(`Total de proyectos en la BD: ${allProjects.size}`);
+      console.log("Lista de IDs de proyectos disponibles:");
+      allProjects.forEach(doc => {
+        const data = doc.data();
+        console.log(`- Doc ID: ${doc.id}, Campo id: '${data.id || "NO TIENE CAMPO ID"}'`);
+      });
+      
+      return null;
+    }
+    
+    const projectDoc = projectQuery.docs[0];
+    console.log(`Proyecto encontrado con ID: ${projectDoc.id}`);
+    return { id: projectDoc.id, ...projectDoc.data() };
+  } catch (error) {
+    console.error(`Error al buscar proyecto: ${error.message}`);
+    return null;
+  }
+};
+
 // Validadores específicos para trabajos extra
 const validateExtraWork = async (data, projectId) => {
   const errors = {};
   
   // Verificar que el proyecto existe y permite trabajos extra
-  const projectDoc = await db.collection('projects').doc(projectId).get();
-  if (!projectDoc.exists) {
+  const project = await findProjectById(projectId);
+  
+  if (!project) {
     errors.projectId = 'El proyecto no existe';
     return { isValid: false, errors };
   }
   
-  const project = projectDoc.data();
   if (project.type !== 'fixed' || !project.allowExtraWork) {
     errors.isExtraWork = 'Este proyecto no permite trabajos extra';
     return { isValid: false, errors };
@@ -158,6 +201,8 @@ const validateProject = (data) => {
 const validateDailyReport = async (data) => {
   const errors = {};
   
+  console.log(`Validando parte diario:`, JSON.stringify(data, null, 2));
+  
   if (!isValidDate(data.reportDate)) {
     errors.reportDate = 'La fecha debe ser válida';
   }
@@ -165,12 +210,13 @@ const validateDailyReport = async (data) => {
   if (!isRequired(data.projectId)) {
     errors.projectId = 'El ID del proyecto es obligatorio';
   } else {
-    // Verificar que el proyecto existe
-    const projectDoc = await db.collection('projects').doc(data.projectId).get();
-    if (!projectDoc.exists) {
+    // Usar la función mejorada para buscar el proyecto
+    const project = await findProjectById(data.projectId);
+    
+    if (!project) {
       errors.projectId = 'El proyecto no existe';
     } else {
-      const projectType = projectDoc.data().type;
+      const projectType = project.type;
       
       // Verificar si es un trabajo extra
       if (data.isExtraWork) {
@@ -221,10 +267,17 @@ const validateDailyReport = async (data) => {
     errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
   }
   
-  return {
+  const result = {
     isValid: Object.keys(errors).length === 0,
     errors
   };
+  
+  console.log(`Resultado de validación: ${result.isValid ? 'Válido' : 'Inválido'}`);
+  if (!result.isValid) {
+    console.log(`Errores:`, JSON.stringify(result.errors, null, 2));
+  }
+  
+  return result;
 };
 
 // Funciones Cloud con región explícita
@@ -234,7 +287,7 @@ exports.createProject = onCall(
     const data = request.data;
     const context = request.auth;
 
-    console.log("Datos recibidos:", JSON.stringify(data));
+    console.log("Datos recibidos:", JSON.stringify(data, null, 2));
     console.log("Contexto de auth:", context ? JSON.stringify(context) : "No autenticado");
     // Verificar autenticación
     if (!context) {
@@ -251,26 +304,32 @@ exports.createProject = onCall(
     }
     
     try {
-      // Verificar que no existe un proyecto con el mismo ID
+      // IMPORTANTE: Normalizar el campo id (trim)
+      const normalizedId = String(data.id).trim();
+      console.log(`ID normalizado: ${normalizedId}`);
+      
+      // Verificar que no existe un proyecto con el mismo ID personalizado
       const existingProjects = await db.collection('projects')
-        .where('id', '==', data.id)
+        .where('id', '==', normalizedId)
         .get();
       
       if (!existingProjects.empty) {
         throw new Error(JSON.stringify({
-          message: `Ya existe un proyecto con el ID ${data.id}`
+          message: `Ya existe un proyecto con el ID ${normalizedId}`
         }));
       }
       
-      // Agregar ID de usuario
+      // Agregar ID de usuario y normalizar el ID personalizado
       const projectData = {
         ...data,
+        id: normalizedId, // Guardar ID normalizado
         userId: context.uid,
         createdAt: new Date()
       };
       
       // Crear proyecto
       const docRef = await db.collection('projects').add(projectData);
+      console.log(`Proyecto creado con ID: ${docRef.id}, ID personalizado: ${normalizedId}`);
       
       return { 
         id: docRef.id,
@@ -294,6 +353,8 @@ exports.createDailyReport = onCall(
   async (request) => {
     const data = request.data;
     const context = request.auth;
+    
+    console.log("Recibida solicitud para crear parte diario:", JSON.stringify(data, null, 2));
     
     // Verificar autenticación
     if (!context) {
@@ -319,6 +380,7 @@ exports.createDailyReport = onCall(
       
       // Crear parte diario
       const docRef = await db.collection('dailyReports').add(reportData);
+      console.log(`Parte diario creado correctamente con ID: ${docRef.id}`);
       
       return { 
         id: docRef.id,
@@ -326,6 +388,7 @@ exports.createDailyReport = onCall(
         message: 'Parte diario creado correctamente'
       };
     } catch (error) {
+      console.error(`Error al crear parte diario:`, error);
       // Parsear el mensaje de error si es un JSON
       try {
         const errorData = JSON.parse(error.message);

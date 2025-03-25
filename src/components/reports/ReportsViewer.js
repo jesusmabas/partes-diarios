@@ -51,7 +51,8 @@ const ReportsViewer = () => {
     isError,
     error,
     fetchNextPage, // Para paginación infinita
-    hasNextPage
+    hasNextPage,
+    refetch
   } = useQueryReportsInfinite({  // Usar useQueryReportsInfinite
     projectId: selectedProjectId || undefined, // Usar undefined en lugar de "" para no filtrar
     startDate: dateRange.startDate || undefined,
@@ -135,7 +136,9 @@ const ReportsViewer = () => {
 
   const handleEditComplete = useCallback(() => {
     setEditingReportId(null); // Cerrar modal
-  }, []);
+    refetch();
+
+  }, [refetch]);
 
     if (isLoading && reports.length === 0) return <p>Cargando reportes...</p>;
     if (isError) return <p className="error-message">Error: {error?.message}</p>;

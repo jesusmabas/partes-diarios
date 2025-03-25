@@ -1,14 +1,18 @@
-// src/components/reports/ReportEditForm.js (Completo)
+// src/components/reports/ReportEditForm.js
 import React, { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore"; // Importar updateDoc
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getWeekNumber } from "../../utils/calculationUtils";
 import { useStorage } from "../../hooks/useStorage";
 import { useCalculationsService } from "../../hooks/useCalculationsService";
+import { useQueryClient } from '@tanstack/react-query'; // Importación añadida
 import MaterialsEditor from "./MaterialsEditor";
 import PhotosEditor from "./PhotosEditor";
 
 const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
+  // Hook useQueryClient llamado correctamente en el nivel superior
+  const queryClient = useQueryClient();
+  
   const [editedReport, setEditedReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -80,12 +84,13 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
     });
   }, []);
 
-
+  // Ahora podemos usar queryClient dentro de handleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!editedReport) return;
 
-    try {      setLoading(true);
+    try {
+      setLoading(true);
       const reportRef = doc(db, "dailyReports", reportId);
 
       // Preparar los datos a actualizar
@@ -123,7 +128,11 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         }
       }
 
-      await updateDoc(reportRef, updatedData); // Usar updateDoc
+      await updateDoc(reportRef, updatedData);
+      
+      // Invalidar la caché para forzar una actualización de la UI
+      await queryClient.invalidateQueries({ queryKey: ['reports'] });
+      
       onComplete();
     } catch (err) {
       setError(`Error al guardar cambios: ${err.message}`);
@@ -170,16 +179,19 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         required
       />
 
-      {/* Checkbox para isBilled */}
-      <label>
-        <input
-          type="checkbox"
-          name="isBilled"
-          checked={!!editedReport.isBilled} // Usar doble negación para asegurar booleano
-          onChange={handleInputChange}
-        />
-        Facturado
-      </label>
+      {/* Checkbox para isBilled con mejor estilo */}
+      <div className="billing-checkbox-container">
+        <label className="billing-checkbox-label">
+          <input
+            type="checkbox"
+            name="isBilled"
+            className="billing-checkbox"
+            checked={!!editedReport.isBilled}
+            onChange={handleInputChange}
+          />
+          <span className="billing-checkbox-text">Facturado</span>
+        </label>
+      </div>
 
       {isHourlyProject ? (
         <>

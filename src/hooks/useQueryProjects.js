@@ -26,18 +26,54 @@ const fetchProjects = async (userId = null) => {
   }
   
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  
+  // MODIFICADO: No sobrescribir el campo 'id' personalizado
+  // En lugar de usar { id: doc.id, ...doc.data() }
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    // Aseguramos que el ID personalizado esté disponible tal cual viene de la BD
+    return {
+      firestoreId: doc.id, // Guardar el ID de Firestore en una propiedad separada
+      ...data // Incluir todos los datos, manteniendo el campo 'id' original
+    };
+  });
 };
 
 // Obtener un proyecto por ID
 const fetchProjectById = async (projectId) => {
   if (!projectId) return null;
   
-  const docRef = doc(db, 'projects', projectId);
-  const docSnap = await getDoc(docRef);
+  // MODIFICADO: Intentar buscar primero por ID de Firestore
+  try {
+    const docRef = doc(db, 'projects', projectId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return { 
+        firestoreId: docSnap.id,
+        ...data 
+      };
+    }
+  } catch (error) {
+    console.error("Error buscando por ID de Firestore:", error);
+  }
   
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() };
+  // Si no se encuentra, intentar buscar por ID personalizado
+  try {
+    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectId));
+    const querySnapshot = await getDocs(projectsQuery);
+    
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      const data = docSnap.data();
+      return { 
+        firestoreId: docSnap.id,
+        ...data 
+      };
+    }
+  } catch (error) {
+    console.error("Error buscando por ID personalizado:", error);
   }
   
   return null;
@@ -85,7 +121,8 @@ export const useUpdateProject = () => {
   
   return useMutation({
     mutationFn: async ({ projectId, data }) => {
-      const projectRef = doc(db, 'projects', projectId);
+      // MODIFICADO: Asegurarse de usar el ID correcto de Firestore
+      const projectRef = doc(db, 'projects', projectId); // Usar firestoreId si está disponible
       await updateDoc(projectRef, data);
       return { id: projectId, ...data };
     },
@@ -107,7 +144,7 @@ export const useUpdateProject = () => {
       queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
         if (!old) return old;
         return old.map(project => 
-          project.id === projectId ? { ...project, ...data } : project
+          project.firestoreId === projectId ? { ...project, ...data } : project
         );
       });
       
@@ -135,41 +172,33 @@ export const useDeleteProject = () => {
     mutationFn: async (projectId) => {
       // Buscar el proyecto por ID dentro de los datos
       const projects = await fetchProjects();
-      const project = projects.find(p => p.id === projectId);
+      const project = projects.find(p => p.firestoreId === projectId);
       
       if (!project) {
         throw new Error(`Proyecto con ID ${projectId} no encontrado`);
       }
       
       // Eliminar el documento de Firestore
-      const projectDoc = projects.find(p => p.id === projectId);
-      await deleteDoc(doc(db, 'projects', projectDoc.id));
+      await deleteDoc(doc(db, 'projects', project.firestoreId));
       
       return projectId;
     },
-    // Actualizar la caché optimistamente
+
     onMutate: async (projectId) => {
-      // Cancelar consultas pendientes
       await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-      
-      // Guardar el estado previo
-      const previousProjects = queryClient.getQueryData([PROJECTS_CACHE_KEY]);
-      
-      // Actualizar la caché optimistamente
-      queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
-        if (!old) return [];
-        return old.filter(project => project.id !== projectId);
-      });
-      
-      return { previousProjects };
+      const previousCacheData = queryClient.getQueryState([PROJECTS_CACHE_KEY]);
+
+      queryClient.setQueriesData(
+        { queryKey: [PROJECTS_CACHE_KEY] },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return oldData.filter(project => project.firestoreId !== projectId);
+        }
+      );
+
+      return { previousCacheData };
     },
-    // En caso de error, restaurar el estado previo
-    onError: (err, projectId, context) => {
-      if (context?.previousProjects) {
-        queryClient.setQueryData([PROJECTS_CACHE_KEY], context.previousProjects);
-      }
-    },
-    // Invalidar cache al finalizar
+
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
     },

@@ -390,3 +390,33 @@
 .pdf-button-container a {
   text-decoration: none;
 }
+
+/* Estilos para mejorar el checkbox de facturación */
+.billing-checkbox-container {
+  margin: 10px 0;
+  padding: 8px 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  border-left: 3px solid #8D432D;
+  display: flex;
+  align-items: center;
+}
+
+.billing-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.billing-checkbox {
+  margin: 0;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.billing-checkbox-text {
+  font-weight: 500;
+  color: #2c3e50;
+}
