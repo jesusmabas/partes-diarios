@@ -420,3 +420,293 @@
   font-weight: 500;
   color: #2c3e50;
 }
+
+/* Estilos adicionales para los nuevos filtros en Reports.css */
+
+/* Mejoras al contenedor de filtros */
+.filter-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #8D432D;
+  transition: all 0.3s ease;
+}
+
+.filter-section.has-active-filters {
+  background-color: #f2f6fa;
+  border-left-color: #3498db;
+}
+
+/* Encabezado de filtros con botones de acción */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-family: "Cormorant", serif;
+  color: #2c3e50;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-action-button {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-action-button:hover {
+  background-color: #e0e0e0;
+}
+
+.filter-action-button.save-button {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.filter-action-button.save-button:hover {
+  background-color: #27ae60;
+}
+
+.filter-action-button.reset-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.filter-action-button.reset-button:hover {
+  background-color: #c0392b;
+}
+
+.filter-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secciones de filtros */
+.basic-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.advanced-filters {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 10px;
+  border-left: 3px solid #3498db;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* Grupo de filtros específicos */
+.filter-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.filter-group select,
+.filter-group input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Filtro de rango de importes */
+.amount-range {
+  display: flex;
+  flex-direction: column;
+}
+
+.amount-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amount-field {
+  flex: 1;
+}
+
+.amount-separator {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+/* Opciones de ordenación */
+.sorting-options {
+  background-color: #f0f8ff;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+/* Filtros guardados */
+.saved-filters {
+  margin-top: 20px;
+}
+
+.saved-filters h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-family: "Cormorant", serif;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.saved-filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-filter-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-filter-button:hover {
+  background-color: #2980b9;
+}
+
+/* Indicador de filtros activos */
+.active-filters-indicator {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  border-left: 3px solid #3498db;
+}
+
+.active-filters-indicator p {
+  margin: 0 0 5px 0;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.active-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-tag {
+  background-color: #e1f0fa;
+  color: #2980b9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: inline-block;
+}
+
+/* Resumen de filtros */
+.filters-summary {
+  margin-bottom: 15px;
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+/* Contenedor para el botón de cargar más */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.load-more-button {
+  background-color: #8D432D;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-button:hover {
+  background-color: #7A3624;
+}
+
+.load-more-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Adaptaciones para móviles */
+@media (max-width: 768px) {
+  .filter-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .filter-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .basic-filters,
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .amount-inputs {
+    flex-direction: column;
+    gap: 5px;
+    align-items: stretch;
+  }
+  
+  .amount-separator {
+    display: none;
+  }
+  
+  .active-filter-tags {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

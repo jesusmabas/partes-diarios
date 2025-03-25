@@ -109,8 +109,10 @@ src/hooks/reports/useReportSummary.js
 src/hooks/useCalculationsService.js
 src/hooks/useFormValidation.js
 src/hooks/useLabor.js
+src/hooks/useLocalStorage.js
 src/hooks/useQueryProjects.js
 src/hooks/useQueryReports.js
+src/hooks/useQueryUser.js
 src/hooks/useStorage.js
 src/index.css
 src/index.js
@@ -139,267 +141,95 @@ storage.rules
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/ProjectForm.css">
-/* ProjectForm.css - Estilos específicos para el formulario de proyectos */
+<file path="src/hooks/useLocalStorage.js">
+// src/hooks/useLocalStorage.js - Hook para persistir datos en localStorage
+import { useState, useEffect } from 'react';
 
-/* Contenedor del formulario */
-.project-form {
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px;
-}
+/**
+ * Hook personalizado para persistir datos en localStorage
+ * @param {string} key - Clave para almacenar en localStorage
+ * @param {any} initialValue - Valor inicial si no existe la clave
+ * @returns {Array} - [storedValue, setValue] similar a useState
+ */
+export const useLocalStorage = (key, initialValue) => {
+  // Estado para almacenar el valor
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      // Obtener del localStorage por la clave
+      const item = window.localStorage.getItem(key);
+      // Analizar el JSON almacenado o devolver initialValue
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      // Si hay error al leer localStorage, devolver initialValue
+      console.error(`Error al leer '${key}' de localStorage:`, error);
+      return initialValue;
+    }
+  });
 
-/* Grupo de campos del formulario */
-.form-group {
-  margin-bottom: 20px;
-}
+  // Función para actualizar localStorage y el estado
+  const setValue = (value) => {
+    try {
+      // Permitir que value sea una función como en useState
+      const valueToStore =
+        value instanceof Function ? value(storedValue) : value;
+      
+      // Guardar en el estado
+      setStoredValue(valueToStore);
+      
+      // Guardar en localStorage
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error(`Error al guardar '${key}' en localStorage:`, error);
+    }
+  };
 
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #333;
-}
+  // Efecto para actualizar localStorage si la clave cambia
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(storedValue));
+    } catch (error) {
+      console.error(`Error al sincronizar '${key}' con localStorage:`, error);
+    }
+  }, [key, storedValue]);
 
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.3s;
-}
+  return [storedValue, setValue];
+};
 
-.form-group input:focus,
-.form-group select:focus {
-  border-color: #8D432D;
-  outline: none;
-}
+export default useLocalStorage;
+</file>
 
-/* Estilo para campo con error */
-.input-error {
-  border-color: #e74c3c !important;
-  background-color: #fff8f8;
-}
+<file path="src/hooks/useQueryUser.js">
+// src/hooks/useQueryUser.js
+import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
-/* Grupo de checkbox */
-.checkbox-group {
-  display: flex;
-  align-items: center;
-  background-color: #f8f9fa;
-  padding: 12px 15px;
-  border-radius: 5px;
-  border-left: 3px solid #8D432D;
-}
+/**
+ * Hook para consultar usuarios desde Firestore
+ * @returns {Object} Objeto con datos de usuarios, estado de carga y error
+ */
+export const useQueryUser = () => {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'users'));
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } catch (error) {
+        console.error("Error al consultar usuarios:", error);
+        return []; // Devolver array vacío en caso de error
+      }
+    },
+    // No refetch automáticamente, los usuarios no suelen cambiar con frecuencia
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+};
 
-.checkbox-input {
-  width: auto !important;
-  margin-right: 10px !important;
-}
-
-.checkbox-label {
-  margin: 0;
-  font-weight: normal;
-}
-
-/* Sección de trabajos extra */
-.extra-work-section {
-  background-color: #fffaed;
-  border-left: 4px solid #E67E22;
-  padding: 15px;
-  margin-top: 15px;
-  margin-bottom: 20px;
-  border-radius: 0 5px 5px 0;
-}
-
-.extra-work-section h4 {
-  color: #d35400;
-  margin-top: 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0e0c0;
-}
-
-.hint-text {
-  font-size: 0.9rem;
-  color: #666;
-  margin-bottom: 15px;
-  font-style: italic;
-}
-
-/* Botones */
-.project-form button {
-  padding: 12px 20px;
-  background-color: #8D432D;
-  color: white;
-  border: none;
-  border-radius: 0;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s;
-  margin-right: 10px;
-}
-
-.project-form button:hover:not(:disabled) {
-  background-color: #7A3624;
-}
-
-.project-form button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.button-secondary {
-  background-color: #6c757d !important;
-}
-
-.button-secondary:hover:not(:disabled) {
-  background-color: #5a6268 !important;
-}
-
-.button-disabled {
-  opacity: 0.65;
-}
-
-/* Mensajes de feedback */
-.error-message {
-  background-color: #fff0f0;
-  border-left: 4px solid #e74c3c;
-  padding: 10px 15px;
-  margin: 10px 0;
-  border-radius: 0 4px 4px 0;
-  color: #c0392b;
-}
-
-.success-message {
-  background-color: #e8f7eb;
-  border-left: 4px solid #27ae60;
-  padding: 10px 15px;
-  margin: 10px 0;
-  border-radius: 0 4px 4px 0;
-  color: #27ae60;
-}
-
-/* Animación de carga para botones */
-.button-loading {
-  position: relative;
-  overflow: hidden;
-  background-color: #8D432D !important;
-}
-
-.button-loading::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.2) 25%,
-    transparent 25%,
-    transparent 50%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.2) 75%,
-    transparent 75%,
-    transparent
-  );
-  background-size: 30px 30px;
-  animation: loading-animation 2s linear infinite;
-  z-index: 1;
-}
-
-@keyframes loading-animation {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 60px 30px;
-  }
-}
-
-/* Estilos responsivos */
-@media (max-width: 768px) {
-  .project-form {
-    padding: 15px;
-  }
-  
-  .extra-work-section {
-    padding: 12px;
-  }
-  
-  .project-form button {
-    width: 100%;
-    margin-bottom: 10px;
-  }
-}
-
-/* Estilo mejorado para el contenedor de detalles del proyecto */
-.project-details {
-  background-color: #f9f9f9;
-  border: 1px solid #e0e0e0;
-  border-left: 4px solid #8D432D;
-  border-radius: 6px;
-  padding: 16px 20px;
-  margin: 20px 0 30px 0;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-}
-
-/* Título para la sección de detalles */
-.project-details-title {
-  font-family: "Cormorant", serif;
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-top: 0;
-  margin-bottom: 15px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #eaeaea;
-}
-
-/* Estilo para cada línea de detalle - alineado a la izquierda */
-.project-details p {
-  margin: 8px 0;
-  padding: 4px 0;
-  display: block; /* Cambiado de flex a block */
-  border-bottom: 1px dotted #eee;
-  line-height: 1.6;
-}
-
-/* Resaltar etiquetas de los campos */
-.project-details .detail-label {
-  font-weight: 500;
-  color: #555;
-  display: inline-block; /* Para mantenerlo en línea */
-  width: auto; /* Sin ancho fijo */
-  margin-right: 8px;
-}
-
-/* Resaltar valores de los campos */
-.project-details .detail-value {
-  font-weight: 600;
-  color: #2c3e50;
-  display: inline-block; /* Para mantenerlo en línea */
-}
-
-/* Información de trabajos extra */
-.project-details .extra-work-info {
-  background-color: #fff8e1;
-  color: #e67e22;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-weight: 500;
-  display: block; /* Cambiado a block para que ocupe toda la línea */
-  margin-top: 10px;
-  border-left: 3px solid #e67e22;
-}
-
-/* Separador entre selector y detalles */
-.project-selector {
-  margin-bottom: 10px;
-}
+export default useQueryUser;
 </file>
 
 <file path="functions/package.json">
@@ -1417,6 +1247,269 @@ export default React.memo(ExtraWorkForm);
   .preview-item img {
     height: 100px;
   }
+}
+</file>
+
+<file path="src/components/ProjectForm.css">
+/* ProjectForm.css - Estilos específicos para el formulario de proyectos */
+
+/* Contenedor del formulario */
+.project-form {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+/* Grupo de campos del formulario */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #8D432D;
+  outline: none;
+}
+
+/* Estilo para campo con error */
+.input-error {
+  border-color: #e74c3c !important;
+  background-color: #fff8f8;
+}
+
+/* Grupo de checkbox */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  background-color: #f8f9fa;
+  padding: 12px 15px;
+  border-radius: 5px;
+  border-left: 3px solid #8D432D;
+}
+
+.checkbox-input {
+  width: auto !important;
+  margin-right: 10px !important;
+}
+
+.checkbox-label {
+  margin: 0;
+  font-weight: normal;
+}
+
+/* Sección de trabajos extra */
+.extra-work-section {
+  background-color: #fffaed;
+  border-left: 4px solid #E67E22;
+  padding: 15px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  border-radius: 0 5px 5px 0;
+}
+
+.extra-work-section h4 {
+  color: #d35400;
+  margin-top: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0e0c0;
+}
+
+.hint-text {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 15px;
+  font-style: italic;
+}
+
+/* Botones */
+.project-form button {
+  padding: 12px 20px;
+  background-color: #8D432D;
+  color: white;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s;
+  margin-right: 10px;
+}
+
+.project-form button:hover:not(:disabled) {
+  background-color: #7A3624;
+}
+
+.project-form button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  background-color: #6c757d !important;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background-color: #5a6268 !important;
+}
+
+.button-disabled {
+  opacity: 0.65;
+}
+
+/* Mensajes de feedback */
+.error-message {
+  background-color: #fff0f0;
+  border-left: 4px solid #e74c3c;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 0 4px 4px 0;
+  color: #c0392b;
+}
+
+.success-message {
+  background-color: #e8f7eb;
+  border-left: 4px solid #27ae60;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 0 4px 4px 0;
+  color: #27ae60;
+}
+
+/* Animación de carga para botones */
+.button-loading {
+  position: relative;
+  overflow: hidden;
+  background-color: #8D432D !important;
+}
+
+.button-loading::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 30px 30px;
+  animation: loading-animation 2s linear infinite;
+  z-index: 1;
+}
+
+@keyframes loading-animation {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 30px;
+  }
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .project-form {
+    padding: 15px;
+  }
+  
+  .extra-work-section {
+    padding: 12px;
+  }
+  
+  .project-form button {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}
+
+/* Estilo mejorado para el contenedor de detalles del proyecto */
+.project-details {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-left: 4px solid #8D432D;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 20px 0 30px 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Título para la sección de detalles */
+.project-details-title {
+  font-family: "Cormorant", serif;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+/* Estilo para cada línea de detalle - alineado a la izquierda */
+.project-details p {
+  margin: 8px 0;
+  padding: 4px 0;
+  display: block; /* Cambiado de flex a block */
+  border-bottom: 1px dotted #eee;
+  line-height: 1.6;
+}
+
+/* Resaltar etiquetas de los campos */
+.project-details .detail-label {
+  font-weight: 500;
+  color: #555;
+  display: inline-block; /* Para mantenerlo en línea */
+  width: auto; /* Sin ancho fijo */
+  margin-right: 8px;
+}
+
+/* Resaltar valores de los campos */
+.project-details .detail-value {
+  font-weight: 600;
+  color: #2c3e50;
+  display: inline-block; /* Para mantenerlo en línea */
+}
+
+/* Información de trabajos extra */
+.project-details .extra-work-info {
+  background-color: #fff8e1;
+  color: #e67e22;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: block; /* Cambiado a block para que ocupe toda la línea */
+  margin-top: 10px;
+  border-left: 3px solid #e67e22;
+}
+
+/* Separador entre selector y detalles */
+.project-selector {
+  margin-bottom: 10px;
 }
 </file>
 
@@ -2468,215 +2561,6 @@ export const useLabor = (labor, project) => {
       totalLaborCost: officialCost + workerCost,
     };
   }, [labor, project]);
-};
-</file>
-
-<file path="src/hooks/useQueryProjects.js">
-// src/hooks/useQueryProjects.js
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where 
-} from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '../firebase';
-
-// Clave de caché para proyectos
-const PROJECTS_CACHE_KEY = 'projects';
-
-// Obtener todos los proyectos
-const fetchProjects = async (userId = null) => {
-  let q = collection(db, 'projects');
-  
-  if (userId) {
-    q = query(q, where('userId', '==', userId));
-  }
-  
-  const querySnapshot = await getDocs(q);
-  
-  // MODIFICADO: No sobrescribir el campo 'id' personalizado
-  // En lugar de usar { id: doc.id, ...doc.data() }
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    // Aseguramos que el ID personalizado esté disponible tal cual viene de la BD
-    return {
-      firestoreId: doc.id, // Guardar el ID de Firestore en una propiedad separada
-      ...data // Incluir todos los datos, manteniendo el campo 'id' original
-    };
-  });
-};
-
-// Obtener un proyecto por ID
-const fetchProjectById = async (projectId) => {
-  if (!projectId) return null;
-  
-  // MODIFICADO: Intentar buscar primero por ID de Firestore
-  try {
-    const docRef = doc(db, 'projects', projectId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return { 
-        firestoreId: docSnap.id,
-        ...data 
-      };
-    }
-  } catch (error) {
-    console.error("Error buscando por ID de Firestore:", error);
-  }
-  
-  // Si no se encuentra, intentar buscar por ID personalizado
-  try {
-    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectId));
-    const querySnapshot = await getDocs(projectsQuery);
-    
-    if (!querySnapshot.empty) {
-      const docSnap = querySnapshot.docs[0];
-      const data = docSnap.data();
-      return { 
-        firestoreId: docSnap.id,
-        ...data 
-      };
-    }
-  } catch (error) {
-    console.error("Error buscando por ID personalizado:", error);
-  }
-  
-  return null;
-};
-
-// Hook para obtener proyectos
-export const useQueryProjects = (userId = null) => {
-  return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, { userId }],
-    queryFn: () => fetchProjects(userId),
-  });
-};
-
-// Hook para obtener un proyecto específico
-export const useQueryProject = (projectId) => {
-  return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, projectId],
-    queryFn: () => fetchProjectById(projectId),
-    enabled: !!projectId, // Solo ejecutar si hay un projectId
-  });
-};
-
-// Hook para agregar un proyecto
-export const useAddProject = () => {
-  const queryClient = useQueryClient();
-  const functions = getFunctions();
-  const createProjectFunction = httpsCallable(functions, 'createProject');
-  
-  return useMutation({
-    mutationFn: async (projectData) => {
-      // Usar Cloud Function para validación y creación
-      const result = await createProjectFunction(projectData);
-      return result.data;
-    },
-    // Invalidar cache al finalizar
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
-};
-
-// Hook para actualizar un proyecto
-export const useUpdateProject = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ projectId, data }) => {
-      // MODIFICADO: Asegurarse de usar el ID correcto de Firestore
-      const projectRef = doc(db, 'projects', projectId); // Usar firestoreId si está disponible
-      await updateDoc(projectRef, data);
-      return { id: projectId, ...data };
-    },
-    // Actualizar la caché optimistamente
-    onMutate: async ({ projectId, data }) => {
-      // Cancelar consultas pendientes
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      
-      // Guardar el estado previo
-      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, projectId]);
-      
-      // Actualizar la caché optimistamente
-      queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], old => ({
-        ...old,
-        ...data,
-      }));
-      
-      // También actualizar la lista de proyectos
-      queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
-        if (!old) return old;
-        return old.map(project => 
-          project.firestoreId === projectId ? { ...project, ...data } : project
-        );
-      });
-      
-      return { previousProject };
-    },
-    // En caso de error, restaurar el estado previo
-    onError: (err, { projectId }, context) => {
-      if (context?.previousProject) {
-        queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], context.previousProject);
-      }
-    },
-    // Invalidar cache al finalizar
-    onSettled: (data, error, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
-};
-
-// Hook para eliminar un proyecto
-export const useDeleteProject = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (projectId) => {
-      // Buscar el proyecto por ID dentro de los datos
-      const projects = await fetchProjects();
-      const project = projects.find(p => p.firestoreId === projectId);
-      
-      if (!project) {
-        throw new Error(`Proyecto con ID ${projectId} no encontrado`);
-      }
-      
-      // Eliminar el documento de Firestore
-      await deleteDoc(doc(db, 'projects', project.firestoreId));
-      
-      return projectId;
-    },
-
-    onMutate: async (projectId) => {
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-      const previousCacheData = queryClient.getQueryState([PROJECTS_CACHE_KEY]);
-
-      queryClient.setQueriesData(
-        { queryKey: [PROJECTS_CACHE_KEY] },
-        (oldData) => {
-          if (!oldData) return oldData;
-          return oldData.filter(project => project.firestoreId !== projectId);
-        }
-      );
-
-      return { previousCacheData };
-    },
-
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
 };
 </file>
 
@@ -4799,447 +4683,6 @@ service cloud.firestore {
 }
 </file>
 
-<file path="functions/index.js">
-const { onCall } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-
-// Inicializar la aplicación
-initializeApp();
-const db = getFirestore();
-
-// Configuración común para todas las funciones
-const functionConfig = {
-  region: "us-central1", // Definir región explícitamente
-  minInstances: 0,
-  maxInstances: 10
-};
-
-// Funciones de validación básicas
-const isRequired = (value) => value !== undefined && value !== null && value !== '';
-const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
-const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
-const isValidTime = (value) => !value || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
-const isValidDate = (value) => isRequired(value) && !isNaN(Date.parse(value));
-const isBoolean = (value) => typeof value === 'boolean';
-
-// Validadores específicos del servidor
-const isAuthenticated = (context) => !!context.auth;
-const isOwner = async (userId, resourcePath) => {
-  try {
-    const docSnap = await db.doc(resourcePath).get();
-    return docSnap.exists && docSnap.data().userId === userId;
-  } catch (error) {
-    return false;
-  }
-};
-
-// Función mejorada para buscar proyecto por ID personalizado
-const findProjectById = async (projectId) => {
-  console.log(`Buscando proyecto con ID personalizado: '${projectId}'`);
-  
-  if (!projectId) {
-    console.log("ID de proyecto no proporcionado");
-    return null;
-  }
-  
-  try {
-    // Normalizar el ID para la búsqueda (trim y to string)
-    const normalizedId = String(projectId).trim();
-    console.log(`ID de proyecto normalizado: '${normalizedId}'`);
-    
-    // Buscar con consulta case-sensitive
-    const projectQuery = await db.collection('projects')
-      .where('id', '==', normalizedId)
-      .get();
-    
-    if (projectQuery.empty) {
-      console.log(`No se encontró ningún proyecto con ID '${normalizedId}' (búsqueda case-sensitive)`);
-      
-      // Intentar listar todos los proyectos para diagnóstico
-      const allProjects = await db.collection('projects').get();
-      console.log(`Total de proyectos en la BD: ${allProjects.size}`);
-      console.log("Lista de IDs de proyectos disponibles:");
-      allProjects.forEach(doc => {
-        const data = doc.data();
-        console.log(`- Doc ID: ${doc.id}, Campo id: '${data.id || "NO TIENE CAMPO ID"}'`);
-      });
-      
-      return null;
-    }
-    
-    const projectDoc = projectQuery.docs[0];
-    console.log(`Proyecto encontrado con ID: ${projectDoc.id}`);
-    return { id: projectDoc.id, ...projectDoc.data() };
-  } catch (error) {
-    console.error(`Error al buscar proyecto: ${error.message}`);
-    return null;
-  }
-};
-
-// Validadores específicos para trabajos extra
-const validateExtraWork = async (data, projectId) => {
-  const errors = {};
-  
-  // Verificar que el proyecto existe y permite trabajos extra
-  const project = await findProjectById(projectId);
-  
-  if (!project) {
-    errors.projectId = 'El proyecto no existe';
-    return { isValid: false, errors };
-  }
-  
-  if (project.type !== 'fixed' || !project.allowExtraWork) {
-    errors.isExtraWork = 'Este proyecto no permite trabajos extra';
-    return { isValid: false, errors };
-  }
-  
-  // Validar tipo de trabajo extra
-  if (!['additional_budget', 'hourly'].includes(data.extraWorkType)) {
-    errors.extraWorkType = 'El tipo de trabajo extra debe ser "additional_budget" o "hourly"';
-  }
-  
-  // Si es presupuesto adicional, validar importe
-  if (data.extraWorkType === 'additional_budget') {
-    if (!isPositiveNumber(data.extraBudgetAmount)) {
-      errors.extraBudgetAmount = 'El importe adicional debe ser un número positivo';
-    }
-  }
-  
-  // Si es por horas, validar datos de mano de obra
-  if (data.extraWorkType === 'hourly') {
-    if (!data.labor) {
-      errors.labor = 'Los datos de mano de obra son obligatorios para trabajos extra por horas';
-    } else {
-      if (!isValidTime(data.labor.officialEntry)) {
-        errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.officialExit)) {
-        errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.workerEntry)) {
-        errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.workerExit)) {
-        errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
-      }
-    }
-  }
-  
-  // Validar descripción de trabajo realizado
-  if (!data.workPerformed) {
-    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
-  } else if (!isRequired(data.workPerformed.description)) {
-    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
-  }
-  
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-};
-
-// Funciones de validación
-const validateProject = (data) => {
-  const errors = {};
-  
-  if (!isRequired(data.id)) {
-    errors.id = 'El ID es obligatorio';
-  } else if (!/^[a-zA-Z0-9-_]+$/.test(data.id)) {
-    errors.id = 'El ID solo puede contener letras, números, guiones y guiones bajos';
-  }
-  
-  if (!isRequired(data.client)) errors.client = 'El cliente es obligatorio';
-  if (!isRequired(data.address)) errors.address = 'La dirección es obligatoria';
-  
-  if (!isRequired(data.nifNie)) {
-    errors.nifNie = 'El NIF/NIE es obligatorio';
-  } else if (!/^[0-9XYZ][0-9]{7}[A-Z]$/.test(data.nifNie)) {
-    errors.nifNie = 'El NIF/NIE debe tener un formato válido';
-  }
-  
-  if (!isRequired(data.type)) {
-    errors.type = 'El tipo es obligatorio';
-  } else if (!['hourly', 'fixed'].includes(data.type)) {
-    errors.type = 'El tipo debe ser "hourly" o "fixed"';
-  }
-  
-  if (data.type === 'hourly') {
-    if (!isPositiveNumber(data.officialPrice)) {
-      errors.officialPrice = 'El precio por hora del oficial debe ser un número positivo';
-    }
-    
-    if (!isPositiveNumber(data.workerPrice)) {
-      errors.workerPrice = 'El precio por hora del peón debe ser un número positivo';
-    }
-  } else if (data.type === 'fixed') {
-    if (!isPositiveNumber(data.budgetAmount)) {
-      errors.budgetAmount = 'El importe del presupuesto debe ser un número positivo';
-    }
-    
-    // Validar campos para trabajos extra si están habilitados
-    if (data.allowExtraWork) {
-      // Solo validar precios por hora si se permiten trabajos extra
-      if (!isPositiveNumber(data.officialPrice)) {
-        errors.officialPrice = 'El precio por hora del oficial para trabajos extra debe ser un número positivo';
-      }
-      
-      if (!isPositiveNumber(data.workerPrice)) {
-        errors.workerPrice = 'El precio por hora del peón para trabajos extra debe ser un número positivo';
-      }
-    }
-  }
-  
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-};
-
-const validateDailyReport = async (data) => {
-  const errors = {};
-  
-  console.log(`Validando parte diario:`, JSON.stringify(data, null, 2));
-  
-  if (!isValidDate(data.reportDate)) {
-    errors.reportDate = 'La fecha debe ser válida';
-  }
-  
-  if (!isRequired(data.projectId)) {
-    errors.projectId = 'El ID del proyecto es obligatorio';
-  } else {
-    // Usar la función mejorada para buscar el proyecto
-    const project = await findProjectById(data.projectId);
-    
-    if (!project) {
-      errors.projectId = 'El proyecto no existe';
-    } else {
-      const projectType = project.type;
-      
-      // Verificar si es un trabajo extra
-      if (data.isExtraWork) {
-        // Validar trabajo extra
-        const extraWorkValidation = await validateExtraWork(data, data.projectId);
-        
-        if (!extraWorkValidation.isValid) {
-          // Combinar errores
-          Object.assign(errors, extraWorkValidation.errors);
-        }
-      } else {
-        // Validaciones específicas según el tipo de proyecto
-        if (projectType === 'hourly') {
-          // Validar datos de mano de obra si es proyecto por horas
-          if (!data.labor) {
-            errors.labor = 'Los datos de mano de obra son obligatorios para proyectos por horas';
-          } else {
-            if (!isValidTime(data.labor.officialEntry)) {
-              errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.officialExit)) {
-              errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.workerEntry)) {
-              errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.workerExit)) {
-              errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
-            }
-          }
-        } else if (projectType === 'fixed') {
-          // Validar importe facturado si es proyecto de presupuesto cerrado
-          if (!isPositiveNumber(data.invoicedAmount)) {
-            errors.invoicedAmount = 'El importe facturado debe ser un número positivo';
-          }
-        }
-      }
-    }
-  }
-  
-  // Validar trabajo realizado
-  if (!data.workPerformed) {
-    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
-  } else if (!isRequired(data.workPerformed.description)) {
-    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
-  }
-  
-  const result = {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-  
-  console.log(`Resultado de validación: ${result.isValid ? 'Válido' : 'Inválido'}`);
-  if (!result.isValid) {
-    console.log(`Errores:`, JSON.stringify(result.errors, null, 2));
-  }
-  
-  return result;
-};
-
-// Funciones Cloud con región explícita
-exports.createProject = onCall(
-  functionConfig, 
-  async (request) => {
-    const data = request.data;
-    const context = request.auth;
-
-    console.log("Datos recibidos:", JSON.stringify(data, null, 2));
-    console.log("Contexto de auth:", context ? JSON.stringify(context) : "No autenticado");
-    // Verificar autenticación
-    if (!context) {
-      throw new Error('El usuario debe estar autenticado para crear proyectos');
-    }
-    
-    // Validar datos
-    const validationResult = validateProject(data);
-    if (!validationResult.isValid) {
-      throw new Error(JSON.stringify({
-        message: 'Datos de proyecto inválidos',
-        details: validationResult.errors
-      }));
-    }
-    
-    try {
-      // IMPORTANTE: Normalizar el campo id (trim)
-      const normalizedId = String(data.id).trim();
-      console.log(`ID normalizado: ${normalizedId}`);
-      
-      // Verificar que no existe un proyecto con el mismo ID personalizado
-      const existingProjects = await db.collection('projects')
-        .where('id', '==', normalizedId)
-        .get();
-      
-      if (!existingProjects.empty) {
-        throw new Error(JSON.stringify({
-          message: `Ya existe un proyecto con el ID ${normalizedId}`
-        }));
-      }
-      
-      // Agregar ID de usuario y normalizar el ID personalizado
-      const projectData = {
-        ...data,
-        id: normalizedId, // Guardar ID normalizado
-        userId: context.uid,
-        createdAt: new Date()
-      };
-      
-      // Crear proyecto
-      const docRef = await db.collection('projects').add(projectData);
-      console.log(`Proyecto creado con ID: ${docRef.id}, ID personalizado: ${normalizedId}`);
-      
-      return { 
-        id: docRef.id,
-        success: true,
-        message: 'Proyecto creado correctamente'
-      };
-    } catch (error) {
-      // Parsear el mensaje de error si es un JSON
-      try {
-        const errorData = JSON.parse(error.message);
-        throw new Error(errorData.message);
-      } catch (parseError) {
-        throw new Error(error.message);
-      }
-    }
-  }
-);
-
-exports.createDailyReport = onCall(
-  functionConfig,
-  async (request) => {
-    const data = request.data;
-    const context = request.auth;
-    
-    console.log("Recibida solicitud para crear parte diario:", JSON.stringify(data, null, 2));
-    
-    // Verificar autenticación
-    if (!context) {
-      throw new Error('El usuario debe estar autenticado para crear partes diarios');
-    }
-    
-    try {
-      // Validar datos
-      const validationResult = await validateDailyReport(data);
-      if (!validationResult.isValid) {
-        throw new Error(JSON.stringify({
-          message: 'Datos de parte diario inválidos',
-          details: validationResult.errors
-        }));
-      }
-      
-      // Agregar ID de usuario y timestamp
-      const reportData = {
-        ...data,
-        userId: context.uid,
-        createdAt: new Date()
-      };
-      
-      // Crear parte diario
-      const docRef = await db.collection('dailyReports').add(reportData);
-      console.log(`Parte diario creado correctamente con ID: ${docRef.id}`);
-      
-      return { 
-        id: docRef.id,
-        success: true,
-        message: 'Parte diario creado correctamente'
-      };
-    } catch (error) {
-      console.error(`Error al crear parte diario:`, error);
-      // Parsear el mensaje de error si es un JSON
-      try {
-        const errorData = JSON.parse(error.message);
-        throw new Error(errorData.message);
-      } catch (parseError) {
-        throw new Error(error.message);
-      }
-    }
-  }
-);
-
-// Trigger para validación en tiempo real - también con región específica
-exports.validateOnCreate = onDocumentCreated(
-  {
-    document: '{collection}/{docId}',
-    region: 'us-central1' // Especificamos la misma región aquí
-  },
-  async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) return;
-
-    const collection = event.params.collection;
-    const data = snapshot.data();
-    
-    // Solo procesar colecciones específicas
-    if (['projects', 'dailyReports'].includes(collection)) {
-      let validationResult;
-      
-      if (collection === 'projects') {
-        validationResult = validateProject(data);
-      } else if (collection === 'dailyReports') {
-        validationResult = await validateDailyReport(data);
-      }
-      
-      // Si hay errores, registrarlos y potencialmente revertir la operación
-      if (validationResult && !validationResult.isValid) {
-        console.error(`Validation failed for ${collection}/${snapshot.id}:`, validationResult.errors);
-        
-        // Opcionalmente: Marcar el documento como inválido en lugar de eliminarlo
-        await snapshot.ref.update({
-          _validationErrors: validationResult.errors,
-          _validationStatus: 'invalid'
-        });
-      }
-    }
-  }
-);
-</file>
-
 <file path="public/index.html">
 <!DOCTYPE html>
 <html lang="en">
@@ -6355,8 +5798,9 @@ export default ProjectForm;
 </file>
 
 <file path="src/components/reports/ReportFilters.js">
-// src/components/reports/ReportFilters.js (Completo)
-import React, { useCallback } from "react";
+// src/components/reports/ReportFilters.js - Componente mejorado con más filtros
+import React, { useCallback, useState } from "react";
+import { formatCurrency } from "../../utils/calculationUtils";
 
 const ReportFilters = ({
   projects,
@@ -6364,9 +5808,29 @@ const ReportFilters = ({
   dateRange,
   onProjectChange,
   onDateRangeChange,
-  onBilledStatusChange, // NUEVO: Prop para manejar el cambio de estado de facturación
-  billedStatus         // NUEVO: Prop para el estado actual de facturación
+  onBilledStatusChange,
+  billedStatus,
+  // Nuevos props para filtros adicionales
+  onWorkTypeChange,
+  workType,
+  onUserChange,
+  selectedUserId,
+  users = [], // Lista de usuarios (opcional)
+  onAmountRangeChange,
+  amountRange = { min: "", max: "" },
+  // Ordenación
+  onSortChange,
+  sortField = "reportDate",
+  sortDirection = "desc",
+  // Props para UI mejorada
+  onSaveFilter,
+  onResetFilters,
+  savedFilters = []
 }) => {
+  // Estado para controlar panel de filtros expandible
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Manejadores existentes
   const handleProjectSelect = useCallback((e) => {
     onProjectChange(e.target.value);
   }, [onProjectChange]);
@@ -6379,453 +5843,321 @@ const ReportFilters = ({
     });
   }, [dateRange, onDateRangeChange]);
 
-  // NUEVO: Manejador para el cambio de estado de facturación
   const handleBilledStatusSelect = useCallback((e) => {
     onBilledStatusChange(e.target.value);
   }, [onBilledStatusChange]);
 
+  // Nuevos manejadores
+  const handleWorkTypeSelect = useCallback((e) => {
+    if (onWorkTypeChange) {
+      onWorkTypeChange(e.target.value);
+    }
+  }, [onWorkTypeChange]);
+
+  const handleUserSelect = useCallback((e) => {
+    if (onUserChange) {
+      onUserChange(e.target.value);
+    }
+  }, [onUserChange]);
+
+  const handleAmountChange = useCallback((e) => {
+    const { name, value } = e.target;
+    if (onAmountRangeChange) {
+      onAmountRangeChange({
+        ...amountRange,
+        [name.replace("amount", "")]: value
+      });
+    }
+  }, [amountRange, onAmountRangeChange]);
+
+  const handleSortChange = useCallback((e) => {
+    if (onSortChange) {
+      onSortChange({
+        field: e.target.value,
+        direction: sortDirection
+      });
+    }
+  }, [onSortChange, sortDirection]);
+
+  const handleSortDirectionChange = useCallback((e) => {
+    if (onSortChange) {
+      onSortChange({
+        field: sortField,
+        direction: e.target.value
+      });
+    }
+  }, [onSortChange, sortField]);
+
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+
+  const handleSaveCurrentFilter = () => {
+    if (onSaveFilter) {
+      const filterName = prompt("Nombre para guardar este filtro:");
+      if (filterName) {
+        onSaveFilter({
+          name: filterName,
+          filter: {
+            projectId: selectedProjectId,
+            dateRange,
+            billedStatus,
+            workType,
+            selectedUserId,
+            amountRange,
+            sort: { field: sortField, direction: sortDirection }
+          }
+        });
+      }
+    }
+  };
+
+  const handleReset = () => {
+    if (onResetFilters) {
+      onResetFilters();
+    }
+  };
+
+  // Verificar si hay filtros activos para resaltar
+  const hasActiveFilters = 
+    selectedProjectId || 
+    dateRange.startDate || 
+    dateRange.endDate || 
+    billedStatus || 
+    workType || 
+    selectedUserId || 
+    amountRange.min || 
+    amountRange.max;
+
   return (
-    <div className="filter-section">
-      <label>Filtrar por Proyecto: </label>
-      <select value={selectedProjectId} onChange={handleProjectSelect}>
-        <option value="">Todos los proyectos</option>
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.id} - {project.client}
-          </option>
-        ))}
-      </select>
-
-      <div className="date-range">
-        <div className="date-field">
-          <label>Fecha de inicio:</label>
-          <input
-            type="date"
-            name="startDate"
-            value={dateRange.startDate}
-            onChange={handleDateChange}
-          />
-        </div>
-        <div className="date-field">
-          <label>Fecha de fin:</label>
-          <input
-            type="date"
-            name="endDate"
-            value={dateRange.endDate}
-            onChange={handleDateChange}
-          />
+    <div className={`filter-section ${hasActiveFilters ? 'has-active-filters' : ''}`}>
+      <div className="filter-header">
+        <h3>Filtros</h3>
+        <div className="filter-actions">
+          <button 
+            type="button" 
+            className="filter-action-button"
+            onClick={toggleExpand}
+          >
+            {isExpanded ? 'Contraer filtros' : 'Expandir filtros'}
+          </button>
+          <button 
+            type="button" 
+            className="filter-action-button save-button"
+            onClick={handleSaveCurrentFilter}
+            disabled={!hasActiveFilters}
+          >
+            Guardar filtro
+          </button>
+          <button 
+            type="button" 
+            className="filter-action-button reset-button"
+            onClick={handleReset}
+            disabled={!hasActiveFilters}
+          >
+            Limpiar filtros
+          </button>
         </div>
       </div>
 
-      {/* NUEVO: Filtro para el estado de facturación */}
-      <div className="filter-group">
-        <label>Estado de facturación:</label>
-        <select value={billedStatus} onChange={handleBilledStatusSelect}>
-          <option value="">Todos</option>
-          <option value="true">Facturados</option>
-          <option value="false">No facturados</option>
-        </select>
+      {/* Filtros básicos siempre visibles */}
+      <div className="basic-filters">
+        <div className="filter-group">
+          <label>Proyecto: </label>
+          <select value={selectedProjectId} onChange={handleProjectSelect}>
+            <option value="">Todos los proyectos</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.id} - {project.client}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="date-range">
+          <div className="date-field">
+            <label>Fecha de inicio:</label>
+            <input
+              type="date"
+              name="startDate"
+              value={dateRange.startDate}
+              onChange={handleDateChange}
+            />
+          </div>
+          <div className="date-field">
+            <label>Fecha de fin:</label>
+            <input
+              type="date"
+              name="endDate"
+              value={dateRange.endDate}
+              onChange={handleDateChange}
+            />
+          </div>
+        </div>
+
+        <div className="filter-group">
+          <label>Facturación:</label>
+          <select value={billedStatus} onChange={handleBilledStatusSelect}>
+            <option value="">Todos</option>
+            <option value="true">Facturados</option>
+            <option value="false">No facturados</option>
+          </select>
+        </div>
       </div>
+
+      {/* Filtros avanzados (expandibles) */}
+      {isExpanded && (
+        <div className="advanced-filters">
+          <div className="filter-row">
+            <div className="filter-group">
+              <label>Tipo de trabajo:</label>
+              <select value={workType || ""} onChange={handleWorkTypeSelect}>
+                <option value="">Todos los tipos</option>
+                <option value="normal">Trabajo normal</option>
+                <option value="extra">Trabajo extra</option>
+                <option value="extra_hourly">Extra por horas</option>
+                <option value="extra_budget">Extra con presupuesto</option>
+              </select>
+            </div>
+            
+            {users.length > 0 && (
+              <div className="filter-group">
+                <label>Usuario:</label>
+                <select value={selectedUserId || ""} onChange={handleUserSelect}>
+                  <option value="">Todos los usuarios</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="filter-row">
+            <div className="filter-group amount-range">
+              <label>Rango de importes:</label>
+              <div className="amount-inputs">
+                <div className="amount-field">
+                  <input
+                    type="number"
+                    name="amountmin"
+                    placeholder="Mínimo €"
+                    value={amountRange.min}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <span className="amount-separator">a</span>
+                <div className="amount-field">
+                  <input
+                    type="number"
+                    name="amountmax"
+                    placeholder="Máximo €"
+                    value={amountRange.max}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="filter-row sorting-options">
+            <div className="filter-group">
+              <label>Ordenar por:</label>
+              <select value={sortField} onChange={handleSortChange}>
+                <option value="reportDate">Fecha</option>
+                <option value="invoicedAmount">Importe facturado</option>
+                <option value="totalCost">Coste total</option>
+                <option value="projectId">Proyecto</option>
+                <option value="isBilled">Estado de facturación</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label>Dirección:</label>
+              <select value={sortDirection} onChange={handleSortDirectionChange}>
+                <option value="asc">Ascendente</option>
+                <option value="desc">Descendente</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sección de filtros guardados */}
+          {savedFilters.length > 0 && (
+            <div className="saved-filters">
+              <h4>Filtros guardados</h4>
+              <div className="saved-filters-list">
+                {savedFilters.map((filter, index) => (
+                  <button
+                    key={index}
+                    className="saved-filter-button"
+                    onClick={() => onSaveFilter(filter, true)} // true indica que es para aplicar, no guardar
+                  >
+                    {filter.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Indicador de filtros activos */}
+      {hasActiveFilters && (
+        <div className="active-filters-indicator">
+          <p>Filtros activos: </p>
+          <div className="active-filter-tags">
+            {selectedProjectId && (
+              <span className="filter-tag">
+                Proyecto: {projects.find(p => p.id === selectedProjectId)?.client || selectedProjectId}
+              </span>
+            )}
+            {dateRange.startDate && (
+              <span className="filter-tag">
+                Desde: {new Date(dateRange.startDate).toLocaleDateString()}
+              </span>
+            )}
+            {dateRange.endDate && (
+              <span className="filter-tag">
+                Hasta: {new Date(dateRange.endDate).toLocaleDateString()}
+              </span>
+            )}
+            {billedStatus && (
+              <span className="filter-tag">
+                {billedStatus === "true" ? "Facturados" : "No facturados"}
+              </span>
+            )}
+            {workType && (
+              <span className="filter-tag">
+                Tipo: {workType === "normal" ? "Normal" : "Extra"}
+              </span>
+            )}
+            {selectedUserId && (
+              <span className="filter-tag">
+                Usuario: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}
+              </span>
+            )}
+            {(amountRange.min || amountRange.max) && (
+              <span className="filter-tag">
+                Importe: {amountRange.min ? formatCurrency(amountRange.min) : "0€"} - 
+                {amountRange.max ? formatCurrency(amountRange.max) : "sin límite"}
+              </span>
+            )}
+            {(sortField !== "reportDate" || sortDirection !== "desc") && (
+              <span className="filter-tag">
+                Ordenado por: {sortField} ({sortDirection === "asc" ? "↑" : "↓"})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default React.memo(ReportFilters);
-</file>
-
-<file path="src/components/reports/Reports.css">
-/* Estilos para la tabla de resumen */
-.summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-.summary-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.summary-table td.amount {
-  text-align: right;
-  font-weight: 500;
-}
-
-.summary-table tr.total-row {
-  border-top: 2px solid #ddd;
-  font-weight: bold;
-  color: #333;
-}
-
-.summary-table tr.total-row td {
-  padding-top: 12px;
-}
-
-/* Estilos para el botón PDF */
-.pdf-button-container {
-  margin-bottom: 20px;
-}
-
-.pdf-button {
-  display: block;
-  width: 100%;
-  padding: 12px 20px;
-  background-color: #8D432D;
-  color: white;
-  text-align: center;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.3s;
-}
-
-.pdf-button:hover {
-  background-color: #7A3624;
-}
-
-.pdf-button.error-button {
-  background-color: #e74c3c;
-}
-
-.pdf-disabled-message {
-  color: #666;
-  font-style: italic;
-  margin-bottom: 20px;
-  text-align: center;
-  padding: 10px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-}
-
-/* CREANDO CLASES ESPECÍFICAS PARA EVITAR CONFLICTOS CON APP.CSS */
-/* Estilo para el overlay del modal */
-.modal-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  z-index: 1000 !important;
-  animation: fadeIn 0.3s ease;
-}
-
-/* Estilo para nuestro modal personalizado (usando una clase diferente) */
-.custom-modal {
-  position: relative !important;
-  background-color: white !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
-  width: 90% !important;
-  max-width: 800px !important;
-  height: auto !important;
-  max-height: 80vh !important;
-  overflow-y: auto !important;
-  padding: 30px !important;
-  margin: 0 auto !important;
-  animation: slideIn 0.3s ease;
-  
-  /* Aseguramos que no herede los estilos problemáticos del .modal en App.css */
-  top: auto !important;
-  left: auto !important;
-  transform: none !important;
-}
-
-/* Mantenemos la clase edit-modal para aplicar estilos específicos del formulario de edición */
-.edit-modal {
-  scrollbar-width: thin;
-  scrollbar-color: #d4d4d4 #f5f5f5;
-}
-
-/* Para Chrome, Safari, y Edge: estilizar la barra de desplazamiento */
-.edit-modal::-webkit-scrollbar {
-  width: 8px;
-}
-
-.edit-modal::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-
-.edit-modal::-webkit-scrollbar-thumb {
-  background-color: #d4d4d4;
-  border-radius: 4px;
-}
-
-/* Título del modal */
-.custom-modal h3 {
-  margin-top: 0 !important;
-  margin-bottom: 20px !important;
-  border-bottom: 1px solid #ddd !important;
-  padding-bottom: 10px !important;
-  font-family: "Cormorant", serif !important;
-  color: #2c3e50 !important;
-  position: sticky !important;
-  top: 0 !important;
-  background-color: white !important;
-  z-index: 1 !important;
-  padding-top: 5px !important;
-}
-
-/* Botón de cerrar en la esquina superior derecha */
-.custom-modal .close-button {
-  position: absolute !important;
-  top: 20px !important;
-  right: 20px !important;
-  background: none !important;
-  border: none !important;
-  font-size: 24px !important;
-  cursor: pointer !important;
-  color: #7f8c8d !important;
-  padding: 5px !important;
-  transition: color 0.3s ease !important;
-  z-index: 2 !important;
-}
-
-.custom-modal .close-button:hover {
-  color: #e74c3c !important;
-}
-
-/* Ajustar botones del formulario */
-.custom-modal .form-actions {
-  display: flex !important;
-  justify-content: flex-end !important;
-  gap: 10px !important;
-  margin-top: 20px !important;
-  padding-top: 15px !important;
-  border-top: 1px solid #eee !important;
-  position: sticky !important;
-  bottom: 0 !important;
-  background-color: white !important;
-  padding-bottom: 5px !important;
-  z-index: 1 !important;
-}
-
-/* Estilo para prevenir el scroll en el body cuando el modal está abierto */
-.body-no-scroll {
-  overflow: hidden !important;
-}
-
-/* Animaciones */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideIn {
-  from { transform: translateY(-30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* Estilos para el interior del formulario */
-.edit-form {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 15px !important;
-  padding-bottom: 20px !important;
-}
-
-.edit-form label {
-  font-weight: 500 !important;
-  display: block !important;
-  margin-bottom: 5px !important;
-}
-
-.edit-form input,
-.edit-form textarea,
-.edit-form select {
-  padding: 10px !important;
-  border: 1px solid #ddd !important;
-  border-radius: 4px !important;
-  font-size: 14px !important;
-  width: 100% !important;
-}
-
-.edit-form textarea {
-  min-height: 100px !important;
-  resize: vertical !important;
-}
-
-.edit-form h4 {
-  margin-top: 15px !important;
-  margin-bottom: 8px !important;
-  color: #2c3e50 !important;
-  font-family: "Cormorant", serif !important;
-}
-
-/* Estilos responsivos para el modal */
-@media (max-width: 768px) {
-  .custom-modal {
-    width: 95% !important;
-    max-height: 85vh !important;
-    padding: 20px 15px !important;
-  }
-  
-  .custom-modal .form-actions {
-    flex-direction: column !important;
-  }
-  
-  .custom-modal .form-actions button {
-    width: 100% !important;
-  }
-}
-
-/* Estilos para controlar el tamaño de las imágenes en el modal de edición */
-
-/* Contenedor de fotos con grid responsivo */
-.photos-container {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-  margin-top: 15px !important;
-  width: 100% !important;
-}
-
-/* Contenedor individual de cada foto */
-.photo-container {
-  position: relative !important;
-  width: 100% !important;
-  height: 120px !important;
-  border: 1px solid #ddd !important;
-  border-radius: 4px !important;
-  overflow: hidden !important;
-}
-
-/* Estilos para las imágenes dentro de los contenedores */
-.photo-container img,
-.photo-thumbnail {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-  transition: transform 0.2s ease !important;
-}
-
-.photo-container:hover img {
-  transform: scale(1.05) !important;
-}
-
-/* Botón para eliminar foto */
-.remove-photo-button {
-  position: absolute !important;
-  top: 5px !important;
-  right: 5px !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 50% !important;
-  width: 25px !important;
-  height: 25px !important;
-  font-size: 14px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  opacity: 0.8 !important;
-  transition: opacity 0.3s ease !important;
-}
-
-.remove-photo-button:hover {
-  opacity: 1 !important;
-}
-
-/* Estilos para el contenedor de imágenes existentes */
-.existing-images {
-  margin-top: 20px !important;
-}
-
-/* Estilos para vista previa de imágenes */
-.preview-item {
-  position: relative !important;
-  width: 140px !important;
-  height: 120px !important;
-  border-radius: 4px !important;
-  overflow: hidden !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-  background-color: white !important;
-}
-
-.preview-item img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-/* Estilos responsivos para pantallas pequeñas */
-@media (max-width: 768px) {
-  .photos-container {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* Vista más limpia para muchas imágenes */
-.photos-editor {
-  margin-bottom: 20px !important;
-  padding-bottom: 10px !important;
-  border-bottom: 1px solid #eee !important;
-}
-
-/* Estilos específicos para el ImageUploader */
-.image-uploader .previews {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-  margin-top: 10px !important;
-  margin-bottom: 15px !important;
-}
-
-.image-uploader .existing-images .previews {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-}
-
-/* Añadir estos estilos a src/components/reports/Reports.css */
-
-/* Espaciado para los botones de acción en los partes diarios */
-.report-actions {
-  display: flex;
-  gap: 10px; /* Espacio entre los botones */
-  margin-top: 15px;
-}
-
-.report-actions button {
-  padding: 8px 15px;
-  min-width: 100px;
-  border: none;
-  border-radius: 0px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-}
-
-.report-actions .edit-button {
-  background-color: #8D432D;
-  color: white;
-}
-
-.report-actions .edit-button:hover {
-  background-color: #7A3624;
-}
-
-.report-actions .delete-button {
-  background-color: #e74c3c;
-  color: white;
-}
-
-.report-actions .delete-button:hover {
-  background-color: #c0392b;
-}
-
-/* Eliminar subrayado del enlace de descarga PDF */
-.pdf-button-container a {
-  text-decoration: none;
-}
 </file>
 
 <file path="src/components/reports/ReportSummary.js">
@@ -7253,28 +6585,76 @@ export const useReportActions = () => {
 </file>
 
 <file path="src/hooks/reports/useReportFilters.js">
-import { useState, useCallback, useMemo } from "react";
+// src/hooks/reports/useReportFilters.js - Hook mejorado con más capacidades
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useLocalStorage } from "../useLocalStorage"; // Necesitarás crear este hook
 
 /**
- * Hook personalizado para la gestión de filtros de reportes
+ * Hook personalizado para la gestión de filtros de reportes avanzados
  * @param {Object} initialFilters - Filtros iniciales
  * @returns {Object} - Objeto con estados y funciones para gestionar filtros
  */
 export const useReportFilters = (initialFilters = {}) => {
+  // Estado para filtros principales
   const [filters, setFilters] = useState({
     projectId: "",
     startDate: "",
     endDate: "",
+    isBilled: undefined,
+    // Nuevos filtros
+    workType: "",
+    userId: "",
+    amountMin: "",
+    amountMax: "",
     ...initialFilters
   });
 
+  // Estado para opciones de ordenación
+  const [sortOptions, setSortOptions] = useState({
+    field: "reportDate",
+    direction: "desc"
+  });
+
+  // Persistir filtros guardados en localStorage
+  const [savedFilters, setSavedFilters] = useLocalStorage("reportFilters", []);
+
+  // Detectar cambios de URL (si implementamos rutas)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get("projectId") || "";
+    const startDate = params.get("startDate") || "";
+    const endDate = params.get("endDate") || "";
+    const isBilled = params.get("isBilled");
+    
+    // Solo actualizar si hay parámetros en la URL
+    if (projectId || startDate || endDate || isBilled !== null) {
+      setFilters(prev => ({
+        ...prev,
+        projectId,
+        startDate,
+        endDate,
+        isBilled: isBilled === "true" ? true : isBilled === "false" ? false : undefined
+      }));
+    }
+  }, []);
+
   // Actualizar un filtro específico
   const updateFilter = useCallback((key, value) => {
-    console.log("updateFilter", key, value); 
     setFilters(prev => ({
       ...prev,
       [key]: value
     }));
+
+    // Actualizar URL si es necesario (opcional)
+    if (window.history && window.history.pushState) {
+      const url = new URL(window.location);
+      if (value === "" || value === undefined) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, value);
+      }
+      window.history.pushState({}, '', url);
+    }
   }, []);
 
   // Actualizar múltiples filtros a la vez
@@ -7285,14 +6665,67 @@ export const useReportFilters = (initialFilters = {}) => {
     }));
   }, []);
 
+  // Actualizar opciones de ordenación
+  const updateSortOptions = useCallback(({ field, direction }) => {
+    setSortOptions({
+      field: field || sortOptions.field,
+      direction: direction || sortOptions.direction
+    });
+  }, [sortOptions]);
+
   // Restablecer todos los filtros
   const resetFilters = useCallback(() => {
     setFilters({
       projectId: "",
       startDate: "",
       endDate: "",
+      isBilled: undefined,
+      workType: "",
+      userId: "",
+      amountMin: "",
+      amountMax: ""
     });
+    setSortOptions({
+      field: "reportDate",
+      direction: "desc"
+    });
+
+    // Limpiar URL si es necesario
+    if (window.history && window.history.pushState) {
+      const url = new URL(window.location);
+      url.search = "";
+      window.history.pushState({}, '', url);
+    }
   }, []);
+
+  // Guardar un filtro con nombre
+  const saveFilter = useCallback((filterData) => {
+    // Si es para aplicar un filtro guardado
+    if (filterData.filter && filterData.apply) {
+      setFilters(filterData.filter);
+      setSortOptions(filterData.filter.sort || { field: "reportDate", direction: "desc" });
+      return;
+    }
+
+    // Si es para guardar un nuevo filtro
+    setSavedFilters(prev => {
+      // Verificar si ya existe un filtro con el mismo nombre
+      const existingIndex = prev.findIndex(f => f.name === filterData.name);
+      if (existingIndex >= 0) {
+        // Actualizar filtro existente
+        const updated = [...prev];
+        updated[existingIndex] = filterData;
+        return updated;
+      }
+      // Añadir nuevo filtro
+      return [...prev, filterData];
+    });
+  }, [setSavedFilters]);
+
+  // Eliminar un filtro guardado
+  const deleteFilter = useCallback((filterName) => {
+    setSavedFilters(prev => prev.filter(f => f.name !== filterName));
+  }, [setSavedFilters]);
 
   // Filtrar una lista de reportes basándose en los filtros actuales
   const filterReports = useCallback((reports) => {
@@ -7323,14 +6756,124 @@ export const useReportFilters = (initialFilters = {}) => {
         }
       }
       
+      // Filtro por estado de facturación
+      if (filters.isBilled !== undefined) {
+        if (filters.isBilled !== !!report.isBilled) {
+          return false;
+        }
+      }
+      
+      // Filtro por tipo de trabajo
+      if (filters.workType) {
+        if (filters.workType === 'normal' && report.isExtraWork) {
+          return false;
+        }
+        if (filters.workType === 'extra' && !report.isExtraWork) {
+          return false;
+        }
+        if (filters.workType === 'extra_hourly' && 
+            (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
+          return false;
+        }
+        if (filters.workType === 'extra_budget' && 
+            (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
+          return false;
+        }
+      }
+      
+      // Filtro por usuario
+      if (filters.userId && report.userId !== filters.userId) {
+        return false;
+      }
+      
+      // Filtro por rango de importes
+      if (filters.amountMin || filters.amountMax) {
+        const amount = 
+          report.invoicedAmount || 
+          report.extraBudgetAmount || 
+          report.totalCost || 
+          0;
+        
+        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
+          return false;
+        }
+        
+        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
+          return false;
+        }
+      }
+      
       return true;
     });
   }, [filters]);
 
+  // Ordenar reportes según las opciones actuales
+  const sortReports = useCallback((reports) => {
+    if (!Array.isArray(reports) || reports.length === 0) return [];
+    
+    const { field, direction } = sortOptions;
+    const sortedReports = [...reports];
+    
+    sortedReports.sort((a, b) => {
+      let valueA, valueB;
+      
+      // Extraer valores según el campo
+      switch (field) {
+        case 'reportDate':
+          valueA = new Date(a.reportDate || 0).getTime();
+          valueB = new Date(b.reportDate || 0).getTime();
+          break;
+        case 'invoicedAmount':
+          valueA = a.invoicedAmount || 0;
+          valueB = b.invoicedAmount || 0;
+          break;
+        case 'totalCost':
+          valueA = a.totalCost || 0;
+          valueB = b.totalCost || 0;
+          break;
+        case 'projectId':
+          valueA = a.projectId || '';
+          valueB = b.projectId || '';
+          break;
+        case 'isBilled':
+          valueA = a.isBilled ? 1 : 0;
+          valueB = b.isBilled ? 1 : 0;
+          break;
+        default:
+          valueA = a[field] || 0;
+          valueB = b[field] || 0;
+      }
+      
+      // Ordenar según dirección
+      if (direction === 'asc') {
+        return valueA > valueB ? 1 : -1;
+      } else {
+        return valueA < valueB ? 1 : -1;
+      }
+    });
+    
+    return sortedReports;
+  }, [sortOptions]);
+  
+  // Procesar reportes - aplicar filtros y ordenación
+  const processReports = useCallback((reports) => {
+    if (!Array.isArray(reports)) return [];
+    
+    const filtered = filterReports(reports);
+    return sortReports(filtered);
+  }, [filterReports, sortReports]);
+
   // Verifica si hay filtros activos
   const hasActiveFilters = useMemo(() => {
-    return filters.projectId !== "" || filters.startDate !== "" || filters.endDate !== "";
-  }, [filters.projectId, filters.startDate, filters.endDate]);
+    return filters.projectId !== "" || 
+           filters.startDate !== "" || 
+           filters.endDate !== "" || 
+           filters.isBilled !== undefined ||
+           filters.workType !== "" ||
+           filters.userId !== "" ||
+           filters.amountMin !== "" ||
+           filters.amountMax !== "";
+  }, [filters]);
 
   // Crear una cadena de texto que describa los filtros actuales (para uso en mensajes o títulos)
   const filtersDescription = useMemo(() => {
@@ -7348,15 +6891,49 @@ export const useReportFilters = (initialFilters = {}) => {
       parts.push(`Hasta: ${new Date(filters.endDate).toLocaleDateString()}`);
     }
     
-    return parts.join(' - ') || 'Sin filtros aplicados';
-  }, [filters]);
+    if (filters.isBilled !== undefined) {
+      parts.push(filters.isBilled ? 'Facturados' : 'No facturados');
+    }
+    
+    if (filters.workType) {
+      parts.push(`Tipo: ${filters.workType}`);
+    }
+    
+    if (filters.userId) {
+      parts.push(`Usuario: ${filters.userId}`);
+    }
+    
+    if (filters.amountMin || filters.amountMax) {
+      const min = filters.amountMin ? `${filters.amountMin}€` : '0€';
+      const max = filters.amountMax ? `${filters.amountMax}€` : 'sin límite';
+      parts.push(`Importe: ${min} - ${max}`);
+    }
+    
+    if (sortOptions.field !== 'reportDate' || sortOptions.direction !== 'desc') {
+      parts.push(`Ordenado por: ${sortOptions.field} (${sortOptions.direction === 'asc' ? '↑' : '↓'})`);
+    }
+    
+    return parts.join(' · ') || 'Sin filtros aplicados';
+  }, [filters, sortOptions]);
 
   return {
+    // Estados
     filters,
+    sortOptions,
+    savedFilters,
+    // Actualizadores
     updateFilter,
     updateFilters,
+    updateSortOptions,
     resetFilters,
+    // Gestión de filtros guardados
+    saveFilter,
+    deleteFilter,
+    // Procesamiento de reportes
     filterReports,
+    sortReports,
+    processReports,
+    // Metadatos
     hasActiveFilters,
     filtersDescription
   };
@@ -7519,6 +7096,215 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
 };
 
 export default useFormValidation;
+</file>
+
+<file path="src/hooks/useQueryProjects.js">
+// src/hooks/useQueryProjects.js
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where 
+} from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db } from '../firebase';
+
+// Clave de caché para proyectos
+const PROJECTS_CACHE_KEY = 'projects';
+
+// Obtener todos los proyectos
+const fetchProjects = async (userId = null) => {
+  let q = collection(db, 'projects');
+  
+  if (userId) {
+    q = query(q, where('userId', '==', userId));
+  }
+  
+  const querySnapshot = await getDocs(q);
+  
+  // MODIFICADO: No sobrescribir el campo 'id' personalizado
+  // En lugar de usar { id: doc.id, ...doc.data() }
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    // Aseguramos que el ID personalizado esté disponible tal cual viene de la BD
+    return {
+      firestoreId: doc.id, // Guardar el ID de Firestore en una propiedad separada
+      ...data // Incluir todos los datos, manteniendo el campo 'id' original
+    };
+  });
+};
+
+// Obtener un proyecto por ID
+const fetchProjectById = async (projectId) => {
+  if (!projectId) return null;
+  
+  // MODIFICADO: Intentar buscar primero por ID de Firestore
+  try {
+    const docRef = doc(db, 'projects', projectId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return { 
+        firestoreId: docSnap.id,
+        ...data 
+      };
+    }
+  } catch (error) {
+    console.error("Error buscando por ID de Firestore:", error);
+  }
+  
+  // Si no se encuentra, intentar buscar por ID personalizado
+  try {
+    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectId));
+    const querySnapshot = await getDocs(projectsQuery);
+    
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      const data = docSnap.data();
+      return { 
+        firestoreId: docSnap.id,
+        ...data 
+      };
+    }
+  } catch (error) {
+    console.error("Error buscando por ID personalizado:", error);
+  }
+  
+  return null;
+};
+
+// Hook para obtener proyectos
+export const useQueryProjects = (userId = null) => {
+  return useQuery({
+    queryKey: [PROJECTS_CACHE_KEY, { userId }],
+    queryFn: () => fetchProjects(userId),
+  });
+};
+
+// Hook para obtener un proyecto específico
+export const useQueryProject = (projectId) => {
+  return useQuery({
+    queryKey: [PROJECTS_CACHE_KEY, projectId],
+    queryFn: () => fetchProjectById(projectId),
+    enabled: !!projectId, // Solo ejecutar si hay un projectId
+  });
+};
+
+// Hook para agregar un proyecto
+export const useAddProject = () => {
+  const queryClient = useQueryClient();
+  const functions = getFunctions();
+  const createProjectFunction = httpsCallable(functions, 'createProject');
+  
+  return useMutation({
+    mutationFn: async (projectData) => {
+      // Usar Cloud Function para validación y creación
+      const result = await createProjectFunction(projectData);
+      return result.data;
+    },
+    // Invalidar cache al finalizar
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    },
+  });
+};
+
+// Hook para actualizar un proyecto
+export const useUpdateProject = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ projectId, data }) => {
+      // MODIFICADO: Asegurarse de usar el ID correcto de Firestore
+      const projectRef = doc(db, 'projects', projectId); // Usar firestoreId si está disponible
+      await updateDoc(projectRef, data);
+      return { id: projectId, ...data };
+    },
+    // Actualizar la caché optimistamente
+    onMutate: async ({ projectId, data }) => {
+      // Cancelar consultas pendientes
+      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
+      
+      // Guardar el estado previo
+      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, projectId]);
+      
+      // Actualizar la caché optimistamente
+      queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], old => ({
+        ...old,
+        ...data,
+      }));
+      
+      // También actualizar la lista de proyectos
+      queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
+        if (!old) return old;
+        return old.map(project => 
+          project.firestoreId === projectId ? { ...project, ...data } : project
+        );
+      });
+      
+      return { previousProject };
+    },
+    // En caso de error, restaurar el estado previo
+    onError: (err, { projectId }, context) => {
+      if (context?.previousProject) {
+        queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], context.previousProject);
+      }
+    },
+    // Invalidar cache al finalizar
+    onSettled: (data, error, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    },
+  });
+};
+
+// Hook para eliminar un proyecto
+export const useDeleteProject = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (projectId) => {
+      // Buscar el proyecto por ID dentro de los datos
+      const projects = await fetchProjects();
+      const project = projects.find(p => p.firestoreId === projectId);
+      
+      if (!project) {
+        throw new Error(`Proyecto con ID ${projectId} no encontrado`);
+      }
+      
+      // Eliminar el documento de Firestore
+      await deleteDoc(doc(db, 'projects', project.firestoreId));
+      
+      return projectId;
+    },
+
+    onMutate: async (projectId) => {
+      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+      const previousCacheData = queryClient.getQueryState([PROJECTS_CACHE_KEY]);
+
+      queryClient.setQueriesData(
+        { queryKey: [PROJECTS_CACHE_KEY] },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return oldData.filter(project => project.firestoreId !== projectId);
+        }
+      );
+
+      return { previousCacheData };
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    },
+  });
+};
 </file>
 
 <file path="src/hooks/useQueryReports.js">
@@ -8204,6 +7990,447 @@ yarn-error.log*
 .vercel
 
 /00
+</file>
+
+<file path="functions/index.js">
+const { onCall } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+
+// Inicializar la aplicación
+initializeApp();
+const db = getFirestore();
+
+// Configuración común para todas las funciones
+const functionConfig = {
+  region: "us-central1", // Definir región explícitamente
+  minInstances: 0,
+  maxInstances: 10
+};
+
+// Funciones de validación básicas
+const isRequired = (value) => value !== undefined && value !== null && value !== '';
+const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
+const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
+const isValidTime = (value) => !value || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
+const isValidDate = (value) => isRequired(value) && !isNaN(Date.parse(value));
+const isBoolean = (value) => typeof value === 'boolean';
+
+// Validadores específicos del servidor
+const isAuthenticated = (context) => !!context.auth;
+const isOwner = async (userId, resourcePath) => {
+  try {
+    const docSnap = await db.doc(resourcePath).get();
+    return docSnap.exists && docSnap.data().userId === userId;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Función mejorada para buscar proyecto por ID personalizado
+const findProjectById = async (projectId) => {
+  console.log(`Buscando proyecto con ID personalizado: '${projectId}'`);
+  
+  if (!projectId) {
+    console.log("ID de proyecto no proporcionado");
+    return null;
+  }
+  
+  try {
+    // Normalizar el ID para la búsqueda (trim y to string)
+    const normalizedId = String(projectId).trim();
+    console.log(`ID de proyecto normalizado: '${normalizedId}'`);
+    
+    // Buscar con consulta case-sensitive
+    const projectQuery = await db.collection('projects')
+      .where('id', '==', normalizedId)
+      .get();
+    
+    if (projectQuery.empty) {
+      console.log(`No se encontró ningún proyecto con ID '${normalizedId}' (búsqueda case-sensitive)`);
+      
+      // Intentar listar todos los proyectos para diagnóstico
+      const allProjects = await db.collection('projects').get();
+      console.log(`Total de proyectos en la BD: ${allProjects.size}`);
+      console.log("Lista de IDs de proyectos disponibles:");
+      allProjects.forEach(doc => {
+        const data = doc.data();
+        console.log(`- Doc ID: ${doc.id}, Campo id: '${data.id || "NO TIENE CAMPO ID"}'`);
+      });
+      
+      return null;
+    }
+    
+    const projectDoc = projectQuery.docs[0];
+    console.log(`Proyecto encontrado con ID: ${projectDoc.id}`);
+    return { id: projectDoc.id, ...projectDoc.data() };
+  } catch (error) {
+    console.error(`Error al buscar proyecto: ${error.message}`);
+    return null;
+  }
+};
+
+// Validadores específicos para trabajos extra
+const validateExtraWork = async (data, projectId) => {
+  const errors = {};
+  
+  // Verificar que el proyecto existe y permite trabajos extra
+  const project = await findProjectById(projectId);
+  
+  if (!project) {
+    errors.projectId = 'El proyecto no existe';
+    return { isValid: false, errors };
+  }
+  
+  if (project.type !== 'fixed' || !project.allowExtraWork) {
+    errors.isExtraWork = 'Este proyecto no permite trabajos extra';
+    return { isValid: false, errors };
+  }
+  
+  // Validar tipo de trabajo extra
+  if (!['additional_budget', 'hourly'].includes(data.extraWorkType)) {
+    errors.extraWorkType = 'El tipo de trabajo extra debe ser "additional_budget" o "hourly"';
+  }
+  
+  // Si es presupuesto adicional, validar importe
+  if (data.extraWorkType === 'additional_budget') {
+    if (!isPositiveNumber(data.extraBudgetAmount)) {
+      errors.extraBudgetAmount = 'El importe adicional debe ser un número positivo';
+    }
+  }
+  
+  // Si es por horas, validar datos de mano de obra
+  if (data.extraWorkType === 'hourly') {
+    if (!data.labor) {
+      errors.labor = 'Los datos de mano de obra son obligatorios para trabajos extra por horas';
+    } else {
+      if (!isValidTime(data.labor.officialEntry)) {
+        errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.officialExit)) {
+        errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.workerEntry)) {
+        errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.workerExit)) {
+        errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
+      }
+    }
+  }
+  
+  // Validar descripción de trabajo realizado
+  if (!data.workPerformed) {
+    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
+  } else if (!isRequired(data.workPerformed.description)) {
+    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
+  }
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+};
+
+// Funciones de validación
+const validateProject = (data) => {
+  const errors = {};
+  
+  if (!isRequired(data.id)) {
+    errors.id = 'El ID es obligatorio';
+  } else if (!/^[a-zA-Z0-9-_]+$/.test(data.id)) {
+    errors.id = 'El ID solo puede contener letras, números, guiones y guiones bajos';
+  }
+  
+  if (!isRequired(data.client)) errors.client = 'El cliente es obligatorio';
+  if (!isRequired(data.address)) errors.address = 'La dirección es obligatoria';
+  
+  if (!isRequired(data.nifNie)) {
+    errors.nifNie = 'El NIF/NIE es obligatorio';
+  } else if (!/^[0-9XYZ][0-9]{7}[A-Z]$/.test(data.nifNie)) {
+    errors.nifNie = 'El NIF/NIE debe tener un formato válido';
+  }
+  
+  if (!isRequired(data.type)) {
+    errors.type = 'El tipo es obligatorio';
+  } else if (!['hourly', 'fixed'].includes(data.type)) {
+    errors.type = 'El tipo debe ser "hourly" o "fixed"';
+  }
+  
+  if (data.type === 'hourly') {
+    if (!isPositiveNumber(data.officialPrice)) {
+      errors.officialPrice = 'El precio por hora del oficial debe ser un número positivo';
+    }
+    
+    if (!isPositiveNumber(data.workerPrice)) {
+      errors.workerPrice = 'El precio por hora del peón debe ser un número positivo';
+    }
+  } else if (data.type === 'fixed') {
+    if (!isPositiveNumber(data.budgetAmount)) {
+      errors.budgetAmount = 'El importe del presupuesto debe ser un número positivo';
+    }
+    
+    // Validar campos para trabajos extra si están habilitados
+    if (data.allowExtraWork) {
+      // Solo validar precios por hora si se permiten trabajos extra
+      if (!isPositiveNumber(data.officialPrice)) {
+        errors.officialPrice = 'El precio por hora del oficial para trabajos extra debe ser un número positivo';
+      }
+      
+      if (!isPositiveNumber(data.workerPrice)) {
+        errors.workerPrice = 'El precio por hora del peón para trabajos extra debe ser un número positivo';
+      }
+    }
+  }
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+};
+
+const validateDailyReport = async (data) => {
+  const errors = {};
+  
+  console.log(`Validando parte diario:`, JSON.stringify(data, null, 2));
+  
+  if (!isValidDate(data.reportDate)) {
+    errors.reportDate = 'La fecha debe ser válida';
+  }
+  
+  if (!isRequired(data.projectId)) {
+    errors.projectId = 'El ID del proyecto es obligatorio';
+  } else {
+    // Usar la función mejorada para buscar el proyecto
+    const project = await findProjectById(data.projectId);
+    
+    if (!project) {
+      errors.projectId = 'El proyecto no existe';
+    } else {
+      const projectType = project.type;
+      
+      // Verificar si es un trabajo extra
+      if (data.isExtraWork) {
+        // Validar trabajo extra
+        const extraWorkValidation = await validateExtraWork(data, data.projectId);
+        
+        if (!extraWorkValidation.isValid) {
+          // Combinar errores
+          Object.assign(errors, extraWorkValidation.errors);
+        }
+      } else {
+        // Validaciones específicas según el tipo de proyecto
+        if (projectType === 'hourly') {
+          // Validar datos de mano de obra si es proyecto por horas
+          if (!data.labor) {
+            errors.labor = 'Los datos de mano de obra son obligatorios para proyectos por horas';
+          } else {
+            if (!isValidTime(data.labor.officialEntry)) {
+              errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.officialExit)) {
+              errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.workerEntry)) {
+              errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.workerExit)) {
+              errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
+            }
+          }
+        } else if (projectType === 'fixed') {
+          // Validar importe facturado si es proyecto de presupuesto cerrado
+          if (!isPositiveNumber(data.invoicedAmount)) {
+            errors.invoicedAmount = 'El importe facturado debe ser un número positivo';
+          }
+        }
+      }
+    }
+  }
+  
+  // Validar trabajo realizado
+  if (!data.workPerformed) {
+    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
+  } else if (!isRequired(data.workPerformed.description)) {
+    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
+  }
+  
+  const result = {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+  
+  console.log(`Resultado de validación: ${result.isValid ? 'Válido' : 'Inválido'}`);
+  if (!result.isValid) {
+    console.log(`Errores:`, JSON.stringify(result.errors, null, 2));
+  }
+  
+  return result;
+};
+
+// Funciones Cloud con región explícita
+exports.createProject = onCall(
+  functionConfig, 
+  async (request) => {
+    const data = request.data;
+    const context = request.auth;
+
+    console.log("Datos recibidos:", JSON.stringify(data, null, 2));
+    console.log("Contexto de auth:", context ? JSON.stringify(context) : "No autenticado");
+    // Verificar autenticación
+    if (!context) {
+      throw new Error('El usuario debe estar autenticado para crear proyectos');
+    }
+    
+    // Validar datos
+    const validationResult = validateProject(data);
+    if (!validationResult.isValid) {
+      throw new Error(JSON.stringify({
+        message: 'Datos de proyecto inválidos',
+        details: validationResult.errors
+      }));
+    }
+    
+    try {
+      // IMPORTANTE: Normalizar el campo id (trim)
+      const normalizedId = String(data.id).trim();
+      console.log(`ID normalizado: ${normalizedId}`);
+      
+      // Verificar que no existe un proyecto con el mismo ID personalizado
+      const existingProjects = await db.collection('projects')
+        .where('id', '==', normalizedId)
+        .get();
+      
+      if (!existingProjects.empty) {
+        throw new Error(JSON.stringify({
+          message: `Ya existe un proyecto con el ID ${normalizedId}`
+        }));
+      }
+      
+      // Agregar ID de usuario y normalizar el ID personalizado
+      const projectData = {
+        ...data,
+        id: normalizedId, // Guardar ID normalizado
+        userId: context.uid,
+        createdAt: new Date()
+      };
+      
+      // Crear proyecto
+      const docRef = await db.collection('projects').add(projectData);
+      console.log(`Proyecto creado con ID: ${docRef.id}, ID personalizado: ${normalizedId}`);
+      
+      return { 
+        id: docRef.id,
+        success: true,
+        message: 'Proyecto creado correctamente'
+      };
+    } catch (error) {
+      // Parsear el mensaje de error si es un JSON
+      try {
+        const errorData = JSON.parse(error.message);
+        throw new Error(errorData.message);
+      } catch (parseError) {
+        throw new Error(error.message);
+      }
+    }
+  }
+);
+
+exports.createDailyReport = onCall(
+  functionConfig,
+  async (request) => {
+    const data = request.data;
+    const context = request.auth;
+    
+    console.log("Recibida solicitud para crear parte diario:", JSON.stringify(data, null, 2));
+    
+    // Verificar autenticación
+    if (!context) {
+      throw new Error('El usuario debe estar autenticado para crear partes diarios');
+    }
+    
+    try {
+      // Validar datos
+      const validationResult = await validateDailyReport(data);
+      if (!validationResult.isValid) {
+        throw new Error(JSON.stringify({
+          message: 'Datos de parte diario inválidos',
+          details: validationResult.errors
+        }));
+      }
+      
+      // Agregar ID de usuario y timestamp
+      const reportData = {
+        ...data,
+        userId: context.uid,
+        createdAt: new Date()
+      };
+      
+      // Crear parte diario
+      const docRef = await db.collection('dailyReports').add(reportData);
+      console.log(`Parte diario creado correctamente con ID: ${docRef.id}`);
+      
+      return { 
+        id: docRef.id,
+        success: true,
+        message: 'Parte diario creado correctamente'
+      };
+    } catch (error) {
+      console.error(`Error al crear parte diario:`, error);
+      // Parsear el mensaje de error si es un JSON
+      try {
+        const errorData = JSON.parse(error.message);
+        throw new Error(errorData.message);
+      } catch (parseError) {
+        throw new Error(error.message);
+      }
+    }
+  }
+);
+
+// Trigger para validación en tiempo real - también con región específica
+exports.validateOnCreate = onDocumentCreated(
+  {
+    document: '{collection}/{docId}',
+    region: 'us-central1' // Especificamos la misma región aquí
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const collection = event.params.collection;
+    const data = snapshot.data();
+    
+    // Solo procesar colecciones específicas
+    if (['projects', 'dailyReports'].includes(collection)) {
+      let validationResult;
+      
+      if (collection === 'projects') {
+        validationResult = validateProject(data);
+      } else if (collection === 'dailyReports') {
+        validationResult = await validateDailyReport(data);
+      }
+      
+      // Si hay errores, registrarlos y potencialmente revertir la operación
+      if (validationResult && !validationResult.isValid) {
+        console.error(`Validation failed for ${collection}/${snapshot.id}:`, validationResult.errors);
+        
+        // Opcionalmente: Marcar el documento como inválido en lugar de eliminarlo
+        await snapshot.ref.update({
+          _validationErrors: validationResult.errors,
+          _validationStatus: 'invalid'
+        });
+      }
+    }
+  }
+);
 </file>
 
 <file path="src/App.css">
@@ -9411,775 +9638,719 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
 export default React.memo(MaterialsForm);
 </file>
 
-<file path="src/components/ProjectSelector.js">
-import React from "react";
-import { useQueryProjects } from "../hooks/useQueryProjects";
-import { formatCurrency } from "../utils/calculationUtils";
-
-const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
-  // Usamos el hook de React Query para obtener proyectos
-  const { data: projects = [], isLoading, error } = useQueryProjects();
-
-  const handleChange = (e) => {
-    const selectedProjectId = e.target.value; 
-    // MODIFICADO: Buscamos el proyecto usando el ID personalizado, no el firestoreId
-    const project = projects.find((p) => p.id === selectedProjectId);
-    onProjectSelect(project);
-  };
-
-  if (isLoading) return <p>Cargando proyectos...</p>;
-  if (error) return <p className="error-message">Error: {error.message}</p>;
-
-  return (
-    <div>
-      <label>ID del Proyecto</label>
-      <select onChange={handleChange} value={selectedProject?.id || ""} required>
-        <option value="">Selecciona un proyecto</option>
-        {projects.map((p) => (
-          <option key={p.firestoreId} value={p.id}>{p.id}</option>
-        ))}
-      </select>
-      {selectedProject && (
-  <div className="project-details">
-    <h4 className="project-details-title">Detalles del Proyecto</h4>
-    <p>
-      <span className="detail-label">Dirección:</span>
-      <span className="detail-value">{selectedProject.address}</span>
-    </p>
-    <p>
-      <span className="detail-label">Cliente:</span>
-      <span className="detail-value">{selectedProject.client}</span>
-    </p>
-    <p>
-      <span className="detail-label">NIF/NIE:</span>
-      <span className="detail-value">{selectedProject.nifNie}</span>
-    </p>
-    {selectedProject.type === "hourly" ? (
-      <>
-        <p>
-          <span className="detail-label">Precio oficial:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.officialPrice)} /h</span>
-        </p>
-        <p>
-          <span className="detail-label">Precio peón:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.workerPrice)} /h</span>
-        </p>
-      </>
-    ) : (
-      <>
-        <p>
-          <span className="detail-label">Presupuesto:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.budgetAmount)}</span>
-        </p>
-        {selectedProject.allowExtraWork && (
-          <p className="extra-work-info">Este proyecto permite trabajos extra</p>
-        )}
-      </>
-    )}
-  </div>
-)}
-    </div>
-  );
-};
-
-export default React.memo(ProjectSelector);
-</file>
-
-<file path="src/components/reports/ReportEditForm.js">
-// src/components/reports/ReportEditForm.js (Completo)
-import React, { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore"; // Importar updateDoc
-import { db } from "../../firebase";
-import { getWeekNumber } from "../../utils/calculationUtils";
-import { useStorage } from "../../hooks/useStorage";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
-import MaterialsEditor from "./MaterialsEditor";
-import PhotosEditor from "./PhotosEditor";
-
-const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
-  const [editedReport, setEditedReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { uploadFile } = useStorage();
-  const { calculateLabor, calculateMaterials } = useCalculationsService();
-
-  // Efecto para bloquear scroll cuando el modal está abierto
-  useEffect(() => {
-    const handleEscKey = (e) => {
-      if (e.key === "Escape") {
-        onCancel();
-      }
-    };
-
-    document.body.classList.add('body-no-scroll');
-    document.addEventListener("keydown", handleEscKey);
-
-    return () => {
-      document.body.classList.remove('body-no-scroll');
-      document.removeEventListener("keydown", handleEscKey);
-    };
-  }, [onCancel]);
-
-  // Cargar datos del reporte
-  useEffect(() => {
-    const loadReport = async () => {
-      try {
-        setLoading(true);
-        const reportRef = doc(db, "dailyReports", reportId);
-        const reportSnap = await getDoc(reportRef);
-
-        if (reportSnap.exists()) {
-          setEditedReport({ id: reportSnap.id, ...reportSnap.data() });
-        } else {
-          setError("El reporte no existe");
-        }
-      } catch (err) {
-        setError(`Error al cargar el reporte: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadReport();
-  }, [reportId]);
-
-  // Manejador de cambios para inputs (incluyendo isBilled)
-  const handleInputChange = useCallback((e) => {
-    const { name, value, type, checked } = e.target;
-
-    setEditedReport(prev => {
-      if (!prev) return prev;
-
-      let updatedValue = value;
-      if (type === "checkbox") {
-        updatedValue = checked; // Para checkboxes, usa el valor de 'checked'
-      }
-
-      if (name.includes(".")) {
-        const [parent, field] = name.split(".")
-        if (parent === "labor") {
-          return { ...prev, labor: { ...prev.labor, [field]: updatedValue } };
-        } else if (parent === "workPerformed") {
-          updatedValue = field === 'invoicedAmount' ? parseFloat(value) : value;
-          return { ...prev, workPerformed: { ...prev.workPerformed, [field]: updatedValue } };
-        }
-      }
-      return { ...prev, [name]: updatedValue };
-    });
-  }, []);
-
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!editedReport) return;
-
-    try {      setLoading(true);
-      const reportRef = doc(db, "dailyReports", reportId);
-
-      // Preparar los datos a actualizar
-      const updatedData = {
-        reportDate: editedReport.reportDate,
-        weekNumber: getWeekNumber(editedReport.reportDate),
-        materials: editedReport.materials || [],
-        workPerformed: {
-          ...editedReport.workPerformed,
-          description: editedReport.workPerformed.description,
-          photos: editedReport.workPerformed.photos || [],
-        },
-        isBilled: !!editedReport.isBilled, // Asegura que sea booleano
-      };
-
-      // Lógica específica por tipo de proyecto
-      const project = projects.find((p) => p.id === editedReport.projectId);
-
-      if (editedReport.labor) {
-        const laborData = calculateLabor(editedReport.labor, project);
-        updatedData.labor = { ...editedReport.labor, ...laborData };
-      }
-
-      if (editedReport.workPerformed?.invoicedAmount !== undefined) {
-        updatedData.invoicedAmount = editedReport.workPerformed.invoicedAmount;
-      }
-
-      if (project && project.type === "hourly") {
-        const materialsData = calculateMaterials(editedReport.materials);
-        updatedData.totalMaterialsCost = materialsData.totalMaterialsCost;
-
-        if (editedReport.labor) {
-          const laborData = calculateLabor(editedReport.labor, project);
-          updatedData.totalCost = laborData.totalLaborCost + materialsData.totalMaterialsCost;
-        }
-      }
-
-      await updateDoc(reportRef, updatedData); // Usar updateDoc
-      onComplete();
-    } catch (err) {
-      setError(`Error al guardar cambios: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Manejadores para materiales y fotos
-  const handleMaterialsChange = useCallback((materials) => {
-    setEditedReport(prev => ({
-      ...prev,
-      materials
-    }));
-  }, []);
-
-  const handlePhotosChange = useCallback((photos) => {
-    setEditedReport(prev => ({
-      ...prev,
-      workPerformed: {
-        ...prev.workPerformed,
-        photos
-      }
-    }));
-  }, []);
-
-  if (loading && !editedReport) return <p>Cargando reporte...</p>;
-  if (error) return <p className="error-message">{error}</p>;
-  if (!editedReport) return <p>No se encontró el reporte</p>;
-
-  const project = projects.find(p => p.id === editedReport.projectId) || {};
-  const isHourlyProject = project.type === "hourly";
-
-  return (
-    <form onSubmit={handleSubmit} className="edit-form">
-      {error && <p className="error-message">{error}</p>}
-
-      <label>Fecha del parte:</label>
-      <input
-        type="date"
-        name="reportDate"
-        value={editedReport.reportDate}
-        onChange={handleInputChange}
-        required
-      />
-
-      {/* Checkbox para isBilled */}
-      <label>
-        <input
-          type="checkbox"
-          name="isBilled"
-          checked={!!editedReport.isBilled} // Usar doble negación para asegurar booleano
-          onChange={handleInputChange}
-        />
-        Facturado
-      </label>
-
-      {isHourlyProject ? (
-        <>
-          <h4>Mano de obra</h4>
-          <div className="labor-row">
-            <div className="labor-field">
-              <label>Hora entrada oficial</label>
-              <input
-                type="time"
-                name="labor.officialEntry"
-                value={editedReport.labor?.officialEntry || ""}
-                onChange={handleInputChange}
-                className="time-input"
-              />
-            </div>
-            <div className="labor-field">
-              <label>Hora salida oficial</label>
-              <input
-                type="time"
-                name="labor.officialExit"
-                value={editedReport.labor?.officialExit || ""}
-                onChange={handleInputChange}
-                className="time-input"
-              />
-            </div>
-          </div>
-
-          <div className="labor-row">
-            <div className="labor-field">
-              <label>Hora entrada peón</label>
-              <input
-                type="time"
-                name="labor.workerEntry"
-                value={editedReport.labor?.workerEntry || ""}
-                onChange={handleInputChange}
-                className="time-input"
-              />
-            </div>
-            <div className="labor-field">
-              <label>Hora salida peón</label>
-              <input
-                type="time"
-                name="labor.workerExit"
-                value={editedReport.labor?.workerExit || ""}
-                onChange={handleInputChange}
-                className="time-input"
-              />
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      <h4>Descripción de trabajos</h4>
-      <textarea
-        name="workPerformed.description"
-        value={editedReport.workPerformed?.description || ""}
-        onChange={handleInputChange}
-        placeholder="Descripción de los trabajos realizados"
-      />
-
-      {!isHourlyProject && (
-        <>
-          <label>Importe Facturado (€)</label>
-          <input
-            type="number"
-            name="workPerformed.invoicedAmount"
-            min="0"
-            step="0.01"
-            value={editedReport.workPerformed?.invoicedAmount || 0}
-            onChange={handleInputChange}
-          />
-        </>
-      )}
-
-      {isHourlyProject && (
-        <MaterialsEditor
-          materials={editedReport.materials || []}
-          onMaterialsChange={handleMaterialsChange}
-          projectId={editedReport.projectId}
-          reportDate={editedReport.reportDate}
-          uploadFile={uploadFile}
-        />
-      )}
-
-      <PhotosEditor
-        photos={editedReport.workPerformed?.photos || []}
-        onPhotosChange={handlePhotosChange}
-        projectId={editedReport.projectId}
-        reportDate={editedReport.reportDate}
-        uploadFile={uploadFile}
-      />
-
-      <div className="form-actions">
-        <button type="submit" disabled={loading}>
-          {loading ? "Guardando..." : "Guardar cambios"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={loading}
-          className="cancel-button"
-        >
-          Cancelar
-        </button>
-      </div>
-    </form>
-  );
-};
-
-export default React.memo(ReportEditForm);
-</file>
-
-<file path="src/components/reports/ReportItem.js">
-// src/components/reports/ReportItem.js (Completo)
-import React, { useCallback } from "react";
-import { formatNumber, formatCurrency } from "../../utils/calculationUtils";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
-import { useUpdateReport } from "../../hooks/useQueryReports"; // Importar useUpdateReport
-import "../../components/ExtraWork.css"; // Asegúrate de que esta ruta sea correcta
-
-const ReportItem = ({ report, project, onEdit, onDelete }) => {
-  const { calculateLabor, calculateMaterials } = useCalculationsService();
-  const calculatedLabor = report.labor ? calculateLabor(report.labor, project) : null;
-  const calculatedMaterials = report.materials ? calculateMaterials(report.materials) : null;
-
-  const isHourlyProject = project.type === "hourly";
-  const reportDate = new Date(report.reportDate).toLocaleDateString();
-  const isExtraWork = report.isExtraWork;
-  const extraWorkType = isExtraWork ? report.extraWorkType : null;
-
-  // Usar el hook useUpdateReport
-  const updateReportMutation = useUpdateReport();
-
-  // Función para manejar el cambio del checkbox de facturación
-  const handleBilledChange = useCallback(async (e) => {
-    const isBilled = e.target.checked;
-    try {
-      await updateReportMutation.mutateAsync({
-        reportId: report.id,
-        data: { isBilled }, // Solo actualizamos isBilled
-      });
-    } catch (error) {
-      console.error("Error al actualizar el estado de facturación:", error);
-      // Aquí podrías mostrar un mensaje de error al usuario si lo deseas
-    }
-  }, [report.id, updateReportMutation]);
-
-  const renderWorkType = () => {
-    if (isHourlyProject) {
-      return "Trabajo por horas";
-    } else if (isExtraWork) {
-      if (extraWorkType === "additional_budget") {
-        return "Trabajo extra - Presupuesto adicional";
-      } else {
-        return "Trabajo extra - Por horas";
-      }
-    } else {
-      return "Trabajo dentro de presupuesto";
-    }
-  };
-
-  const cardStyle = isExtraWork ? { borderLeft: '4px solid #E67E22' } : {};
-  const badgeStyle = isExtraWork ? {
-    backgroundColor: '#E67E22',
-    color: 'white',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    fontSize: '0.8rem',
-    fontWeight: 'bold',
-    display: 'inline-block',
-    marginBottom: '8px'
-  } : null;
-
-  return (
-    <div className="report-card" style={cardStyle}>
-      <h4>Parte del {reportDate}</h4>
-      {isExtraWork && <span style={badgeStyle}>TRABAJO EXTRA</span>}
-
-      <div className="report-details">
-        <p><strong>Semana:</strong> {report.weekNumber}</p>
-        <p><strong>Proyecto:</strong> {report.projectId}</p>
-        <p><strong>Cliente:</strong> {project.client || "No disponible"}</p>
-        <p><strong>Dirección:</strong> {project.address || "No disponible"}</p>
-        <p><strong>Tipo:</strong> {renderWorkType()}</p>
-        {/* Checkbox de facturación */}
-        <label>
-          <input
-            type="checkbox"
-            checked={report.isBilled || false}
-            onChange={handleBilledChange}
-            disabled={updateReportMutation.isPending} // Deshabilitar durante la mutación
-          />
-          Facturado
-        </label>
-      </div>
-
-      {isHourlyProject || (isExtraWork && extraWorkType === "hourly") ? (
-        <div className="labor-details">
-          <h5>Mano de obra</h5>
-          <p>Oficial: {formatNumber(calculatedLabor?.officialHours || 0)} h - {formatCurrency(calculatedLabor?.officialCost || 0)}</p>
-          <p>Peón: {formatNumber(calculatedLabor?.workerHours || 0)} h - {formatCurrency(calculatedLabor?.workerCost || 0)}</p>
-          <p>Total mano de obra: {formatCurrency(calculatedLabor?.totalLaborCost || 0)}</p>
-
-          <h5>Materiales</h5>
-          {renderMaterials(report.materials)}
-          <p>Total materiales: {formatCurrency(calculatedMaterials?.totalMaterialsCost || 0)}</p>
-        </div>
-      ) : (
-        <div className="fixed-budget-details">
-          {isExtraWork && extraWorkType === "additional_budget" ? (
-            <p><strong>Importe adicional presupuestado:</strong> {formatCurrency(report.extraBudgetAmount || 0)}</p>
-          ) : (
-            <p><strong>Importe facturado:</strong> {formatCurrency(report.invoicedAmount || 0)}</p>
-          )}
-        </div>
-      )}
-
-      <div className="work-details">
-        <h5>Trabajos realizados</h5>
-        <p>{report.workPerformed?.description || "Sin descripción"}</p>
-        {renderPhotos(report.workPerformed?.photos)}
-      </div>
-
-      {(isHourlyProject || (isExtraWork && extraWorkType === "hourly")) && (
-        <p className="report-total">
-          <strong>Total:</strong> {formatCurrency(
-            (calculatedLabor?.totalLaborCost || 0) + (calculatedMaterials?.totalMaterialsCost || 0)
-          )}
-        </p>
-      )}
-
-      <div className="report-actions">
-        <button onClick={onEdit} className="edit-button">Editar</button>
-        <button onClick={onDelete} className="delete-button">Eliminar</button>
-      </div>
-    </div>
-  );
-};
-
-// Funciones auxiliares para renderizado (sin cambios)
-function renderMaterials(materials = []) {
-  if (!materials || materials.length === 0) {
-    return <p>No hay materiales registrados.</p>;
-  }
-
-  return (
-    <div className="materials-list">
-      {materials.map((material, index) => (
-        <p key={material.id || index}>
-          {material.description} - {formatCurrency(material.cost)} (
-          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
-            Ver factura
-          </a>
-          )
-        </p>
-      ))}
-    </div>
-  );
+<file path="src/components/reports/Reports.css">
+/* Estilos para la tabla de resumen */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
 }
 
-function renderPhotos(photos = []) {
-  if (!photos || photos.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="photos-container">
-      {photos.map((photo, index) => (
-        <img
-          key={photo.id || index}
-          src={photo.url}
-          alt={`Foto ${index + 1}`}
-          style={{ width: "100px", marginRight: "10px" }}
-        />
-      ))}
-    </div>
-  );
+.summary-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
 }
 
-export default React.memo(ReportItem);
-</file>
+.summary-table td.amount {
+  text-align: right;
+  font-weight: 500;
+}
 
-<file path="src/components/reports/ReportsViewer.js">
-// src/components/reports/ReportsViewer.js (Completo)
-import React, { useState, useCallback, useMemo } from "react";
-import { useQueryProjects } from "../../hooks/useQueryProjects";
-import {
-  useQueryReportsInfinite,
-  useDeleteReport,
-  // useUpdateReport // Se quita si ya no se usa directamente aquí
-} from "../../hooks/useQueryReports";
-import useReportFilters from "../../hooks/reports/useReportFilters";  // Importa useReportFilters
-import useReportSummary from "../../hooks/reports/useReportSummary";
+.summary-table tr.total-row {
+  border-top: 2px solid #ddd;
+  font-weight: bold;
+  color: #333;
+}
 
-import ReportFilters from "./ReportFilters";
-import ReportsList from "./ReportsList";
-import ReportEditForm from "./ReportEditForm";
-import ReportDeleteModal from "./ReportDeleteModal";
-import ReportSummary from "./ReportSummary";
-import PDFButton from "../common/PDFButton";
-import './Reports.css';
+.summary-table tr.total-row td {
+  padding-top: 12px;
+}
 
-const ReportsViewer = () => {
-  // Estados locales
-  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [editingReportId, setEditingReportId] = useState(null);
-  const [reportToDelete, setReportToDelete] = useState(null);
-  const [pdfKey, setPdfKey] = useState(Date.now());
-  const [billedStatus, setBilledStatus] = useState(""); // Nuevo estado para el filtro de facturación
+/* Estilos para el botón PDF */
+.pdf-button-container {
+  margin-bottom: 20px;
+}
 
+.pdf-button {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background-color: #8D432D;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
 
-  // Hooks de React Query
-  const { data: projects = [] } = useQueryProjects();
+.pdf-button:hover {
+  background-color: #7A3624;
+}
 
-  const {
-    filters,
-    updateFilter,
-    updateFilters, // Usa updateFilters para actualizar varios a la vez
-    filterReports,
-    hasActiveFilters,
-    filtersDescription //Podrías usarlo para un label o algo así
-  } = useReportFilters({
-    projectId: selectedProjectId,
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-    isBilled: billedStatus === "" ? undefined : billedStatus === "true" // Convertir a booleano o undefined.
-  });
+.pdf-button.error-button {
+  background-color: #e74c3c;
+}
 
-  // Consulta de reportes con React Query
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    fetchNextPage, // Para paginación infinita
-    hasNextPage
-  } = useQueryReportsInfinite({  // Usar useQueryReportsInfinite
-    projectId: selectedProjectId || undefined, // Usar undefined en lugar de "" para no filtrar
-    startDate: dateRange.startDate || undefined,
-    endDate: dateRange.endDate || undefined,
-    orderBy: 'reportDate',
-    orderDirection: 'desc',
-    isBilled: billedStatus === "" ? undefined : billedStatus === "true", // Filtro isBilled
-    pageSize: 100, // Ajusta según sea necesario
-  });
+.pdf-disabled-message {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 20px;
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
 
-  // Mutación para eliminar un reporte
-  const deleteReportMutation = useDeleteReport();
+/* CREANDO CLASES ESPECÍFICAS PARA EVITAR CONFLICTOS CON APP.CSS */
+/* Estilo para el overlay del modal */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 1000 !important;
+  animation: fadeIn 0.3s ease;
+}
 
-  // Extraer reportes de los datos paginados
-    const reports = useMemo(() => {
-        if (!data) return [];
-        return data.pages.flatMap(page => page.items);
-    }, [data]);
+/* Estilo para nuestro modal personalizado (usando una clase diferente) */
+.custom-modal {
+  position: relative !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
+  width: 90% !important;
+  max-width: 800px !important;
+  height: auto !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  padding: 30px !important;
+  margin: 0 auto !important;
+  animation: slideIn 0.3s ease;
+  
+  /* Aseguramos que no herede los estilos problemáticos del .modal en App.css */
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+}
 
-    const filteredReports = filterReports(reports);
+/* Mantenemos la clase edit-modal para aplicar estilos específicos del formulario de edición */
+.edit-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 #f5f5f5;
+}
 
-  // Usar hook de resumen para calcular totales
-  const { totals } = useReportSummary(
-    filteredReports,
-    projects,
-    selectedProjectId
-  );
+/* Para Chrome, Safari, y Edge: estilizar la barra de desplazamiento */
+.edit-modal::-webkit-scrollbar {
+  width: 8px;
+}
 
- // Manejadores para cambios en filtros y acciones
-  const handleProjectChange = useCallback((projectId) => {
-    setSelectedProjectId(projectId);
-    updateFilter("projectId", projectId); // Actualiza el filtro de proyecto
-    setPdfKey(Date.now());
-  }, [updateFilter]);
+.edit-modal::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
 
-  const handleDateRangeChange = useCallback((newDateRange) => {
-    setDateRange(newDateRange);
-    updateFilters(newDateRange);  // Usa updateFilters para actualizar ambos a la vez
-    setPdfKey(Date.now());
-  }, [updateFilters]);
+.edit-modal::-webkit-scrollbar-thumb {
+  background-color: #d4d4d4;
+  border-radius: 4px;
+}
 
-  // Nuevo handler para el filtro de estado de facturación
-    const handleBilledStatusChange = useCallback((status) => {
-        setBilledStatus(status);
-        updateFilter("isBilled", status === "" ? undefined : status === "true");
-      }, [updateFilter]);
+/* Título del modal */
+.custom-modal h3 {
+  margin-top: 0 !important;
+  margin-bottom: 20px !important;
+  border-bottom: 1px solid #ddd !important;
+  padding-bottom: 10px !important;
+  font-family: "Cormorant", serif !important;
+  color: #2c3e50 !important;
+  position: sticky !important;
+  top: 0 !important;
+  background-color: white !important;
+  z-index: 1 !important;
+  padding-top: 5px !important;
+}
 
+/* Botón de cerrar en la esquina superior derecha */
+.custom-modal .close-button {
+  position: absolute !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: none !important;
+  border: none !important;
+  font-size: 24px !important;
+  cursor: pointer !important;
+  color: #7f8c8d !important;
+  padding: 5px !important;
+  transition: color 0.3s ease !important;
+  z-index: 2 !important;
+}
 
-  const handleEditReport = useCallback((reportId) => {
-    setEditingReportId(reportId);
-  }, []);
+.custom-modal .close-button:hover {
+  color: #e74c3c !important;
+}
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingReportId(null);
-  }, []);
+/* Ajustar botones del formulario */
+.custom-modal .form-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  margin-top: 20px !important;
+  padding-top: 15px !important;
+  border-top: 1px solid #eee !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  background-color: white !important;
+  padding-bottom: 5px !important;
+  z-index: 1 !important;
+}
 
-  const handleDeleteConfirm = useCallback((reportId) => {
-    setReportToDelete(reportId);
-  }, []);
+/* Estilo para prevenir el scroll en el body cuando el modal está abierto */
+.body-no-scroll {
+  overflow: hidden !important;
+}
 
-  const handleDeleteCancel = useCallback(() => {
-    setReportToDelete(null);
-  }, []);
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
-    const handleModalOverlayClick = useCallback((e) => {
-        if(e.target.className === 'modal-overlay'){
-            handleCancelEdit();
-        }
-    }, [handleCancelEdit])
+@keyframes slideIn {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
-  const handleDeleteReport = useCallback(async () => {
-    if (!reportToDelete) return;
+/* Estilos para el interior del formulario */
+.edit-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  padding-bottom: 20px !important;
+}
 
-    try {
-      await deleteReportMutation.mutateAsync(reportToDelete);
-      setReportToDelete(null); // Limpiar el reporte a eliminar
-    } catch (error) {
-      console.error("Error al eliminar reporte:", error);
-    }
-  }, [reportToDelete, deleteReportMutation]);
+.edit-form label {
+  font-weight: 500 !important;
+  display: block !important;
+  margin-bottom: 5px !important;
+}
 
-  const handleEditComplete = useCallback(() => {
-    setEditingReportId(null); // Cerrar modal
-  }, []);
+.edit-form input,
+.edit-form textarea,
+.edit-form select {
+  padding: 10px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  width: 100% !important;
+}
 
-    if (isLoading && reports.length === 0) return <p>Cargando reportes...</p>;
-    if (isError) return <p className="error-message">Error: {error?.message}</p>;
+.edit-form textarea {
+  min-height: 100px !important;
+  resize: vertical !important;
+}
 
+.edit-form h4 {
+  margin-top: 15px !important;
+  margin-bottom: 8px !important;
+  color: #2c3e50 !important;
+  font-family: "Cormorant", serif !important;
+}
 
-  return (
-    <div className="reports-viewer">
-      <h2>Informes</h2>
+/* Estilos responsivos para el modal */
+@media (max-width: 768px) {
+  .custom-modal {
+    width: 95% !important;
+    max-height: 85vh !important;
+    padding: 20px 15px !important;
+  }
+  
+  .custom-modal .form-actions {
+    flex-direction: column !important;
+  }
+  
+  .custom-modal .form-actions button {
+    width: 100% !important;
+  }
+}
 
-      {/* Filtros */}
-      <ReportFilters
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-        dateRange={dateRange}
-        onProjectChange={handleProjectChange}
-        onDateRangeChange={handleDateRangeChange}
-        onBilledStatusChange={handleBilledStatusChange} // Pasar el manejador
-        billedStatus={billedStatus}                    // Pasar el estado actual
-      />
+/* Estilos para controlar el tamaño de las imágenes en el modal de edición */
 
-      {/* Resumen de Totales (si hay reportes y se ha seleccionado un proyecto) */}
-      {filteredReports.length > 0 && selectedProjectId && (
-        <ReportSummary
-          reports={filteredReports}
-          projects={projects}
-          selectedProjectId={selectedProjectId}
-        />
-      )}
+/* Contenedor de fotos con grid responsivo */
+.photos-container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 15px !important;
+  width: 100% !important;
+}
 
-      {/* Botón para generar PDF (si hay reportes) */}
-      <PDFButton
-        key={pdfKey}
-        reports={filteredReports}
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-        dateRange={dateRange}
-        disabled={!selectedProjectId || filteredReports.length === 0} // Deshabilitar si no hay proyecto o reportes
-      />
+/* Contenedor individual de cada foto */
+.photo-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 120px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+}
 
-      <h3 className="section-title">Partes en el rango seleccionado:</h3>
+/* Estilos para las imágenes dentro de los contenedores */
+.photo-container img,
+.photo-thumbnail {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.2s ease !important;
+}
 
-      {/* Lista de Reportes */}
-      <ReportsList
-        reports={filteredReports}
-        projects={projects}
-        onEdit={handleEditReport}
-        onDelete={handleDeleteConfirm}
-      />
+.photo-container:hover img {
+  transform: scale(1.05) !important;
+}
 
-      {/* Modal de edición de reportes */}
-      {editingReportId && (
-        <div className="modal-overlay" onClick={handleModalOverlayClick}>
-          <div className="custom-modal edit-modal">
-            <h3>Editar Parte</h3>
-            <button
-              type="button"
-              className="close-button"
-              onClick={handleCancelEdit}
-              aria-label="Cerrar formulario"
-            >
-              ×
-            </button>
-            <ReportEditForm
-              reportId={editingReportId}
-              projects={projects}
-              onCancel={handleCancelEdit}
-              onComplete={handleEditComplete}
-            />
-          </div>
-        </div>
-      )}
+/* Botón para eliminar foto */
+.remove-photo-button {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 25px !important;
+  height: 25px !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.3s ease !important;
+}
 
-      {/* Modal de confirmación de eliminación */}
-      {reportToDelete && (
-        <ReportDeleteModal
-          onConfirm={handleDeleteReport}
-          onCancel={handleDeleteCancel}
-          isLoading={deleteReportMutation.isPending} // Pasar estado de carga
-        />
-      )}
-       {/* Paginación (si es necesario) */}
-       {hasNextPage && (
-          <button onClick={() => fetchNextPage()} disabled={isLoading}>
-            Cargar más
-          </button>
-        )}
-    </div>
-  );
-};
+.remove-photo-button:hover {
+  opacity: 1 !important;
+}
 
-export default React.memo(ReportsViewer);
+/* Estilos para el contenedor de imágenes existentes */
+.existing-images {
+  margin-top: 20px !important;
+}
+
+/* Estilos para vista previa de imágenes */
+.preview-item {
+  position: relative !important;
+  width: 140px !important;
+  height: 120px !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  background-color: white !important;
+}
+
+.preview-item img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* Estilos responsivos para pantallas pequeñas */
+@media (max-width: 768px) {
+  .photos-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Vista más limpia para muchas imágenes */
+.photos-editor {
+  margin-bottom: 20px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid #eee !important;
+}
+
+/* Estilos específicos para el ImageUploader */
+.image-uploader .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 10px !important;
+  margin-bottom: 15px !important;
+}
+
+.image-uploader .existing-images .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+}
+
+/* Añadir estos estilos a src/components/reports/Reports.css */
+
+/* Espaciado para los botones de acción en los partes diarios */
+.report-actions {
+  display: flex;
+  gap: 10px; /* Espacio entre los botones */
+  margin-top: 15px;
+}
+
+.report-actions button {
+  padding: 8px 15px;
+  min-width: 100px;
+  border: none;
+  border-radius: 0px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.report-actions .edit-button {
+  background-color: #8D432D;
+  color: white;
+}
+
+.report-actions .edit-button:hover {
+  background-color: #7A3624;
+}
+
+.report-actions .delete-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.report-actions .delete-button:hover {
+  background-color: #c0392b;
+}
+
+/* Eliminar subrayado del enlace de descarga PDF */
+.pdf-button-container a {
+  text-decoration: none;
+}
+
+/* Estilos para mejorar el checkbox de facturación */
+.billing-checkbox-container {
+  margin: 10px 0;
+  padding: 8px 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  border-left: 3px solid #8D432D;
+  display: flex;
+  align-items: center;
+}
+
+.billing-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.billing-checkbox {
+  margin: 0;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.billing-checkbox-text {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+/* Estilos adicionales para los nuevos filtros en Reports.css */
+
+/* Mejoras al contenedor de filtros */
+.filter-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #8D432D;
+  transition: all 0.3s ease;
+}
+
+.filter-section.has-active-filters {
+  background-color: #f2f6fa;
+  border-left-color: #3498db;
+}
+
+/* Encabezado de filtros con botones de acción */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-family: "Cormorant", serif;
+  color: #2c3e50;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-action-button {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-action-button:hover {
+  background-color: #e0e0e0;
+}
+
+.filter-action-button.save-button {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.filter-action-button.save-button:hover {
+  background-color: #27ae60;
+}
+
+.filter-action-button.reset-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.filter-action-button.reset-button:hover {
+  background-color: #c0392b;
+}
+
+.filter-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secciones de filtros */
+.basic-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.advanced-filters {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 10px;
+  border-left: 3px solid #3498db;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* Grupo de filtros específicos */
+.filter-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.filter-group select,
+.filter-group input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Filtro de rango de importes */
+.amount-range {
+  display: flex;
+  flex-direction: column;
+}
+
+.amount-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amount-field {
+  flex: 1;
+}
+
+.amount-separator {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+/* Opciones de ordenación */
+.sorting-options {
+  background-color: #f0f8ff;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+/* Filtros guardados */
+.saved-filters {
+  margin-top: 20px;
+}
+
+.saved-filters h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-family: "Cormorant", serif;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.saved-filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-filter-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-filter-button:hover {
+  background-color: #2980b9;
+}
+
+/* Indicador de filtros activos */
+.active-filters-indicator {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  border-left: 3px solid #3498db;
+}
+
+.active-filters-indicator p {
+  margin: 0 0 5px 0;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.active-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-tag {
+  background-color: #e1f0fa;
+  color: #2980b9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: inline-block;
+}
+
+/* Resumen de filtros */
+.filters-summary {
+  margin-bottom: 15px;
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+/* Contenedor para el botón de cargar más */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.load-more-button {
+  background-color: #8D432D;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-button:hover {
+  background-color: #7A3624;
+}
+
+.load-more-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Adaptaciones para móviles */
+@media (max-width: 768px) {
+  .filter-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .filter-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .basic-filters,
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .amount-inputs {
+    flex-direction: column;
+    gap: 5px;
+    align-items: stretch;
+  }
+  
+  .amount-separator {
+    display: none;
+  }
+  
+  .active-filter-tags {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
 </file>
 
 <file path="src/components/WorkPerformedForm.js">
@@ -10895,6 +11066,949 @@ const TimelineChart = ({ data }) => {
 };
 
 export default React.memo(TimelineChart);
+</file>
+
+<file path="src/components/ProjectSelector.js">
+import React from "react";
+import { useQueryProjects } from "../hooks/useQueryProjects";
+import { formatCurrency } from "../utils/calculationUtils";
+
+const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
+  // Usamos el hook de React Query para obtener proyectos
+  const { data: projects = [], isLoading, error } = useQueryProjects();
+
+  const handleChange = (e) => {
+    const selectedProjectId = e.target.value; 
+    // MODIFICADO: Buscamos el proyecto usando el ID personalizado, no el firestoreId
+    const project = projects.find((p) => p.id === selectedProjectId);
+    onProjectSelect(project);
+  };
+
+  if (isLoading) return <p>Cargando proyectos...</p>;
+  if (error) return <p className="error-message">Error: {error.message}</p>;
+
+  return (
+    <div>
+      <label>ID del Proyecto</label>
+      <select onChange={handleChange} value={selectedProject?.id || ""} required>
+        <option value="">Selecciona un proyecto</option>
+        {projects.map((p) => (
+          <option key={p.firestoreId} value={p.id}>{p.id}</option>
+        ))}
+      </select>
+      {selectedProject && (
+  <div className="project-details">
+    <h4 className="project-details-title">Detalles del Proyecto</h4>
+    <p>
+      <span className="detail-label">Dirección:</span>
+      <span className="detail-value">{selectedProject.address}</span>
+    </p>
+    <p>
+      <span className="detail-label">Cliente:</span>
+      <span className="detail-value">{selectedProject.client}</span>
+    </p>
+    <p>
+      <span className="detail-label">NIF/NIE:</span>
+      <span className="detail-value">{selectedProject.nifNie}</span>
+    </p>
+    {selectedProject.type === "hourly" ? (
+      <>
+        <p>
+          <span className="detail-label">Precio oficial:</span>
+          <span className="detail-value">{formatCurrency(selectedProject.officialPrice)} /h</span>
+        </p>
+        <p>
+          <span className="detail-label">Precio peón:</span>
+          <span className="detail-value">{formatCurrency(selectedProject.workerPrice)} /h</span>
+        </p>
+      </>
+    ) : (
+      <>
+        <p>
+          <span className="detail-label">Presupuesto:</span>
+          <span className="detail-value">{formatCurrency(selectedProject.budgetAmount)}</span>
+        </p>
+        {selectedProject.allowExtraWork && (
+          <p className="extra-work-info">Este proyecto permite trabajos extra</p>
+        )}
+      </>
+    )}
+  </div>
+)}
+    </div>
+  );
+};
+
+export default React.memo(ProjectSelector);
+</file>
+
+<file path="src/components/reports/ReportEditForm.js">
+// src/components/reports/ReportEditForm.js
+import React, { useState, useEffect, useCallback } from "react";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { getWeekNumber } from "../../utils/calculationUtils";
+import { useStorage } from "../../hooks/useStorage";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
+import { useQueryClient } from '@tanstack/react-query'; // Importación añadida
+import MaterialsEditor from "./MaterialsEditor";
+import PhotosEditor from "./PhotosEditor";
+
+const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
+  // Hook useQueryClient llamado correctamente en el nivel superior
+  const queryClient = useQueryClient();
+  
+  const [editedReport, setEditedReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { uploadFile } = useStorage();
+  const { calculateLabor, calculateMaterials } = useCalculationsService();
+
+  // Efecto para bloquear scroll cuando el modal está abierto
+  useEffect(() => {
+    const handleEscKey = (e) => {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    document.body.classList.add('body-no-scroll');
+    document.addEventListener("keydown", handleEscKey);
+
+    return () => {
+      document.body.classList.remove('body-no-scroll');
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [onCancel]);
+
+  // Cargar datos del reporte
+  useEffect(() => {
+    const loadReport = async () => {
+      try {
+        setLoading(true);
+        const reportRef = doc(db, "dailyReports", reportId);
+        const reportSnap = await getDoc(reportRef);
+
+        if (reportSnap.exists()) {
+          setEditedReport({ id: reportSnap.id, ...reportSnap.data() });
+        } else {
+          setError("El reporte no existe");
+        }
+      } catch (err) {
+        setError(`Error al cargar el reporte: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReport();
+  }, [reportId]);
+
+  // Manejador de cambios para inputs (incluyendo isBilled)
+  const handleInputChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+
+    setEditedReport(prev => {
+      if (!prev) return prev;
+
+      let updatedValue = value;
+      if (type === "checkbox") {
+        updatedValue = checked; // Para checkboxes, usa el valor de 'checked'
+      }
+
+      if (name.includes(".")) {
+        const [parent, field] = name.split(".")
+        if (parent === "labor") {
+          return { ...prev, labor: { ...prev.labor, [field]: updatedValue } };
+        } else if (parent === "workPerformed") {
+          updatedValue = field === 'invoicedAmount' ? parseFloat(value) : value;
+          return { ...prev, workPerformed: { ...prev.workPerformed, [field]: updatedValue } };
+        }
+      }
+      return { ...prev, [name]: updatedValue };
+    });
+  }, []);
+
+  // Ahora podemos usar queryClient dentro de handleSubmit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!editedReport) return;
+
+    try {
+      setLoading(true);
+      const reportRef = doc(db, "dailyReports", reportId);
+
+      // Preparar los datos a actualizar
+      const updatedData = {
+        reportDate: editedReport.reportDate,
+        weekNumber: getWeekNumber(editedReport.reportDate),
+        materials: editedReport.materials || [],
+        workPerformed: {
+          ...editedReport.workPerformed,
+          description: editedReport.workPerformed.description,
+          photos: editedReport.workPerformed.photos || [],
+        },
+        isBilled: !!editedReport.isBilled, // Asegura que sea booleano
+      };
+
+      // Lógica específica por tipo de proyecto
+      const project = projects.find((p) => p.id === editedReport.projectId);
+
+      if (editedReport.labor) {
+        const laborData = calculateLabor(editedReport.labor, project);
+        updatedData.labor = { ...editedReport.labor, ...laborData };
+      }
+
+      if (editedReport.workPerformed?.invoicedAmount !== undefined) {
+        updatedData.invoicedAmount = editedReport.workPerformed.invoicedAmount;
+      }
+
+      if (project && project.type === "hourly") {
+        const materialsData = calculateMaterials(editedReport.materials);
+        updatedData.totalMaterialsCost = materialsData.totalMaterialsCost;
+
+        if (editedReport.labor) {
+          const laborData = calculateLabor(editedReport.labor, project);
+          updatedData.totalCost = laborData.totalLaborCost + materialsData.totalMaterialsCost;
+        }
+      }
+
+      await updateDoc(reportRef, updatedData);
+      
+      // Invalidar la caché para forzar una actualización de la UI
+      await queryClient.invalidateQueries({ queryKey: ['reports'] });
+      
+      onComplete();
+    } catch (err) {
+      setError(`Error al guardar cambios: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manejadores para materiales y fotos
+  const handleMaterialsChange = useCallback((materials) => {
+    setEditedReport(prev => ({
+      ...prev,
+      materials
+    }));
+  }, []);
+
+  const handlePhotosChange = useCallback((photos) => {
+    setEditedReport(prev => ({
+      ...prev,
+      workPerformed: {
+        ...prev.workPerformed,
+        photos
+      }
+    }));
+  }, []);
+
+  if (loading && !editedReport) return <p>Cargando reporte...</p>;
+  if (error) return <p className="error-message">{error}</p>;
+  if (!editedReport) return <p>No se encontró el reporte</p>;
+
+  const project = projects.find(p => p.id === editedReport.projectId) || {};
+  const isHourlyProject = project.type === "hourly";
+
+  return (
+    <form onSubmit={handleSubmit} className="edit-form">
+      {error && <p className="error-message">{error}</p>}
+
+      <label>Fecha del parte:</label>
+      <input
+        type="date"
+        name="reportDate"
+        value={editedReport.reportDate}
+        onChange={handleInputChange}
+        required
+      />
+
+      {/* Checkbox para isBilled con mejor estilo */}
+      <div className="billing-checkbox-container">
+        <label className="billing-checkbox-label">
+          <input
+            type="checkbox"
+            name="isBilled"
+            className="billing-checkbox"
+            checked={!!editedReport.isBilled}
+            onChange={handleInputChange}
+          />
+          <span className="billing-checkbox-text">Facturado</span>
+        </label>
+      </div>
+
+      {isHourlyProject ? (
+        <>
+          <h4>Mano de obra</h4>
+          <div className="labor-row">
+            <div className="labor-field">
+              <label>Hora entrada oficial</label>
+              <input
+                type="time"
+                name="labor.officialEntry"
+                value={editedReport.labor?.officialEntry || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+            <div className="labor-field">
+              <label>Hora salida oficial</label>
+              <input
+                type="time"
+                name="labor.officialExit"
+                value={editedReport.labor?.officialExit || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+          </div>
+
+          <div className="labor-row">
+            <div className="labor-field">
+              <label>Hora entrada peón</label>
+              <input
+                type="time"
+                name="labor.workerEntry"
+                value={editedReport.labor?.workerEntry || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+            <div className="labor-field">
+              <label>Hora salida peón</label>
+              <input
+                type="time"
+                name="labor.workerExit"
+                value={editedReport.labor?.workerExit || ""}
+                onChange={handleInputChange}
+                className="time-input"
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <h4>Descripción de trabajos</h4>
+      <textarea
+        name="workPerformed.description"
+        value={editedReport.workPerformed?.description || ""}
+        onChange={handleInputChange}
+        placeholder="Descripción de los trabajos realizados"
+      />
+
+      {!isHourlyProject && (
+        <>
+          <label>Importe Facturado (€)</label>
+          <input
+            type="number"
+            name="workPerformed.invoicedAmount"
+            min="0"
+            step="0.01"
+            value={editedReport.workPerformed?.invoicedAmount || 0}
+            onChange={handleInputChange}
+          />
+        </>
+      )}
+
+      {isHourlyProject && (
+        <MaterialsEditor
+          materials={editedReport.materials || []}
+          onMaterialsChange={handleMaterialsChange}
+          projectId={editedReport.projectId}
+          reportDate={editedReport.reportDate}
+          uploadFile={uploadFile}
+        />
+      )}
+
+      <PhotosEditor
+        photos={editedReport.workPerformed?.photos || []}
+        onPhotosChange={handlePhotosChange}
+        projectId={editedReport.projectId}
+        reportDate={editedReport.reportDate}
+        uploadFile={uploadFile}
+      />
+
+      <div className="form-actions">
+        <button type="submit" disabled={loading}>
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="cancel-button"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default React.memo(ReportEditForm);
+</file>
+
+<file path="src/components/reports/ReportItem.js">
+// src/components/reports/ReportItem.js (Completo)
+import React, { useCallback } from "react";
+import { formatNumber, formatCurrency } from "../../utils/calculationUtils";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
+import { useUpdateReport } from "../../hooks/useQueryReports"; // Importar useUpdateReport
+import "../../components/ExtraWork.css"; // Asegúrate de que esta ruta sea correcta
+
+const ReportItem = ({ report, project, onEdit, onDelete }) => {
+  const { calculateLabor, calculateMaterials } = useCalculationsService();
+  const calculatedLabor = report.labor ? calculateLabor(report.labor, project) : null;
+  const calculatedMaterials = report.materials ? calculateMaterials(report.materials) : null;
+
+  const isHourlyProject = project.type === "hourly";
+  const reportDate = new Date(report.reportDate).toLocaleDateString();
+  const isExtraWork = report.isExtraWork;
+  const extraWorkType = isExtraWork ? report.extraWorkType : null;
+
+  // Usar el hook useUpdateReport
+  const updateReportMutation = useUpdateReport();
+
+  // Función para manejar el cambio del checkbox de facturación
+  const handleBilledChange = useCallback(async (e) => {
+    const isBilled = e.target.checked;
+    try {
+      await updateReportMutation.mutateAsync({
+        reportId: report.id,
+        data: { isBilled }, // Solo actualizamos isBilled
+      });
+    } catch (error) {
+      console.error("Error al actualizar el estado de facturación:", error);
+      // Aquí podrías mostrar un mensaje de error al usuario si lo deseas
+    }
+  }, [report.id, updateReportMutation]);
+
+  const renderWorkType = () => {
+    if (isHourlyProject) {
+      return "Trabajo por horas";
+    } else if (isExtraWork) {
+      if (extraWorkType === "additional_budget") {
+        return "Trabajo extra - Presupuesto adicional";
+      } else {
+        return "Trabajo extra - Por horas";
+      }
+    } else {
+      return "Trabajo dentro de presupuesto";
+    }
+  };
+
+  const cardStyle = isExtraWork ? { borderLeft: '4px solid #E67E22' } : {};
+  const badgeStyle = isExtraWork ? {
+    backgroundColor: '#E67E22',
+    color: 'white',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    fontSize: '0.8rem',
+    fontWeight: 'bold',
+    display: 'inline-block',
+    marginBottom: '8px'
+  } : null;
+
+  return (
+    <div className="report-card" style={cardStyle}>
+      <h4>Parte del {reportDate}</h4>
+      {isExtraWork && <span style={badgeStyle}>TRABAJO EXTRA</span>}
+
+      <div className="report-details">
+        <p><strong>Semana:</strong> {report.weekNumber}</p>
+        <p><strong>Proyecto:</strong> {report.projectId}</p>
+        <p><strong>Cliente:</strong> {project.client || "No disponible"}</p>
+        <p><strong>Dirección:</strong> {project.address || "No disponible"}</p>
+        <p><strong>Tipo:</strong> {renderWorkType()}</p>
+        {/* Checkbox de facturación */}
+        <div className="billing-checkbox-container">
+  <label className="billing-checkbox-label">
+    <input
+      type="checkbox"
+      className="billing-checkbox"
+      checked={report.isBilled || false}
+      onChange={handleBilledChange}
+      disabled={updateReportMutation.isPending}
+    />
+    <span className="billing-checkbox-text">Facturado</span>
+  </label>
+</div>
+      </div>
+
+      {isHourlyProject || (isExtraWork && extraWorkType === "hourly") ? (
+        <div className="labor-details">
+          <h5>Mano de obra</h5>
+          <p>Oficial: {formatNumber(calculatedLabor?.officialHours || 0)} h - {formatCurrency(calculatedLabor?.officialCost || 0)}</p>
+          <p>Peón: {formatNumber(calculatedLabor?.workerHours || 0)} h - {formatCurrency(calculatedLabor?.workerCost || 0)}</p>
+          <p>Total mano de obra: {formatCurrency(calculatedLabor?.totalLaborCost || 0)}</p>
+
+          <h5>Materiales</h5>
+          {renderMaterials(report.materials)}
+          <p>Total materiales: {formatCurrency(calculatedMaterials?.totalMaterialsCost || 0)}</p>
+        </div>
+      ) : (
+        <div className="fixed-budget-details">
+          {isExtraWork && extraWorkType === "additional_budget" ? (
+            <p><strong>Importe adicional presupuestado:</strong> {formatCurrency(report.extraBudgetAmount || 0)}</p>
+          ) : (
+            <p><strong>Importe facturado:</strong> {formatCurrency(report.invoicedAmount || 0)}</p>
+          )}
+        </div>
+      )}
+
+      <div className="work-details">
+        <h5>Trabajos realizados</h5>
+        <p>{report.workPerformed?.description || "Sin descripción"}</p>
+        {renderPhotos(report.workPerformed?.photos)}
+      </div>
+
+      {(isHourlyProject || (isExtraWork && extraWorkType === "hourly")) && (
+        <p className="report-total">
+          <strong>Total:</strong> {formatCurrency(
+            (calculatedLabor?.totalLaborCost || 0) + (calculatedMaterials?.totalMaterialsCost || 0)
+          )}
+        </p>
+      )}
+
+      <div className="report-actions">
+        <button onClick={onEdit} className="edit-button">Editar</button>
+        <button onClick={onDelete} className="delete-button">Eliminar</button>
+      </div>
+    </div>
+  );
+};
+
+// Funciones auxiliares para renderizado (sin cambios)
+function renderMaterials(materials = []) {
+  if (!materials || materials.length === 0) {
+    return <p>No hay materiales registrados.</p>;
+  }
+
+  return (
+    <div className="materials-list">
+      {materials.map((material, index) => (
+        <p key={material.id || index}>
+          {material.description} - {formatCurrency(material.cost)} (
+          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
+            Ver factura
+          </a>
+          )
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function renderPhotos(photos = []) {
+  if (!photos || photos.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="photos-container">
+      {photos.map((photo, index) => (
+        <img
+          key={photo.id || index}
+          src={photo.url}
+          alt={`Foto ${index + 1}`}
+          style={{ width: "100px", marginRight: "10px" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default React.memo(ReportItem);
+</file>
+
+<file path="src/components/reports/ReportsViewer.js">
+// src/components/reports/ReportsViewer.js - Actualizado con filtros avanzados
+import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { useQueryProjects } from "../../hooks/useQueryProjects";
+import { useQueryUser } from "../../hooks/useQueryUser"; // Nuevo hook para usuarios
+import {
+  useQueryReportsInfinite,
+  useDeleteReport,
+} from "../../hooks/useQueryReports";
+import useReportFilters from "../../hooks/reports/useReportFilters";
+import useReportSummary from "../../hooks/reports/useReportSummary";
+
+import ReportFilters from "./ReportFilters";
+import ReportsList from "./ReportsList";
+import ReportEditForm from "./ReportEditForm";
+import ReportDeleteModal from "./ReportDeleteModal";
+import ReportSummary from "./ReportSummary";
+import PDFButton from "../common/PDFButton";
+import EmptyState from "../common/EmptyState";
+import './Reports.css';
+
+const ReportsViewer = () => {
+  // Estados locales para UI y modales
+  const [editingReportId, setEditingReportId] = useState(null);
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [pdfKey, setPdfKey] = useState(Date.now());
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  
+  // Estado para filtrado avanzado
+  const [sortConfig, setSortConfig] = useState({
+    field: "reportDate",
+    direction: "desc" 
+  });
+
+  // Hook de filtrado avanzado
+  const {
+    filters,
+    updateFilter,
+    updateFilters,
+    filterReports,
+    hasActiveFilters,
+    filtersDescription,
+    sortOptions,
+    updateSortOptions,
+    resetFilters,
+    saveFilter,
+    savedFilters,
+    processReports
+  } = useReportFilters({
+    projectId: "",
+    startDate: "",
+    endDate: "",
+    isBilled: undefined,
+    workType: "",
+    userId: "",
+    amountMin: "",
+    amountMax: "",
+  });
+
+  // Consultar proyectos y usuarios
+  const { data: projects = [] } = useQueryProjects();
+  const { data: users = [], isLoading: usersLoading } = useQueryUser();
+
+  // Consulta de reportes con React Query - usando los filtros nuevos
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    refetch
+  } = useQueryReportsInfinite({
+    projectId: filters.projectId || undefined,
+    startDate: filters.startDate || undefined,
+    endDate: filters.endDate || undefined,
+    isBilled: filters.isBilled,
+    userId: filters.userId || undefined,
+    orderBy: sortOptions.field,
+    orderDirection: sortOptions.direction,
+    pageSize: 100,
+  });
+
+  // Mutación para eliminar un reporte
+  const deleteReportMutation = useDeleteReport();
+
+  // Extraer reportes de los datos paginados
+  const reports = useMemo(() => {
+    if (!data) return [];
+    return data.pages.flatMap(page => page.items);
+  }, [data]);
+
+  // Aplicar filtros adicionales en el cliente (para los que no soporta Firestore)
+  const filteredReports = useMemo(() => {
+    // Usar processReports que aplica filtrado y ordenación
+    const processed = processReports(reports);
+    
+    // Aplicar filtrado adicional si es necesario
+    return processed.filter(report => {
+      // Filtro por rango de importes
+      if (filters.amountMin || filters.amountMax) {
+        const amount = getReportAmount(report);
+        
+        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
+          return false;
+        }
+        
+        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
+          return false;
+        }
+      }
+      
+      // Filtro por tipo de trabajo específico
+      if (filters.workType === 'extra_hourly' && 
+          (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
+        return false;
+      }
+      
+      if (filters.workType === 'extra_budget' && 
+          (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [reports, filters, processReports]);
+
+  // Función auxiliar para obtener el monto relevante de un reporte
+  const getReportAmount = (report) => {
+    return report.invoicedAmount || 
+           report.extraBudgetAmount || 
+           report.totalCost || 
+           ((report.labor?.totalLaborCost || 0) + (report.totalMaterialsCost || 0)) || 
+           0;
+  };
+
+  // Usar hook de resumen para calcular totales
+  const { totals } = useReportSummary(
+    filteredReports,
+    projects,
+    filters.projectId
+  );
+
+  // Manejadores para cambios en filtros
+  const handleProjectChange = useCallback((projectId) => {
+    updateFilter("projectId", projectId);
+    setPdfKey(Date.now());
+  }, [updateFilter]);
+
+  const handleDateRangeChange = useCallback((newDateRange) => {
+    updateFilters({
+      startDate: newDateRange.startDate || "",
+      endDate: newDateRange.endDate || ""
+    });
+    setPdfKey(Date.now());
+  }, [updateFilters]);
+
+  const handleBilledStatusChange = useCallback((status) => {
+    updateFilter("isBilled", status === "" ? undefined : status === "true");
+  }, [updateFilter]);
+
+  const handleWorkTypeChange = useCallback((type) => {
+    updateFilter("workType", type);
+  }, [updateFilter]);
+
+  const handleUserChange = useCallback((userId) => {
+    updateFilter("userId", userId);
+  }, [updateFilter]);
+
+  const handleAmountRangeChange = useCallback((range) => {
+    updateFilters({
+      amountMin: range.min || "",
+      amountMax: range.max || ""
+    });
+  }, [updateFilters]);
+
+  const handleSortChange = useCallback((sortData) => {
+    updateSortOptions(sortData);
+    setSortConfig(sortData);
+  }, [updateSortOptions]);
+
+  const handleResetFilters = useCallback(() => {
+    resetFilters();
+    setSortConfig({
+      field: "reportDate",
+      direction: "desc"
+    });
+  }, [resetFilters]);
+
+  const handleSaveFilter = useCallback((filterData, apply = false) => {
+    saveFilter({
+      ...filterData,
+      apply
+    });
+    
+    if (apply) {
+      // Si estamos aplicando un filtro guardado
+      const { filter } = filterData;
+      updateFilters(filter);
+      updateSortOptions(filter.sort || { field: "reportDate", direction: "desc" });
+      setSortConfig(filter.sort || { field: "reportDate", direction: "desc" });
+    }
+  }, [saveFilter, updateFilters, updateSortOptions]);
+
+  // Manejadores para edición y eliminación
+  const handleEditReport = useCallback((reportId) => {
+    setEditingReportId(reportId);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingReportId(null);
+  }, []);
+
+  const handleDeleteConfirm = useCallback((reportId) => {
+    setReportToDelete(reportId);
+  }, []);
+
+  const handleDeleteCancel = useCallback(() => {
+    setReportToDelete(null);
+  }, []);
+
+  const handleModalOverlayClick = useCallback((e) => {
+    if(e.target.className === 'modal-overlay'){
+      handleCancelEdit();
+    }
+  }, [handleCancelEdit]);
+
+  const handleDeleteReport = useCallback(async () => {
+    if (!reportToDelete) return;
+
+    try {
+      await deleteReportMutation.mutateAsync(reportToDelete);
+      setReportToDelete(null);
+    } catch (error) {
+      console.error("Error al eliminar reporte:", error);
+    }
+  }, [reportToDelete, deleteReportMutation]);
+
+  const handleEditComplete = useCallback(() => {
+    setEditingReportId(null);
+    refetch();
+  }, [refetch]);
+
+  // Estado de carga
+  const isLoadingData = isLoading && reports.length === 0;
+
+  return (
+    <div className="reports-viewer">
+      <h2>Informes</h2>
+
+      {/* Filtros mejorados */}
+      <ReportFilters
+        projects={projects}
+        selectedProjectId={filters.projectId}
+        dateRange={{
+          startDate: filters.startDate,
+          endDate: filters.endDate
+        }}
+        onProjectChange={handleProjectChange}
+        onDateRangeChange={handleDateRangeChange}
+        onBilledStatusChange={handleBilledStatusChange}
+        billedStatus={filters.isBilled === undefined ? "" : String(filters.isBilled)}
+        // Nuevos props para filtros adicionales
+        onWorkTypeChange={handleWorkTypeChange}
+        workType={filters.workType}
+        onUserChange={handleUserChange}
+        selectedUserId={filters.userId}
+        users={users}
+        onAmountRangeChange={handleAmountRangeChange}
+        amountRange={{
+          min: filters.amountMin,
+          max: filters.amountMax
+        }}
+        // Props para ordenación
+        onSortChange={handleSortChange}
+        sortField={sortConfig.field}
+        sortDirection={sortConfig.direction}
+        // Props para UI mejorada
+        onSaveFilter={handleSaveFilter}
+        onResetFilters={handleResetFilters}
+        savedFilters={savedFilters}
+      />
+
+      {/* Descripción de filtros activos */}
+      {hasActiveFilters && (
+        <div className="filters-summary">
+          <p>Filtros aplicados: {filtersDescription}</p>
+        </div>
+      )}
+
+      {/* Resumen de Totales (si hay reportes y se ha seleccionado un proyecto) */}
+      {filteredReports.length > 0 && filters.projectId && (
+        <ReportSummary
+          reports={filteredReports}
+          projects={projects}
+          selectedProjectId={filters.projectId}
+        />
+      )}
+
+      {/* Botón para generar PDF (si hay reportes) */}
+      <PDFButton
+        key={pdfKey}
+        reports={filteredReports}
+        projects={projects}
+        selectedProjectId={filters.projectId}
+        dateRange={{
+          startDate: filters.startDate,
+          endDate: filters.endDate
+        }}
+        disabled={!filters.projectId || filteredReports.length === 0}
+      />
+
+      <h3 className="section-title">Partes en el rango seleccionado:</h3>
+
+      {/* Mostrar estado vacío si no hay reportes */}
+      {filteredReports.length === 0 && !isLoadingData ? (
+        <EmptyState 
+          title="No se encontraron partes"
+          message={hasActiveFilters ? 
+            "No hay partes que coincidan con los filtros aplicados. Prueba con otros filtros." : 
+            "No hay partes creados aún. Crea tu primer parte diario en la sección 'Partes'."
+          }
+          icon="📊"
+          action={hasActiveFilters ? handleResetFilters : null}
+          actionLabel={hasActiveFilters ? "Limpiar filtros" : null}
+        />
+      ) : (
+        <>
+          {/* Lista de Reportes */}
+          <ReportsList
+            reports={filteredReports}
+            projects={projects}
+            onEdit={handleEditReport}
+            onDelete={handleDeleteConfirm}
+          />
+
+          {/* Cargar más datos si es necesario */}
+          {hasNextPage && (
+            <div className="load-more-container">
+              <button 
+                onClick={() => fetchNextPage()} 
+                disabled={isLoading}
+                className="load-more-button"
+              >
+                {isLoading ? "Cargando más partes..." : "Cargar más partes"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal de edición de reportes */}
+      {editingReportId && (
+        <div className="modal-overlay" onClick={handleModalOverlayClick}>
+          <div className="custom-modal edit-modal">
+            <h3>Editar Parte</h3>
+            <button
+              type="button"
+              className="close-button"
+              onClick={handleCancelEdit}
+              aria-label="Cerrar formulario"
+            >
+              ×
+            </button>
+            <ReportEditForm
+              reportId={editingReportId}
+              projects={projects}
+              onCancel={handleCancelEdit}
+              onComplete={handleEditComplete}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de eliminación */}
+      {reportToDelete && (
+        <ReportDeleteModal
+          onConfirm={handleDeleteReport}
+          onCancel={handleDeleteCancel}
+          isLoading={deleteReportMutation.isPending}
+        />
+      )}
+    </div>
+  );
+};
+
+export default React.memo(ReportsViewer);
 </file>
 
 <file path="src/components/Dashboard.js">
@@ -12237,12 +13351,21 @@ const ReportPDFGenerator = ({ reports, projects }) => {
     calculateBudget 
   } = useCalculationsService();
 
-  const firstReport = reports[0];
+  // Ordenar los reportes por fecha (del más antiguo al más nuevo)
+  const sortedReports = useMemo(() => {
+    return [...reports].sort((a, b) => {
+      const dateA = new Date(a.reportDate);
+      const dateB = new Date(b.reportDate);
+      return dateA - dateB; // Orden ascendente (antiguo a nuevo)
+    });
+  }, [reports]);
+
+  const firstReport = sortedReports[0];
   const project = projects.find((p) => p.id === firstReport?.projectId) || {};
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   // Obtener totales calculados desde el servicio
-  const { totals } = calculateReportSummary(reports, projects, firstReport?.projectId);
+  const { totals } = calculateReportSummary(sortedReports, projects, firstReport?.projectId);
 
   // Función para generar el título con soporte para múltiples semanas
   const renderTitle = () => {
@@ -12297,7 +13420,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
   };
 
   // Verificar si hay trabajos extra
-  const hasExtraWork = reports.some(report => report.isExtraWork);
+  const hasExtraWork = sortedReports.some(report => report.isExtraWork);
 
   return (
     <Document>
@@ -12329,7 +13452,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
       </Page>
 
       {/* Páginas por parte diario */}
-      {reports.map((report, index) => {
+      {sortedReports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
         
@@ -12641,6 +13764,28 @@ const ReportPDFGenerator = ({ reports, projects }) => {
 export default ReportPDFGenerator;
 </file>
 
+<file path="src/firebase.js">
+// firebase.js
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export { app }; // Exporta la instancia de la app
+</file>
+
 <file path="src/App.js">
 // src/App.js (Modificado para integrar el Dashboard)
 import React, { useState, useEffect } from "react";
@@ -12724,28 +13869,6 @@ function App() {
 }
 
 export default App;
-</file>
-
-<file path="src/firebase.js">
-// firebase.js
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-
-const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export { app }; // Exporta la instancia de la app
 </file>
 
 </files>

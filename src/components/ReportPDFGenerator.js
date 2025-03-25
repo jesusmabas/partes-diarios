@@ -290,12 +290,21 @@ const ReportPDFGenerator = ({ reports, projects }) => {
     calculateBudget 
   } = useCalculationsService();
 
-  const firstReport = reports[0];
+  // Ordenar los reportes por fecha (del más antiguo al más nuevo)
+  const sortedReports = useMemo(() => {
+    return [...reports].sort((a, b) => {
+      const dateA = new Date(a.reportDate);
+      const dateB = new Date(b.reportDate);
+      return dateA - dateB; // Orden ascendente (antiguo a nuevo)
+    });
+  }, [reports]);
+
+  const firstReport = sortedReports[0];
   const project = projects.find((p) => p.id === firstReport?.projectId) || {};
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   // Obtener totales calculados desde el servicio
-  const { totals } = calculateReportSummary(reports, projects, firstReport?.projectId);
+  const { totals } = calculateReportSummary(sortedReports, projects, firstReport?.projectId);
 
   // Función para generar el título con soporte para múltiples semanas
   const renderTitle = () => {
@@ -350,7 +359,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
   };
 
   // Verificar si hay trabajos extra
-  const hasExtraWork = reports.some(report => report.isExtraWork);
+  const hasExtraWork = sortedReports.some(report => report.isExtraWork);
 
   return (
     <Document>
@@ -382,7 +391,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
       </Page>
 
       {/* Páginas por parte diario */}
-      {reports.map((report, index) => {
+      {sortedReports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
         
