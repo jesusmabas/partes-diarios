@@ -1,0 +1,133 @@
+/* src/components/ExtraWork.css - Estilos para trabajos extra */
+
+/* Estilos generales para el formulario de trabajos extra */
+.extra-work-form {
+  background-color: #fffaed;
+  border-left: 4px solid #E67E22;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 0 5px 5px 0;
+}
+
+.extra-work-form h3 {
+  color: #d35400;
+  margin-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0e0c0;
+}
+
+/* Estilos para grupo de opciones de radio */
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+  width: auto;
+}
+
+.radio-option label {
+  margin: 0;
+  font-weight: normal;
+}
+
+/* Estilos para el grupo de checkbox */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  background-color: #f8f9fa;
+  padding: 12px;
+  border-radius: 5px;
+  border-left: 3px solid #8D432D;
+}
+
+.checkbox-input {
+  width: auto !important;
+  margin: 0 !important;
+}
+
+.checkbox-label {
+  margin: 0 !important;
+  font-weight: normal;
+}
+
+/* Diseño mejorado para los campos de entrada numérica en el formulario extra */
+.extra-work-form input[type="number"] {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 300px;
+}
+
+/* Texto de ayuda e información */
+.form-hint {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+/* Mensaje de información sobre trabajos extra */
+.extra-work-info {
+  background-color: #e8f4f8;
+  padding: 12px;
+  border-radius: 5px;
+  border-left: 4px solid #3498db;
+  margin-bottom: 15px;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+/* Estilos para la tabla de resumen que incluye trabajos extra */
+.summary-table .extra-section-header {
+  background-color: #fff8e1;
+  font-weight: bold;
+  color: #e67e22;
+}
+
+.summary-table .extra-section-header td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0ad4e;
+}
+
+/* Indicador visual para trabajos extra en reportes */
+.report-card.extra-work {
+  border-left: 4px solid #E67E22;
+  background-color: #fffaf3;
+}
+
+.extra-work-badge {
+  background-color: #E67E22;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+/* Estilos responsivos para móviles */
+@media (max-width: 768px) {
+  .radio-group {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .extra-work-form {
+    padding: 15px;
+  }
+}

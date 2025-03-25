@@ -1,72 +1,101 @@
-// src/components/reports/ReportSummary.js
-import React, { useMemo } from "react";
-import { formatCurrency } from "../../utils/formatters";
+// src/components/reports/ReportSummary.js - Refactorizado para usar useCalculationsService
+import React from "react";
+import { formatCurrency } from "../../utils/calculationUtils";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
 
 const ReportSummary = ({ reports, projects, selectedProjectId }) => {
-  const totals = useMemo(() => {
-    // El cálculo de totales permanece igual
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalCost = 0;
-    let totalInvoiced = 0;
+  // Usamos el servicio centralizado de cálculos
+  const { calculateReportSummary } = useCalculationsService();
+  
+  // Obtenemos los totales calculados del servicio
+  const { totals } = calculateReportSummary(reports, projects, selectedProjectId);
+  
+  // Desestructuramos los valores que necesitamos
+  const { 
+    totalLabor, 
+    totalMaterials, 
+    totalCost, 
+    totalInvoiced,
+    totalExtraHours,
+    totalExtraBudget,
+    totalExtraCost
+  } = totals;
 
-    reports.forEach(report => {
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-      }
-      
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      if (report.totalCost) {
-        totalCost += report.totalCost;
-      } else if (report.labor) {
-        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    return {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced
-    };
-  }, [reports]);
-
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
-  const isHourlyProject = selectedProject?.type === "hourly";
+  const selectedProject = projects.find(p => p.id === selectedProjectId) || {};
+  const isHourlyProject = selectedProject.type === "hourly";
+  
+  // Verificar si hay trabajos extra
+  const hasExtraWork = reports.some(report => report.isExtraWork);
 
   return (
     <div className="totals-summary">
       <h3>Resumen de totales</h3>
       
       {isHourlyProject ? (
-        // Usamos estructura de tabla para proyectos por horas
+        // Proyecto por horas (vista existente)
         <table className="summary-table">
           <tbody>
             <tr>
               <td><strong>Total mano de obra:</strong></td>
-              <td className="amount">{formatCurrency(totals.totalLabor)}</td>
+              <td className="amount">{formatCurrency(totalLabor)}</td>
             </tr>
             <tr>
               <td><strong>Total materiales:</strong></td>
-              <td className="amount">{formatCurrency(totals.totalMaterials)}</td>
+              <td className="amount">{formatCurrency(totalMaterials)}</td>
             </tr>
             <tr className="total-row">
               <td><strong>TOTAL GENERAL:</strong></td>
-              <td className="amount">{formatCurrency(totals.totalCost)}</td>
+              <td className="amount">{formatCurrency(totalCost)}</td>
             </tr>
           </tbody>
         </table>
       ) : (
+        // Proyecto de presupuesto cerrado (con posibles trabajos extra)
         <table className="summary-table">
           <tbody>
             <tr>
-              <td><strong>Total facturado:</strong></td>
-              <td className="amount">{formatCurrency(totals.totalInvoiced)}</td>
+              <td><strong>Total facturado (presupuesto):</strong></td>
+              <td className="amount">{formatCurrency(totalInvoiced)}</td>
+            </tr>
+            
+            {/* Sección de trabajos extra (condicional) */}
+            {hasExtraWork && (
+              <>
+                <tr className="extra-section-header">
+                  <td colSpan="2"><strong>Trabajos Extra</strong></td>
+                </tr>
+                
+                {totalExtraBudget > 0 && (
+                  <tr>
+                    <td><strong>Presupuestos adicionales:</strong></td>
+                    <td className="amount">{formatCurrency(totalExtraBudget)}</td>
+                  </tr>
+                )}
+                
+                {totalExtraHours > 0 && (
+                  <>
+                    <tr>
+                      <td><strong>Mano de obra extra:</strong></td>
+                      <td className="amount">{formatCurrency(totalExtraHours)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total coste trabajos por horas:</strong></td>
+                      <td className="amount">{formatCurrency(totalExtraCost)}</td>
+                    </tr>
+                  </>
+                )}
+                
+                <tr>
+                  <td><strong>Total trabajos extra:</strong></td>
+                  <td className="amount">{formatCurrency(totalExtraCost + totalExtraBudget)}</td>
+                </tr>
+              </>
+            )}
+            
+            {/* Total final combinado */}
+            <tr className="total-row">
+              <td><strong>TOTAL GENERAL:</strong></td>
+              <td className="amount">{formatCurrency(totalInvoiced + totalExtraCost + totalExtraBudget)}</td>
             </tr>
           </tbody>
         </table>

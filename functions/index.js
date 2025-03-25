@@ -14,12 +14,13 @@ const functionConfig = {
   maxInstances: 10
 };
 
-// El resto del código de validación permanece igual...
+// Funciones de validación básicas
 const isRequired = (value) => value !== undefined && value !== null && value !== '';
 const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
 const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
 const isValidTime = (value) => !value || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
 const isValidDate = (value) => isRequired(value) && !isNaN(Date.parse(value));
+const isBoolean = (value) => typeof value === 'boolean';
 
 // Validadores específicos del servidor
 const isAuthenticated = (context) => !!context.auth;
@@ -32,9 +33,73 @@ const isOwner = async (userId, resourcePath) => {
   }
 };
 
-// Funciones de validación (se mantienen igual)
+// Validadores específicos para trabajos extra
+const validateExtraWork = async (data, projectId) => {
+  const errors = {};
+  
+  // Verificar que el proyecto existe y permite trabajos extra
+  const projectDoc = await db.collection('projects').doc(projectId).get();
+  if (!projectDoc.exists) {
+    errors.projectId = 'El proyecto no existe';
+    return { isValid: false, errors };
+  }
+  
+  const project = projectDoc.data();
+  if (project.type !== 'fixed' || !project.allowExtraWork) {
+    errors.isExtraWork = 'Este proyecto no permite trabajos extra';
+    return { isValid: false, errors };
+  }
+  
+  // Validar tipo de trabajo extra
+  if (!['additional_budget', 'hourly'].includes(data.extraWorkType)) {
+    errors.extraWorkType = 'El tipo de trabajo extra debe ser "additional_budget" o "hourly"';
+  }
+  
+  // Si es presupuesto adicional, validar importe
+  if (data.extraWorkType === 'additional_budget') {
+    if (!isPositiveNumber(data.extraBudgetAmount)) {
+      errors.extraBudgetAmount = 'El importe adicional debe ser un número positivo';
+    }
+  }
+  
+  // Si es por horas, validar datos de mano de obra
+  if (data.extraWorkType === 'hourly') {
+    if (!data.labor) {
+      errors.labor = 'Los datos de mano de obra son obligatorios para trabajos extra por horas';
+    } else {
+      if (!isValidTime(data.labor.officialEntry)) {
+        errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.officialExit)) {
+        errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.workerEntry)) {
+        errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
+      }
+      
+      if (!isValidTime(data.labor.workerExit)) {
+        errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
+      }
+    }
+  }
+  
+  // Validar descripción de trabajo realizado
+  if (!data.workPerformed) {
+    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
+  } else if (!isRequired(data.workPerformed.description)) {
+    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
+  }
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+};
+
+// Funciones de validación
 const validateProject = (data) => {
-  // El código de validación se mantiene igual...
   const errors = {};
   
   if (!isRequired(data.id)) {
@@ -70,6 +135,18 @@ const validateProject = (data) => {
     if (!isPositiveNumber(data.budgetAmount)) {
       errors.budgetAmount = 'El importe del presupuesto debe ser un número positivo';
     }
+    
+    // Validar campos para trabajos extra si están habilitados
+    if (data.allowExtraWork) {
+      // Solo validar precios por hora si se permiten trabajos extra
+      if (!isPositiveNumber(data.officialPrice)) {
+        errors.officialPrice = 'El precio por hora del oficial para trabajos extra debe ser un número positivo';
+      }
+      
+      if (!isPositiveNumber(data.workerPrice)) {
+        errors.workerPrice = 'El precio por hora del peón para trabajos extra debe ser un número positivo';
+      }
+    }
   }
   
   return {
@@ -79,7 +156,6 @@ const validateProject = (data) => {
 };
 
 const validateDailyReport = async (data) => {
-  // El código de validación se mantiene igual...
   const errors = {};
   
   if (!isValidDate(data.reportDate)) {
@@ -96,32 +172,43 @@ const validateDailyReport = async (data) => {
     } else {
       const projectType = projectDoc.data().type;
       
-      // Validaciones específicas según el tipo de proyecto
-      if (projectType === 'hourly') {
-        // Validar datos de mano de obra si es proyecto por horas
-        if (!data.labor) {
-          errors.labor = 'Los datos de mano de obra son obligatorios para proyectos por horas';
-        } else {
-          if (!isValidTime(data.labor.officialEntry)) {
-            errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
-          }
-          
-          if (!isValidTime(data.labor.officialExit)) {
-            errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
-          }
-          
-          if (!isValidTime(data.labor.workerEntry)) {
-            errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
-          }
-          
-          if (!isValidTime(data.labor.workerExit)) {
-            errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
-          }
+      // Verificar si es un trabajo extra
+      if (data.isExtraWork) {
+        // Validar trabajo extra
+        const extraWorkValidation = await validateExtraWork(data, data.projectId);
+        
+        if (!extraWorkValidation.isValid) {
+          // Combinar errores
+          Object.assign(errors, extraWorkValidation.errors);
         }
-      } else if (projectType === 'fixed') {
-        // Validar importe facturado si es proyecto de presupuesto cerrado
-        if (!isPositiveNumber(data.invoicedAmount)) {
-          errors.invoicedAmount = 'El importe facturado debe ser un número positivo';
+      } else {
+        // Validaciones específicas según el tipo de proyecto
+        if (projectType === 'hourly') {
+          // Validar datos de mano de obra si es proyecto por horas
+          if (!data.labor) {
+            errors.labor = 'Los datos de mano de obra son obligatorios para proyectos por horas';
+          } else {
+            if (!isValidTime(data.labor.officialEntry)) {
+              errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.officialExit)) {
+              errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.workerEntry)) {
+              errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
+            }
+            
+            if (!isValidTime(data.labor.workerExit)) {
+              errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
+            }
+          }
+        } else if (projectType === 'fixed') {
+          // Validar importe facturado si es proyecto de presupuesto cerrado
+          if (!isPositiveNumber(data.invoicedAmount)) {
+            errors.invoicedAmount = 'El importe facturado debe ser un número positivo';
+          }
         }
       }
     }

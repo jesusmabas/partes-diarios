@@ -1,20 +1,20 @@
-// src/hooks/reports/useReportActions.js
+// src/hooks/reports/useReportActions.js (Completo)
 import { useCallback, useState } from "react";
-import { 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  addDoc, 
-  collection, 
-  getDoc, 
-  getDocs, 
-  query, 
-  orderBy, 
-  where 
+import {
+  doc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  collection,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  where
 } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { db, storage } from "../../firebase";
-import { getWeekNumber } from "../../utils/formatters";
+import { getWeekNumber } from "../../utils/calculationUtils"; // Asegúrate que sea calculationUtils
 
 /**
  * Hook personalizado para gestionar acciones CRUD de reportes
@@ -31,7 +31,7 @@ export const useReportActions = () => {
     setSuccess(null);
   }, []);
 
-  // Función para obtener todos los reportes (NUEVA)
+  // Función para obtener todos los reportes (con filtro isBilled)
   const fetchReports = useCallback(async (filters = {}) => {
     setLoading(true);
     clearMessages();
@@ -39,24 +39,31 @@ export const useReportActions = () => {
     try {
       let reportsQuery = collection(db, "dailyReports");
       const queryFilters = [];
-      
+
       // Aplicar filtros si se proporcionan
       if (filters.projectId) {
         queryFilters.push(where("projectId", "==", filters.projectId));
       }
-      
       if (filters.userId) {
         queryFilters.push(where("userId", "==", filters.userId));
       }
-      
       if (filters.startDate) {
         queryFilters.push(where("reportDate", ">=", filters.startDate));
       }
-      
       if (filters.endDate) {
         queryFilters.push(where("reportDate", "<=", filters.endDate));
       }
-      
+      // NUEVO FILTRO: isBilled
+      if (filters.isBilled !== undefined) {
+        if (filters.isBilled === false) {
+            // Consulta compuesta:  isBilled == false OR isBilled == null
+            reportsQuery = query(reportsQuery,
+                where("isBilled", "in", [false, null]) // Usar 'in'
+            );
+
+        } else {
+          queryFilters.push(where("isBilled", "==", filters.isBilled));
+
       // Construir la consulta con filtros y ordenamiento
       if (queryFilters.length > 0) {
         reportsQuery = query(
@@ -70,13 +77,13 @@ export const useReportActions = () => {
           orderBy("reportDate", "desc")
         );
       }
-      
+
       const querySnapshot = await getDocs(reportsQuery);
       const reportsList = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      
+
       setSuccess("Reportes obtenidos correctamente");
       return reportsList;
     } catch (err) {
@@ -87,6 +94,8 @@ export const useReportActions = () => {
       setLoading(false);
     }
   }, [clearMessages]);
+
+
 
   // Función para crear un nuevo reporte
   const createReport = useCallback(async (reportData, userId) => {
@@ -103,7 +112,7 @@ export const useReportActions = () => {
       if (!reportData.reportDate) {
         reportData.reportDate = new Date().toISOString().split("T")[0];
       }
-      
+
       const weekNumber = getWeekNumber(reportData.reportDate);
 
       // Preparar datos para guardar
@@ -112,11 +121,12 @@ export const useReportActions = () => {
         weekNumber,
         userId,
         createdAt: new Date(),
+        isBilled: false, // NUEVO: isBilled por defecto es false
       };
 
       // Guardar en Firestore
       const docRef = await addDoc(collection(db, "dailyReports"), newReportData);
-      
+
       setSuccess("Reporte creado correctamente");
       return { id: docRef.id, ...newReportData };
     } catch (err) {
@@ -142,22 +152,22 @@ export const useReportActions = () => {
       // Obtener el reporte actual primero
       const reportRef = doc(db, "dailyReports", reportId);
       const reportSnap = await getDoc(reportRef);
-      
+
       if (!reportSnap.exists()) {
         throw new Error("El reporte no existe");
       }
-      
+
       // Si hay una fecha nueva, recalcular el número de semana
       if (updatedData.reportDate && updatedData.reportDate !== reportSnap.data().reportDate) {
         updatedData.weekNumber = getWeekNumber(updatedData.reportDate);
       }
-      
+
       // Actualizar timestamp
       updatedData.updatedAt = new Date();
-      
+
       // Actualizar en Firestore
       await updateDoc(reportRef, updatedData);
-      
+
       setSuccess("Reporte actualizado correctamente");
       return true;
     } catch (err) {
@@ -169,7 +179,9 @@ export const useReportActions = () => {
     }
   }, [clearMessages]);
 
-  // Función para eliminar un reporte y sus archivos asociados
+
+
+// Función para eliminar un reporte y sus archivos asociados (sin cambios)
   const deleteReport = useCallback(async (reportId) => {
     if (!reportId) {
       setError("ID de reporte no proporcionado");
@@ -183,20 +195,39 @@ export const useReportActions = () => {
       // Obtener el reporte primero para saber qué archivos eliminar
       const reportRef = doc(db, "dailyReports", reportId);
       const reportSnap = await getDoc(reportRef);
-      
+
       if (!reportSnap.exists()) {
         throw new Error("El reporte no existe");
       }
-      
+
       const reportData = reportSnap.data();
-      
-      // Función auxiliar para eliminar archivos de Storage
+
+      // Función auxiliar mejorada para eliminar archivos de Storage
       const deleteFileFromStorage = async (url) => {
-        if (!url) return;
-        
+        if (!url || typeof url !== 'string') return;
+
         try {
-          // Extraer la ruta de la URL
-          const path = decodeURIComponent(url.split('/').slice(3).join('/').split('?')[0]);
+          // Convertir URL a ruta de Storage
+          let path;
+
+          // Ejemplo: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?token=TOKEN
+          // Necesitamos extraer PATH
+          if (url.includes('firebasestorage.googleapis.com')) {
+            const startIndex = url.indexOf('/o/') + 3;
+            const endIndex = url.indexOf('?', startIndex);
+
+            if (startIndex > 2 && endIndex > startIndex) {
+              path = decodeURIComponent(url.substring(startIndex, endIndex));
+            } else {
+              console.warn("Formato de URL no reconocido:", url);
+              return;
+            }
+          } else {
+            // Si es una ruta directa, usarla tal cual
+            path = url;
+          }
+
+          console.log("Intentando eliminar archivo:", path);
           const fileRef = ref(storage, path);
           await deleteObject(fileRef);
         } catch (err) {
@@ -204,28 +235,29 @@ export const useReportActions = () => {
           // Continuamos con la eliminación aunque falle un archivo
         }
       };
-      
+
       // Eliminar facturas de materiales
-      if (reportData.materials && reportData.materials.length > 0) {
-        await Promise.all(
-          reportData.materials
-            .filter(m => m.invoiceUrl)
-            .map(m => deleteFileFromStorage(m.invoiceUrl))
-        );
+      if (reportData.materials && Array.isArray(reportData.materials)) {
+        for (const material of reportData.materials) {
+          if (material && material.invoiceUrl) {
+            await deleteFileFromStorage(material.invoiceUrl);
+          }
+        }
       }
-      
+
       // Eliminar fotos
-      if (reportData.workPerformed && reportData.workPerformed.photos) {
-        await Promise.all(
-          reportData.workPerformed.photos
-            .filter(p => p.url)
-            .map(p => deleteFileFromStorage(p.url))
-        );
+      if (reportData.workPerformed && reportData.workPerformed.photos &&
+          Array.isArray(reportData.workPerformed.photos)) {
+        for (const photo of reportData.workPerformed.photos) {
+          if (photo && photo.url) {
+            await deleteFileFromStorage(photo.url);
+          }
+        }
       }
-      
+
       // Eliminar el documento de Firestore
       await deleteDoc(reportRef);
-      
+
       setSuccess("Reporte eliminado correctamente");
       return true;
     } catch (err) {
@@ -237,7 +269,7 @@ export const useReportActions = () => {
     }
   }, [clearMessages]);
 
-  // Obtener un reporte específico por ID
+  // Obtener un reporte específico por ID (sin cambios)
   const getReportById = useCallback(async (reportId) => {
     if (!reportId) {
       setError("ID de reporte no proporcionado");
@@ -250,11 +282,11 @@ export const useReportActions = () => {
     try {
       const reportRef = doc(db, "dailyReports", reportId);
       const reportSnap = await getDoc(reportRef);
-      
+
       if (!reportSnap.exists()) {
         throw new Error("El reporte no existe");
       }
-      
+
       return { id: reportSnap.id, ...reportSnap.data() };
     } catch (err) {
       console.error(`Error al obtener reporte ${reportId}:`, err);
@@ -277,5 +309,3 @@ export const useReportActions = () => {
     clearMessages
   };
 };
-
-export default useReportActions;

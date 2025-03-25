@@ -1,8 +1,15 @@
 import React, { useCallback } from "react";
-import { formatCurrency } from "../utils/formatters";
-import ImageUploader from "./ImageUploader"; // Importamos nuestro nuevo componente
+import { formatCurrency } from "../utils/calculationUtils";
+import ImageUploader from "./ImageUploader";
 
-const FixedReportForm = ({ workPerformed, onWorkPerformedChange, projectId, reportDate, onInvoicedChange, invoicedAmount }) => {
+const FixedReportForm = ({ 
+  workPerformed, 
+  onWorkPerformedChange, 
+  projectId, 
+  reportDate, 
+  onInvoicedChange, 
+  invoicedAmount 
+}) => {
   const handleDescriptionChange = useCallback((e) => {
     onWorkPerformedChange({ ...workPerformed, description: e.target.value });
   }, [workPerformed, onWorkPerformedChange]);
@@ -26,6 +33,12 @@ const FixedReportForm = ({ workPerformed, onWorkPerformedChange, projectId, repo
     },
     [workPerformed, onWorkPerformedChange]
   );
+
+  // Manejador para el cambio de importe facturado
+  const handleInvoicedAmountChange = useCallback((e) => {
+    const value = parseFloat(e.target.value) || 0;
+    onInvoicedChange(e);
+  }, [onInvoicedChange]);
 
   return (
     <div className="fixed-report-form">
@@ -51,7 +64,7 @@ const FixedReportForm = ({ workPerformed, onWorkPerformedChange, projectId, repo
         <input
           type="number"
           value={invoicedAmount || 0}
-          onChange={onInvoicedChange}
+          onChange={handleInvoicedAmountChange}
           min="0"
           step="0.01"
           placeholder="Importe facturado"

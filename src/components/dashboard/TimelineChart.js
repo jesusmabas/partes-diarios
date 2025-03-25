@@ -1,4 +1,4 @@
-// src/components/dashboard/TimelineChart.js
+// src/components/dashboard/TimelineChart.js - Refactorizado para usar useCalculationsService
 import React, { useState, useCallback } from "react";
 import {
   LineChart,
@@ -12,11 +12,12 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
+import { formatCurrency } from "../../utils/calculationUtils";
 
 /**
  * Componente que muestra gráficos de línea temporal para datos de proyectos
  * @param {Object} props - Propiedades del componente
- * @param {Array} props.data - Datos temporales para visualizar
+ * @param {Array} props.data - Datos temporales para visualizar, ya calculados por el servicio
  */
 const TimelineChart = ({ data }) => {
   const [chartType, setChartType] = useState("line"); // 'line' o 'area'
@@ -39,16 +40,6 @@ const TimelineChart = ({ data }) => {
       </div>
     );
   }
-
-  // Función para formatear valores de moneda
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('es-ES', { 
-      style: 'currency', 
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
 
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {

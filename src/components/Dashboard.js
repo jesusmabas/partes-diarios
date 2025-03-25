@@ -1,7 +1,7 @@
-// src/components/Dashboard.js - Versión Modular
-import React, { useState, useEffect } from "react";
-import { useProjects } from "../hooks/useProjects";
-import useReportActions from "../hooks/reports/useReportActions";
+// src/components/Dashboard.js - Refactorizado para usar useCalculationsService
+import React, { useState } from "react";
+import { useQueryProjects } from "../hooks/useQueryProjects";
+import { useQueryReportsInfinite } from "../hooks/useQueryReports";
 import useReportFilters from "../hooks/reports/useReportFilters";
 
 // Componentes
@@ -20,9 +20,7 @@ import "./Dashboard.css";
  * Dashboard principal que muestra KPIs, gráficos y resúmenes de proyectos/reportes
  */
 const Dashboard = () => {
-  // Estados principales
-  const [reports, setReports] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Estados de UI
   const [selectedProject, setSelectedProject] = useState("all");
   const [dateRange, setDateRange] = useState({ 
     startDate: "", 
@@ -30,9 +28,12 @@ const Dashboard = () => {
   });
   const [activeView, setActiveView] = useState("costes");
   
-  // Hooks de datos
-  const { projects } = useProjects();
-  const { fetchReports, error: actionError, clearMessages } = useReportActions();
+  // Obtener proyectos usando React Query
+  const { 
+    data: projects = [], 
+    isLoading: projectsLoading, 
+    error: projectsError 
+  } = useQueryProjects();
   
   // Hook de filtros
   const { updateFilters, filters, filterReports } = useReportFilters({
@@ -41,35 +42,28 @@ const Dashboard = () => {
     endDate: dateRange.endDate
   });
 
-  // Efecto para cargar reportes al iniciar
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadReports = async () => {
-      setIsLoading(true);
-      try {
-        const allReports = await fetchReports();
-        if (isMounted) {
-          setReports(allReports || []);
-        }
-      } catch (err) {
-        console.error("Error al cargar reportes:", err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    loadReports();
-    
-    return () => {
-      isMounted = false;
-      clearMessages();
-    };
-  }, [fetchReports, clearMessages]);
+  // Obtener reportes usando React Query con paginación infinita
+  const { 
+    data, 
+    isLoading: reportsLoading, 
+    fetchNextPage,
+    hasNextPage,
+    error: reportsError,
+    refetch
+  } = useQueryReportsInfinite({
+    pageSize: 100, // Obtener bastantes reportes por página
+    startDate: dateRange.startDate || undefined,
+    endDate: dateRange.endDate || undefined,
+    projectId: selectedProject !== "all" ? selectedProject : undefined
+  });
+  
+  // Transformar los datos paginados a un arreglo plano
+  const reports = React.useMemo(() => {
+    if (!data) return [];
+    return data.pages.flatMap(page => page.items || []);
+  }, [data]);
 
-  // Filtrar reportes basados en filtros actuales
+  // Filtrar reportes basados en filtros actuales (si hay alguno adicional que no maneje ya la consulta)
   const filteredReports = filterReports(reports);
 
   // Manejar cambios en los filtros
@@ -94,34 +88,32 @@ const Dashboard = () => {
     setActiveView(view);
   };
 
+  // Estado de carga combinado
+  const isLoading = projectsLoading || (reportsLoading && reports.length === 0);
+  
   // Condiciones de renderizado
-  const isInitialLoading = isLoading && reports.length === 0;
-  const hasNoData = !isLoading && reports.length === 0;
-
-  // Renderizado condicional para estados de carga y error
-  if (isInitialLoading) {
+  if (isLoading) {
     return <DashboardSkeleton />;
   }
   
-  if (actionError) {
+  if (projectsError || reportsError) {
     return (
       <ErrorDisplay 
-        error={actionError} 
+        error={projectsError || reportsError} 
         message="No se pudieron cargar los datos para el dashboard" 
-        onRetry={() => {
-          clearMessages();
-          fetchReports().then(data => setReports(data || []));
-        }}
+        onRetry={() => refetch()} // React Query proporciona refetch
       />
     );
   }
 
-  if (hasNoData) {
+  if (projects.length === 0 || reports.length === 0) {
     return (
       <EmptyState
         title="No hay datos disponibles"
         message="Añade proyectos y reportes para comenzar a visualizar métricas en el dashboard."
         icon="📊"
+        action={() => refetch()}
+        actionLabel="Actualizar datos"
       />
     );
   }
@@ -160,8 +152,21 @@ const Dashboard = () => {
         reports={filteredReports}
         projects={projects}
         selectedProject={selectedProject}
-        isLoading={isLoading}
+        isLoading={false}
       />
+      
+      {/* Cargar más datos si es necesario */}
+      {hasNextPage && (
+        <div className="load-more-container">
+          <button 
+            onClick={() => fetchNextPage()} 
+            disabled={!hasNextPage}
+            className="load-more-button"
+          >
+            {reportsLoading ? "Cargando más datos..." : "Cargar más datos"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

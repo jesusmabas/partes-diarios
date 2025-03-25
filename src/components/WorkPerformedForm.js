@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import ImageUploader from "./ImageUploader"; // Importamos nuestro nuevo componente
+import ImageUploader from "./ImageUploader";
 
 const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, reportDate }) => {
   const handleDescriptionChange = useCallback(
@@ -38,7 +38,7 @@ const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, re
         placeholder="Descripción de los trabajos realizados"
       />
       
-      {/* Reemplazamos el input file por nuestro ImageUploader */}
+      {/* Componente ImageUploader para gestión de fotos */}
       <ImageUploader
         onImagesUploaded={handleImagesChange}
         folder="photos"

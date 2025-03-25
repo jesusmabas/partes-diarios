@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect } from "react";
-import { useLabor } from "../hooks/useLabor";
-import { formatNumber, formatCurrency } from "../utils/formatters";
+import { useCalculationsService } from "../hooks/useCalculationsService";
+import { formatNumber, formatCurrency } from "../utils/calculationUtils";
 
 const LaborForm = ({ labor, onLaborChange, project }) => {
-  const calculatedLabor = useLabor(labor, project);
+  // Usamos el servicio centralizado de cálculos
+  const { calculateLabor } = useCalculationsService();
+  const calculatedLabor = calculateLabor(labor, project);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;

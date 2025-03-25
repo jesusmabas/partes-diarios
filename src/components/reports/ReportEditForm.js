@@ -1,8 +1,10 @@
+// src/components/reports/ReportEditForm.js (Completo)
 import React, { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore"; // Importar updateDoc
 import { db } from "../../firebase";
-import { getWeekNumber } from "../../utils/formatters";
+import { getWeekNumber } from "../../utils/calculationUtils";
 import { useStorage } from "../../hooks/useStorage";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
 import MaterialsEditor from "./MaterialsEditor";
 import PhotosEditor from "./PhotosEditor";
 
@@ -11,26 +13,22 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { uploadFile } = useStorage();
+  const { calculateLabor, calculateMaterials } = useCalculationsService();
 
   // Efecto para bloquear scroll cuando el modal está abierto
   useEffect(() => {
-    // Función para manejar la tecla Escape
     const handleEscKey = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onCancel();
       }
     };
 
-    // Bloquear scroll cuando el modal se abre
     document.body.classList.add('body-no-scroll');
-    
-    // Añadir event listener para la tecla Escape
-    document.addEventListener('keydown', handleEscKey);
-    
-    // Limpiar al desmontar
+    document.addEventListener("keydown", handleEscKey);
+
     return () => {
       document.body.classList.remove('body-no-scroll');
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener("keydown", handleEscKey);
     };
   }, [onCancel]);
 
@@ -41,7 +39,7 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         setLoading(true);
         const reportRef = doc(db, "dailyReports", reportId);
         const reportSnap = await getDoc(reportRef);
-        
+
         if (reportSnap.exists()) {
           setEditedReport({ id: reportSnap.id, ...reportSnap.data() });
         } else {
@@ -53,39 +51,44 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         setLoading(false);
       }
     };
-    
+
     loadReport();
   }, [reportId]);
 
+  // Manejador de cambios para inputs (incluyendo isBilled)
   const handleInputChange = useCallback((e) => {
-    const { name, value } = e.target;
-    
+    const { name, value, type, checked } = e.target;
+
     setEditedReport(prev => {
       if (!prev) return prev;
-      
+
+      let updatedValue = value;
+      if (type === "checkbox") {
+        updatedValue = checked; // Para checkboxes, usa el valor de 'checked'
+      }
+
       if (name.includes(".")) {
-        const [parent, field] = name.split(".");
+        const [parent, field] = name.split(".")
         if (parent === "labor") {
-          return { ...prev, labor: { ...prev.labor, [field]: value } };
+          return { ...prev, labor: { ...prev.labor, [field]: updatedValue } };
         } else if (parent === "workPerformed") {
-          const updatedValue = field === 'invoicedAmount' ? parseFloat(value) : value;
+          updatedValue = field === 'invoicedAmount' ? parseFloat(value) : value;
           return { ...prev, workPerformed: { ...prev.workPerformed, [field]: updatedValue } };
         }
       }
-      
-      return { ...prev, [name]: value };
+      return { ...prev, [name]: updatedValue };
     });
   }, []);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!editedReport) return;
-    
-    try {
-      setLoading(true);
+
+    try {      setLoading(true);
       const reportRef = doc(db, "dailyReports", reportId);
 
-      // Preparar los datos a actualizar (código similar al original)
+      // Preparar los datos a actualizar
       const updatedData = {
         reportDate: editedReport.reportDate,
         weekNumber: getWeekNumber(editedReport.reportDate),
@@ -95,13 +98,15 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
           description: editedReport.workPerformed.description,
           photos: editedReport.workPerformed.photos || [],
         },
+        isBilled: !!editedReport.isBilled, // Asegura que sea booleano
       };
 
       // Lógica específica por tipo de proyecto
       const project = projects.find((p) => p.id === editedReport.projectId);
-      
+
       if (editedReport.labor) {
-        updatedData.labor = editedReport.labor;
+        const laborData = calculateLabor(editedReport.labor, project);
+        updatedData.labor = { ...editedReport.labor, ...laborData };
       }
 
       if (editedReport.workPerformed?.invoicedAmount !== undefined) {
@@ -109,19 +114,16 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
       }
 
       if (project && project.type === "hourly") {
-        const totalMaterialsCost = editedReport.materials.reduce(
-          (sum, m) => sum + (m.cost || 0), 0
-        );
-        updatedData.totalMaterialsCost = totalMaterialsCost;
+        const materialsData = calculateMaterials(editedReport.materials);
+        updatedData.totalMaterialsCost = materialsData.totalMaterialsCost;
 
-        if (editedReport.labor && 
-            editedReport.labor.officialHours != null && 
-            editedReport.labor.workerHours != null) {
-          updatedData.totalCost = (editedReport.labor.totalLaborCost || 0) + totalMaterialsCost;
+        if (editedReport.labor) {
+          const laborData = calculateLabor(editedReport.labor, project);
+          updatedData.totalCost = laborData.totalLaborCost + materialsData.totalMaterialsCost;
         }
       }
 
-      await updateDoc(reportRef, updatedData);
+      await updateDoc(reportRef, updatedData); // Usar updateDoc
       onComplete();
     } catch (err) {
       setError(`Error al guardar cambios: ${err.message}`);
@@ -158,7 +160,7 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
   return (
     <form onSubmit={handleSubmit} className="edit-form">
       {error && <p className="error-message">{error}</p>}
-      
+
       <label>Fecha del parte:</label>
       <input
         type="date"
@@ -167,6 +169,17 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         onChange={handleInputChange}
         required
       />
+
+      {/* Checkbox para isBilled */}
+      <label>
+        <input
+          type="checkbox"
+          name="isBilled"
+          checked={!!editedReport.isBilled} // Usar doble negación para asegurar booleano
+          onChange={handleInputChange}
+        />
+        Facturado
+      </label>
 
       {isHourlyProject ? (
         <>
@@ -241,9 +254,8 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         </>
       )}
 
-      {/* Editor de materiales (componente separado) */}
       {isHourlyProject && (
-        <MaterialsEditor 
+        <MaterialsEditor
           materials={editedReport.materials || []}
           onMaterialsChange={handleMaterialsChange}
           projectId={editedReport.projectId}
@@ -252,7 +264,6 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         />
       )}
 
-      {/* Editor de fotos (componente separado) */}
       <PhotosEditor
         photos={editedReport.workPerformed?.photos || []}
         onPhotosChange={handlePhotosChange}
@@ -265,8 +276,8 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
         <button type="submit" disabled={loading}>
           {loading ? "Guardando..." : "Guardar cambios"}
         </button>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={onCancel}
           disabled={loading}
           className="cancel-button"

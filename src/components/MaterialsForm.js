@@ -1,37 +1,46 @@
 import React, { useState, useCallback } from "react";
 import { useStorage } from "../hooks/useStorage";
-import { formatCurrency } from "../utils/formatters";
+import { useCalculationsService } from "../hooks/useCalculationsService";
+import { formatCurrency } from "../utils/calculationUtils";
 
 const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) => {
   const [newMaterial, setNewMaterial] = useState({ description: "", cost: "" });
   const { uploadFile, uploading, error: uploadError } = useStorage();
+  
+  // Utilizamos el servicio centralizado de cálculos
+  const { calculateMaterials } = useCalculationsService();
+  
+  // Obtenemos los cálculos actualizados de materiales
+  const { totalMaterialsCost } = calculateMaterials(materials);
 
   const handleInputChange = useCallback((e) => {
     // Muy importante, parsear el coste a Float.
     const { name, value } = e.target;
-     const updatedValue = name === "cost" ? parseFloat(value) : value;
+    const updatedValue = name === "cost" ? parseFloat(value) : value;
     setNewMaterial((prev) => ({ ...prev, [name]: updatedValue }));
-
   }, []);
 
+  const handleAddMaterial = useCallback(async (e) => {
+    const file = e.target.files[0];
+    //Validar que se haya añadido una descripción y un coste
+    if (!file || !newMaterial.description || !newMaterial.cost) {
+      alert("Por favor, añade una descripción, un coste y una factura (PDF)");
+      return; // Error manejado por uploadError
+    }
 
-    const handleAddMaterial = useCallback(async (e) => {
-        const file = e.target.files[0];
-        //Validar que se haya añadido una descripción y un coste
-        if (!file || !newMaterial.description || !newMaterial.cost) {
-            alert("Por favor, añade una descripción, un coste y una factura (PDF)");
-        return; // Error manejado por uploadError
-        }
-
-        const url = await uploadFile(file, "invoices", `${projectId}_${reportDate}`);
-        if (url) {
-        const newMat = { id: Date.now(), description: newMaterial.description, cost: parseFloat(newMaterial.cost), invoiceUrl: url }; //Asegúrate de que sea Float
-        onMaterialsChange([...materials, newMat]);
-        setNewMaterial({ description: "", cost: "" });
-        e.target.value = null;
-        }
-    }, [newMaterial, materials, onMaterialsChange, projectId, reportDate, uploadFile]);
-
+    const url = await uploadFile(file, "invoices", `${projectId}_${reportDate}`);
+    if (url) {
+      const newMat = { 
+        id: Date.now(), 
+        description: newMaterial.description, 
+        cost: parseFloat(newMaterial.cost), 
+        invoiceUrl: url 
+      }; //Asegúrate de que sea Float
+      onMaterialsChange([...materials, newMat]);
+      setNewMaterial({ description: "", cost: "" });
+      e.target.value = null;
+    }
+  }, [newMaterial, materials, onMaterialsChange, projectId, reportDate, uploadFile]);
 
   const handleRemoveMaterial = useCallback((id) => {
     onMaterialsChange(materials.filter((m) => m.id !== id));
@@ -68,6 +77,13 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
           <button onClick={() => handleRemoveMaterial(m.id)}>Eliminar</button>
         </div>
       ))}
+      
+      {/* Mostrar el coste total calculado */}
+      {materials.length > 0 && (
+        <p className="materials-total">
+          <strong>Coste total de materiales:</strong> {formatCurrency(totalMaterialsCost)}
+        </p>
+      )}
     </div>
   );
 };

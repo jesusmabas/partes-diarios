@@ -1,4 +1,4 @@
-// src/utils/validationSchemas.js
+// src/utils/validationSchemas.js - Actualizado para incluir validación de campos de trabajo extra
 
 // Funciones de validación básicas
 const isRequired = (value) => !!value || value === 0;
@@ -7,8 +7,9 @@ const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
 const isValidTime = (value) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
 const isValidDate = (value) => !isNaN(Date.parse(value));
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isBoolean = (value) => typeof value === 'boolean';
 
-// Esquema para proyectos
+// Esquema para proyectos (actualizado)
 export const projectSchema = {
   id: {
     validator: (value) => isRequired(value) && /^[a-zA-Z0-9-_]+$/.test(value),
@@ -32,12 +33,12 @@ export const projectSchema = {
   },
   officialPrice: {
     validator: (value, formData) => 
-      formData.type !== "hourly" || isPositiveNumber(value),
+      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
     message: "El precio por hora del oficial debe ser un número positivo.",
   },
   workerPrice: {
     validator: (value, formData) => 
-      formData.type !== "hourly" || isPositiveNumber(value),
+      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
     message: "El precio por hora del peón debe ser un número positivo.",
   },
   budgetAmount: {
@@ -45,33 +46,62 @@ export const projectSchema = {
       formData.type !== "fixed" || isPositiveNumber(value),
     message: "El importe del presupuesto debe ser un número positivo.",
   },
+  allowExtraWork: {
+    validator: (value, formData) => 
+      formData.type !== "fixed" || typeof value === 'boolean',
+    message: "El campo debe ser verdadero o falso.",
+  },
 };
 
-// Esquema para partes diarios
+// Esquema para partes diarios (actualizado para trabajo extra)
 export const dailyReportSchema = {
   reportDate: {
     validator: isValidDate,
     message: "La fecha debe ser válida.",
   },
-  // Para proyectos por horas
+  projectId: {
+    validator: isRequired,
+    message: "El ID del proyecto es obligatorio.",
+  },
+  // Campos para trabajo extra
+  isExtraWork: {
+    validator: (value, formData) => 
+      formData.projectType !== "fixed" || typeof value === 'boolean',
+    message: "El campo debe ser verdadero o falso.",
+  },
+  extraWorkType: {
+    validator: (value, formData) => 
+      !formData.isExtraWork || ["additional_budget", "hourly"].includes(value),
+    message: "El tipo de trabajo extra debe ser 'additional_budget' o 'hourly'.",
+  },
+  extraBudgetAmount: {
+    validator: (value, formData) => 
+      !formData.isExtraWork || formData.extraWorkType !== "additional_budget" || isPositiveNumber(value),
+    message: "El importe adicional debe ser un número positivo.",
+  },
+  // Para proyectos por horas o extras facturados por horas
   "labor.officialEntry": {
     validator: (value, formData) => 
-      formData.projectType !== "hourly" || !value || isValidTime(value),
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
     message: "La hora de entrada del oficial debe tener un formato válido (HH:MM).",
   },
   "labor.officialExit": {
     validator: (value, formData) => 
-      formData.projectType !== "hourly" || !value || isValidTime(value),
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
     message: "La hora de salida del oficial debe tener un formato válido (HH:MM).",
   },
   "labor.workerEntry": {
     validator: (value, formData) => 
-      formData.projectType !== "hourly" || !value || isValidTime(value),
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
     message: "La hora de entrada del peón debe tener un formato válido (HH:MM).",
   },
   "labor.workerExit": {
     validator: (value, formData) => 
-      formData.projectType !== "hourly" || !value || isValidTime(value),
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
     message: "La hora de salida del peón debe tener un formato válido (HH:MM).",
   },
   // Para todos los tipos
@@ -79,10 +109,10 @@ export const dailyReportSchema = {
     validator: isRequired,
     message: "La descripción de los trabajos realizados es obligatoria.",
   },
-  // Para proyectos de presupuesto cerrado
+  // Para proyectos de presupuesto cerrado (dentro del presupuesto)
   "workPerformed.invoicedAmount": {
     validator: (value, formData) => 
-      formData.projectType !== "fixed" || isPositiveNumber(value),
+      (formData.projectType !== "fixed" || formData.isExtraWork) || isPositiveNumber(value),
     message: "El importe facturado debe ser un número positivo.",
   },
 };

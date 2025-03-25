@@ -1,4 +1,4 @@
-// src/components/dashboard/ProjectCostChart.js
+// src/components/dashboard/ProjectCostChart.js - Refactorizado para usar useCalculationsService
 import React, { useState, useCallback } from "react";
 import {
   BarChart,
@@ -10,11 +10,12 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
+import { formatCurrency } from "../../utils/calculationUtils";
 
 /**
  * Componente que muestra gráficos de barras de costes e ingresos por proyecto
  * @param {Object} props - Propiedades del componente
- * @param {Array} props.data - Datos de los proyectos para mostrar
+ * @param {Array} props.data - Datos de los proyectos para mostrar, ya calculados por el servicio
  */
 const ProjectCostChart = ({ data }) => {
   const [chartType, setChartType] = useState("income"); // Cambiado por defecto a "income"
@@ -54,21 +55,11 @@ const ProjectCostChart = ({ data }) => {
     })
     .slice(0, 10); // Limitar a los 10 proyectos más importantes
 
-  // Función para formatear valores de moneda
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('es-ES', { 
-      style: 'currency', 
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
-
   // Configurar tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       // Encontrar el proyecto correspondiente
-      const project = data.find((item) => item.id === label);
+      const project = data.find((item) => item.projectId === label);
       
       return (
         <div className="custom-tooltip">
@@ -144,7 +135,7 @@ const ProjectCostChart = ({ data }) => {
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
-            dataKey="id"
+            dataKey="projectId"
             angle={-45}
             textAnchor="end"
             height={80}

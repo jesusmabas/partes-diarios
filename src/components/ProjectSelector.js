@@ -1,17 +1,19 @@
 import React from "react";
-import { useProjects } from "../hooks/useProjects";
+import { useQueryProjects } from "../hooks/useQueryProjects";
+import { formatCurrency } from "../utils/calculationUtils";
 
 const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
-  const { projects, loading, error } = useProjects();
+  // Usamos el hook de React Query para obtener proyectos
+  const { data: projects = [], isLoading, error } = useQueryProjects();
 
   const handleChange = (e) => {
-    const selectedProjectId = e.target.value; // Mejor legibilidad
+    const selectedProjectId = e.target.value; 
     const project = projects.find((p) => p.id === selectedProjectId);
     onProjectSelect(project);
   };
 
-  if (loading) return <p>Cargando proyectos...</p>;
-  if (error) return <p className="error-message">Error: {error}</p>;
+  if (isLoading) return <p>Cargando proyectos...</p>;
+  if (error) return <p className="error-message">Error: {error.message}</p>;
 
   return (
     <div>
@@ -27,11 +29,17 @@ const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
           <p>Dirección: {selectedProject.address}</p>
           <p>Cliente: {selectedProject.client}</p>
           <p>NIF/NIE: {selectedProject.nifNie}</p>
-          {/* SÓLO MUESTRA PRECIOS SI ES POR HORAS */}
-          {selectedProject.type === "hourly" && (
+          {selectedProject.type === "hourly" ? (
             <>
-              <p>Precio oficial: {selectedProject.officialPrice} €/h</p>
-              <p>Precio peón: {selectedProject.workerPrice} €/h</p>
+              <p>Precio oficial: {formatCurrency(selectedProject.officialPrice)} /h</p>
+              <p>Precio peón: {formatCurrency(selectedProject.workerPrice)} /h</p>
+            </>
+          ) : (
+            <>
+              <p>Presupuesto: {formatCurrency(selectedProject.budgetAmount)}</p>
+              {selectedProject.allowExtraWork && (
+                <p className="extra-work-info">Este proyecto permite trabajos extra</p>
+              )}
             </>
           )}
         </div>

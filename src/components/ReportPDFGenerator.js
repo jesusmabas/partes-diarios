@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Document, Page, Text, View, StyleSheet, Image, Link, Font } from "@react-pdf/renderer";
 import CompressedImage from "./CompressedImage";
-import { formatNumber, formatCurrency, formatFullDate } from "../utils/formatters";
+import { formatNumber, formatCurrency } from "../utils/calculationUtils";
+import { useCalculationsService } from "../hooks/useCalculationsService";
 
 // Registrar las fuentes personalizadas
 Font.register({
@@ -259,12 +260,42 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
   },
+  
+  // Estilos para trabajos extra
+  extraWorkBadge: {
+    backgroundColor: '#fff8e1',
+    padding: 5,
+    marginBottom: 5,
+    borderRadius: 3
+  },
+  extraWorkText: {
+    fontSize: 10,
+    color: '#e67e22',
+    fontWeight: 'bold'
+  },
+  extraWorkSection: {
+    backgroundColor: '#fff8e1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e67e22',
+  }
 });
 
+// Componente principal del PDF
 const ReportPDFGenerator = ({ reports, projects }) => {
+  // Usar el servicio centralizado de cálculos
+  const { 
+    calculateLabor, 
+    calculateMaterials, 
+    calculateReportSummary, 
+    calculateBudget 
+  } = useCalculationsService();
+
   const firstReport = reports[0];
   const project = projects.find((p) => p.id === firstReport?.projectId) || {};
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  // Obtener totales calculados desde el servicio
+  const { totals } = calculateReportSummary(reports, projects, firstReport?.projectId);
 
   // Función para generar el título con soporte para múltiples semanas
   const renderTitle = () => {
@@ -290,6 +321,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
     return `Acta semanal de obra - Semanas ${uniqueWeeks.join(', ')} - Año ${year}`;
   };
 
+  // Función para renderizar imágenes
   const renderImage = (src) => {
     try {
       if (!src || typeof src !== "string" || !src.startsWith("http")) {
@@ -317,51 +349,8 @@ const ReportPDFGenerator = ({ reports, projects }) => {
     }
   };
 
-  // Calcular importe facturado total para proyectos "fixed"
-  const calculateInvoicedTotal = (projectId) => {
-    const projectReports = reports.filter((report) => report.projectId === projectId && report.invoicedAmount);
-    return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
-  };
-
-  // Calcular totales para la página de resumen
-  const calculateTotals = () => {
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalCost = 0;
-    let totalInvoiced = 0;
-
-    reports.forEach(report => {
-      // Para proyectos por horas
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-      }
-      
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // El coste total puede venir directamente o calcularse
-      if (report.totalCost) {
-        totalCost += report.totalCost;
-      } else if (report.labor) {
-        // Si no existe totalCost pero sí labor, calculamos la suma
-        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    return {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced
-    };
-  };
-
-  const totals = calculateTotals();
-  const isHourlyProject = project.type === "hourly";
+  // Verificar si hay trabajos extra
+  const hasExtraWork = reports.some(report => report.isExtraWork);
 
   return (
     <Document>
@@ -392,32 +381,53 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         </View>
       </Page>
 
-      {/* Páginas por parte diario - NUEVO LAYOUT */}
+      {/* Páginas por parte diario */}
       {reports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
-        const budgetAmount = project.budgetAmount || 0;
-        const invoicedTotal = project.type === "fixed" ? calculateInvoicedTotal(project.id) : 0;
-        const remainingToInvoice = budgetAmount - invoicedTotal;
+        
+        // Usar servicios centralizados para cálculos
+        const budgetSummary = project.type === "fixed" 
+          ? calculateBudget(project, reports.filter(r => r.projectId === project.id)) 
+          : { budgetAmount: 0, invoicedTotal: 0, remainingBudget: 0 };
+          
+        // Calcular datos de labor y materiales si aplica
+        const laborCalcs = report.labor ? calculateLabor(report.labor, project) : null;
+        const materialsCalcs = report.materials ? calculateMaterials(report.materials) : null;
+        
+        // Determinar si es un trabajo extra y su tipo
+        const isExtraWork = report.isExtraWork;
+        const extraWorkType = isExtraWork ? report.extraWorkType : null;
 
         return (
           <Page key={`report-${index}`} size="A4" style={styles.page}>
             {/* Cabecera del parte */}
             <View style={styles.mainHeader}>
-              <Text style={styles.sectionTitle}>Fecha: {formatFullDate(report.reportDate)}</Text>
+              <Text style={styles.sectionTitle}>Fecha: {new Date(report.reportDate).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                 <Text style={{ fontSize: 11, marginRight: 20 }}>Semana: {report.weekNumber}</Text>
                 <Text style={{ fontSize: 11, marginRight: 20 }}>Proyecto: {report.projectId || "No disponible"}</Text>
                 <Text style={{ fontSize: 11 }}>Cliente: {project.client || "No disponible"}</Text>
               </View>
               <Text style={{ fontSize: 11 }}>Dirección: {project.address || "No disponible"}</Text>
+              
+              {/* Indicador de trabajo extra */}
+              {isExtraWork && (
+                <View style={styles.extraWorkBadge}>
+                  <Text style={styles.extraWorkText}>
+                    {extraWorkType === "hourly" 
+                      ? "TRABAJO EXTRA POR HORAS" 
+                      : "TRABAJO EXTRA CON PRESUPUESTO ADICIONAL"}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Distribución en dos columnas para MO y Materiales */}
+            {/* Distribución en dos columnas */}
             <View style={styles.twoColumns}>
-              {/* Columna izquierda - Mano de obra */}
+              {/* Columna izquierda - Mano de obra o presupuesto */}
               <View style={styles.leftColumn}>
-                {isHourly ? (
+                {isHourly || (isExtraWork && extraWorkType === "hourly") ? (
                   <>
                     <Text style={styles.subSectionTitle}>Mano de obra</Text>
                     <View style={styles.table}>
@@ -438,37 +448,49 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                       </View>
                       <View style={styles.tableRow}>
                         <Text style={styles.tableColWide}>Horas trabajadas</Text>
-                        <Text style={styles.tableCol}>{formatNumber(report.labor?.officialHours || 0)}</Text>
-                        <Text style={styles.tableCol}>{formatNumber(report.labor?.workerHours || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatNumber(laborCalcs?.officialHours || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatNumber(laborCalcs?.workerHours || 0)}</Text>
                       </View>
                       <View style={styles.tableRow}>
                         <Text style={styles.tableColWide}>Coste</Text>
-                        <Text style={styles.tableCol}>{formatCurrency(report.labor?.officialCost || 0)}</Text>
-                        <Text style={styles.tableCol}>{formatCurrency(report.labor?.workerCost || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatCurrency(laborCalcs?.officialCost || 0)}</Text>
+                        <Text style={styles.tableCol}>{formatCurrency(laborCalcs?.workerCost || 0)}</Text>
                       </View>
                     </View>
-                    <Text style={{ fontSize: 11, marginTop: 4 }}>Coste total mano de obra: {formatCurrency(report.labor?.totalLaborCost || 0)}</Text>
+                    <Text style={{ fontSize: 11, marginTop: 4 }}>Coste total mano de obra: {formatCurrency(laborCalcs?.totalLaborCost || 0)}</Text>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.subSectionTitle}>Presupuesto cerrado</Text>
+                    <Text style={styles.subSectionTitle}>
+                      {isExtraWork ? "Presupuesto adicional (extra)" : "Presupuesto cerrado"}
+                    </Text>
                     <View style={styles.budgetTable}>
                       <View style={styles.budgetRow}>
                         <Text style={styles.budgetTableHeader}>Concepto</Text>
                         <Text style={styles.budgetTableHeader}>Importe</Text>
                       </View>
-                      <View style={styles.budgetRow}>
-                        <Text style={styles.budgetTableCell}>Importe presupuestado</Text>
-                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetAmount)}</Text>
-                      </View>
-                      <View style={styles.budgetRow}>
-                        <Text style={styles.budgetTableCell}>Importe facturado</Text>
-                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(invoicedTotal)}</Text>
-                      </View>
-                      <View style={styles.budgetRow}>
-                        <Text style={styles.budgetTableCell}>Importe restante</Text>
-                        <Text style={styles.budgetTableCellAmount}>{formatCurrency(remainingToInvoice)}</Text>
-                      </View>
+                      
+                      {isExtraWork ? (
+                        <View style={styles.budgetRow}>
+                          <Text style={styles.budgetTableCell}>Importe extra presupuestado</Text>
+                          <Text style={styles.budgetTableCellAmount}>{formatCurrency(report.extraBudgetAmount || 0)}</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={styles.budgetRow}>
+                            <Text style={styles.budgetTableCell}>Importe presupuestado</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.budgetAmount)}</Text>
+                          </View>
+                          <View style={styles.budgetRow}>
+                            <Text style={styles.budgetTableCell}>Importe facturado</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
+                          </View>
+                          <View style={styles.budgetRow}>
+                            <Text style={styles.budgetTableCell}>Importe restante</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.remainingBudget)}</Text>
+                          </View>
+                        </>
+                      )}
                     </View>
                   </>
                 )}
@@ -500,27 +522,29 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                   ) : (
                     <Text style={{ fontSize: 11 }}>No hay materiales registrados.</Text>
                   )}
-                  <Text style={{ fontSize: 11, marginTop: 6 }}>Coste total de materiales: {formatCurrency(report.totalMaterialsCost || 0)}</Text>
+                  <Text style={{ fontSize: 11, marginTop: 6 }}>Coste total de materiales: {formatCurrency(materialsCalcs?.totalMaterialsCost || 0)}</Text>
                 </View>
               </View>
             </View>
 
             {/* Resumen de costes (ancho completo) */}
-            {isHourly && (
+            {(isHourly || (isExtraWork && extraWorkType === "hourly")) && (
               <View style={styles.fullWidth}>
                 <Text style={styles.subSectionTitle}>Coste total MO + materiales</Text>
                 <View style={styles.costSummary}>
                   <View style={styles.costRow}>
                     <Text style={styles.costColLabel}>Coste total mano de obra</Text>
-                    <Text style={styles.costColValue}>{formatCurrency(report.labor?.totalLaborCost || 0)}</Text>
+                    <Text style={styles.costColValue}>{formatCurrency(laborCalcs?.totalLaborCost || 0)}</Text>
                   </View>
                   <View style={styles.costRow}>
                     <Text style={styles.costColLabel}>Coste total de materiales</Text>
-                    <Text style={styles.costColValue}>{formatCurrency(report.totalMaterialsCost || 0)}</Text>
+                    <Text style={styles.costColValue}>{formatCurrency(materialsCalcs?.totalMaterialsCost || 0)}</Text>
                   </View>
                   <View style={styles.costRow}>
                     <Text style={styles.costColLabel}>Coste total MO + materiales</Text>
-                    <Text style={styles.costColValue}>{formatCurrency(report.totalCost || 0)}</Text>
+                    <Text style={styles.costColValue}>{formatCurrency(
+                      (laborCalcs?.totalLaborCost || 0) + (materialsCalcs?.totalMaterialsCost || 0)
+                    )}</Text>
                   </View>
                 </View>
               </View>
@@ -563,7 +587,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
           </View>
           <View style={styles.detailsRow}>
             <Text style={styles.detailsColLeft}>Proyecto: {project.address || "No disponible"}</Text>
-            <Text style={styles.detailsColRight}>Tipo: {isHourlyProject ? "Por horas" : "Presupuesto cerrado"}</Text>
+            <Text style={styles.detailsColRight}>Tipo: {project.type === "hourly" ? "Por horas" : "Presupuesto cerrado"}</Text>
           </View>
           <View style={styles.detailsRow}>
             <Text style={styles.detailsColLeft}>Período: {renderTitle().replace('Acta semanal de obra - ', '')}</Text>
@@ -571,7 +595,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
           </View>
         </View>
 
-        {isHourlyProject ? (
+        {project.type === "hourly" ? (
           <View style={styles.summaryTable}>
             <View style={styles.summaryHeaderRow}>
               <Text style={{...styles.summaryHeaderCol, width: "70%"}}>Concepto</Text>
@@ -604,15 +628,63 @@ const ReportPDFGenerator = ({ reports, projects }) => {
               <Text style={styles.summaryColLabel}>Total facturado</Text>
               <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced)}</Text>
             </View>
+            
+            {/* Sección de trabajos extra (si hay) */}
+            {(totals.totalExtraCost > 0 || totals.totalExtraBudget > 0) && (
+              <>
+                {/* Encabezado de sección */}
+                <View style={[styles.summaryRow, styles.extraWorkSection]}>
+                  <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
+                    Trabajos Extra (Fuera de Presupuesto)
+                  </Text>
+                  <Text style={[styles.summaryColValue, { color: '#e67e22' }]}>
+                    {formatCurrency(totals.totalExtraCost + totals.totalExtraBudget)}
+                  </Text>
+                </View>
+                
+                {/* Detalles de trabajos extra */}
+                {totals.totalExtraBudget > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryColLabel}>Presupuestos adicionales</Text>
+                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraBudget)}</Text>
+                  </View>
+                )}
+                
+                {totals.totalExtraHours > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryColLabel}>Coste mano de obra extra</Text>
+                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraHours)}</Text>
+                  </View>
+                )}
+                
+                {totals.totalExtraCost > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryColLabel}>Coste total trabajos por horas</Text>
+                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraCost)}</Text>
+                  </View>
+                )}
+              </>
+            )}
+            
             <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>Importe restante</Text>
-              <Text style={styles.summaryTotalValue}>{formatCurrency((project.budgetAmount || 0) - totals.totalInvoiced)}</Text>
+              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
+              <Text style={styles.summaryTotalValue}>
+                {formatCurrency(totals.totalInvoiced + totals.totalExtraCost + totals.totalExtraBudget)}
+              </Text>
+            </View>
+            
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryColLabel}>Importe restante</Text>
+              <Text style={styles.summaryColValue}>
+                {formatCurrency((project.budgetAmount || 0) - totals.totalInvoiced)}
+              </Text>
             </View>
           </View>
         )}
 
         <Text style={styles.summaryNote}>
           Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado.
+          {hasExtraWork ? " Los trabajos extra se muestran separados del presupuesto original." : ""}
         </Text>
       </Page>
     </Document>

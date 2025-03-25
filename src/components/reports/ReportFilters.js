@@ -1,11 +1,14 @@
+// src/components/reports/ReportFilters.js (Completo)
 import React, { useCallback } from "react";
 
-const ReportFilters = ({ 
-  projects, 
-  selectedProjectId, 
+const ReportFilters = ({
+  projects,
+  selectedProjectId,
   dateRange,
   onProjectChange,
-  onDateRangeChange
+  onDateRangeChange,
+  onBilledStatusChange, // NUEVO: Prop para manejar el cambio de estado de facturación
+  billedStatus         // NUEVO: Prop para el estado actual de facturación
 }) => {
   const handleProjectSelect = useCallback((e) => {
     onProjectChange(e.target.value);
@@ -18,6 +21,11 @@ const ReportFilters = ({
       [name]: value
     });
   }, [dateRange, onDateRangeChange]);
+
+  // NUEVO: Manejador para el cambio de estado de facturación
+  const handleBilledStatusSelect = useCallback((e) => {
+    onBilledStatusChange(e.target.value);
+  }, [onBilledStatusChange]);
 
   return (
     <div className="filter-section">
@@ -34,22 +42,32 @@ const ReportFilters = ({
       <div className="date-range">
         <div className="date-field">
           <label>Fecha de inicio:</label>
-          <input 
-            type="date" 
-            name="startDate" 
-            value={dateRange.startDate} 
-            onChange={handleDateChange} 
+          <input
+            type="date"
+            name="startDate"
+            value={dateRange.startDate}
+            onChange={handleDateChange}
           />
         </div>
         <div className="date-field">
           <label>Fecha de fin:</label>
-          <input 
-            type="date" 
-            name="endDate" 
-            value={dateRange.endDate} 
-            onChange={handleDateChange} 
+          <input
+            type="date"
+            name="endDate"
+            value={dateRange.endDate}
+            onChange={handleDateChange}
           />
         </div>
+      </div>
+
+      {/* NUEVO: Filtro para el estado de facturación */}
+      <div className="filter-group">
+        <label>Estado de facturación:</label>
+        <select value={billedStatus} onChange={handleBilledStatusSelect}>
+          <option value="">Todos</option>
+          <option value="true">Facturados</option>
+          <option value="false">No facturados</option>
+        </select>
       </div>
     </div>
   );

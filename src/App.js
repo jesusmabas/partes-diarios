@@ -7,6 +7,7 @@ import Dashboard from "./components/Dashboard"; // Importar el nuevo componente
 import LoginForm from "./components/LoginForm";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from './firebase';
+import "./components/ExtraWork.css"; // Importar archivo CSS de trabajos extra
 import "./App.css";
 
 

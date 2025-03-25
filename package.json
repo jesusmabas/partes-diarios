@@ -8,29 +8,42 @@
     "buffer": "^6.0.3",
     "file-saver": "^2.0.5",
     "firebase": "^11.4.0",
+    "glob": "^11.0.1",
     "html2canvas": "^1.4.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-firebase-hooks": "^5.1.1",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "recharts": "^2.10.3",
-    "uuid": "^11.1.0"
+    "rimraf": "^6.0.1",
+    "svgo": "^3.3.2",
+    "uuid": "^11.1.0",
+    "workbox-cacheable-response": "^7.3.0",
+    "workbox-google-analytics": "^7.3.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "eslint-config-react-app": "^7.0.1",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "semver": "^7.5.3",
     "shell-quote": "^1.7.3",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^4.2.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "preinstall": "npx npm-force-resolutions"
+    "test": "react-scripts test",
+    "test:coverage": "react-scripts test --coverage --watchAll=false",
+    "test:calculations": "react-scripts test --testPathPattern=src/utils/calculations/__tests__ --coverage --watchAll=false",
+    "test:hooks": "react-scripts test --testPathPattern=src/hooks/__tests__ --coverage --watchAll=false",
+    "test:integration": "react-scripts test --testPathPattern=src/tests/integration --coverage --watchAll=false",
+    "test:utils": "react-scripts test --testPathPattern=src/utils/__tests__ --coverage --watchAll=false",
+    "test:ci": "CI=true react-scripts test --coverage --watchAll=false"
   },
   "eslintConfig": {
     "extends": [
@@ -58,5 +71,31 @@
     "shell-quote": "1.7.3",
     "semver": "7.5.3",
     "nth-check": "2.1.1"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx}",
+      "!src/index.js",
+      "!src/reportWebVitals.js",
+      "!src/firebase.js",
+      "!src/App.js",
+      "src/utils/calculations/**/*.js",
+      "src/utils/calculationUtils.js",
+      "src/utils/formatters.js",
+      "src/hooks/useCalculationsService.js",
+      "src/hooks/useFormValidation.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 80,
+        "functions": 80,
+        "lines": 80
+      }
+    },
+    "moduleNameMapper": {
+      "\\.(css|less|scss|sass)$": "identity-obj-proxy",
+      "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.js"
+    }
   }
 }

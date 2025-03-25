@@ -1,4 +1,5 @@
-// src/components/ProjectForm.js
+// src/components/ProjectForm.js - Modificación para incluir campos de trabajo extra
+
 import React, { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import useFormValidation from "../hooks/useFormValidation";
@@ -10,7 +11,7 @@ const ProjectForm = ({ onProjectAdded }) => {
   const [serverSuccess, setServerSuccess] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Valores iniciales del formulario
+  // Valores iniciales del formulario con campos adicionales
   const initialValues = {
     id: "",
     client: "",
@@ -19,7 +20,8 @@ const ProjectForm = ({ onProjectAdded }) => {
     type: "hourly",
     officialPrice: 0,
     workerPrice: 0,
-    budgetAmount: 0
+    budgetAmount: 0,
+    allowExtraWork: false  // Nuevo campo para habilitar trabajos extra
   };
 
   // Usar nuestro hook personalizado para formularios
@@ -69,6 +71,17 @@ const ProjectForm = ({ onProjectAdded }) => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Función para manejar el cambio en el checkbox de trabajos extra
+  const handleAllowExtraWorkChange = (e) => {
+    const { checked } = e.target;
+    handleChange({
+      target: {
+        name: 'allowExtraWork',
+        value: checked
+      }
+    });
   };
 
   return (
@@ -195,22 +208,79 @@ const ProjectForm = ({ onProjectAdded }) => {
           </div>
         </>
       ) : (
-        <div className="form-group">
-          <label htmlFor="project-budget">Importe presupuestado (€)</label>
-          <input
-            id="project-budget"
-            type="number"
-            name="budgetAmount"
-            value={values.budgetAmount}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={hasError('budgetAmount') ? 'input-error' : ''}
-            min="0"
-            step="0.01"
-            placeholder="Importe total presupuestado"
-          />
-          {hasError('budgetAmount') && <p className="error-message">{getError('budgetAmount')}</p>}
-        </div>
+        <>
+          <div className="form-group">
+            <label htmlFor="project-budget">Importe presupuestado (€)</label>
+            <input
+              id="project-budget"
+              type="number"
+              name="budgetAmount"
+              value={values.budgetAmount}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              className={hasError('budgetAmount') ? 'input-error' : ''}
+              min="0"
+              step="0.01"
+              placeholder="Importe total presupuestado"
+            />
+            {hasError('budgetAmount') && <p className="error-message">{getError('budgetAmount')}</p>}
+          </div>
+          
+          {/* Opción para habilitar trabajos extra en proyectos de presupuesto cerrado */}
+          <div className="form-group checkbox-group">
+            <input
+              id="project-allow-extra"
+              type="checkbox"
+              name="allowExtraWork"
+              checked={values.allowExtraWork}
+              onChange={handleAllowExtraWorkChange}
+              className="checkbox-input"
+            />
+            <label htmlFor="project-allow-extra" className="checkbox-label">
+              Permitir trabajos extra fuera de presupuesto
+            </label>
+          </div>
+          
+          {/* Si se habilitan trabajos extra, mostrar campos de precios por hora */}
+          {values.allowExtraWork && (
+            <div className="extra-work-section">
+              <h4>Tarifas para trabajos extra por horas</h4>
+              <p className="hint-text">Estos precios se aplicarán solo a trabajos extra facturados por horas</p>
+              
+              <div className="form-group">
+                <label htmlFor="project-extra-official-price">Precio oficial para extras (€/h)</label>
+                <input
+                  id="project-extra-official-price"
+                  type="number"
+                  name="officialPrice"
+                  value={values.officialPrice}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={hasError('officialPrice') ? 'input-error' : ''}
+                  min="0"
+                  step="0.01"
+                  placeholder="Precio por hora del oficial para trabajos extra"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="project-extra-worker-price">Precio peón para extras (€/h)</label>
+                <input
+                  id="project-extra-worker-price"
+                  type="number"
+                  name="workerPrice"
+                  value={values.workerPrice}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={hasError('workerPrice') ? 'input-error' : ''}
+                  min="0"
+                  step="0.01"
+                  placeholder="Precio por hora del peón para trabajos extra"
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Botón de envío */}

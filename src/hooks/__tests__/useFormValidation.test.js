@@ -22,7 +22,7 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
   // Efecto para validar cuando cambian los valores
   useEffect(() => {
     validateFormData();
-  }, [validateFormData]);
+  }, [values]); // Corrected dependency array
 
   // Manejar cambios en campos
   const handleChange = useCallback((e) => {
@@ -126,7 +126,7 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
           current = current[parts[i]];
         }
         
-        current[parts[parts.length - 1]] = value;
+        current[parts.length - 1]] = value;
         return newValues;
       }
       

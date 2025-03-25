@@ -15,6 +15,7 @@ export const useReportFilters = (initialFilters = {}) => {
 
   // Actualizar un filtro específico
   const updateFilter = useCallback((key, value) => {
+    console.log("updateFilter", key, value); 
     setFilters(prev => ({
       ...prev,
       [key]: value
