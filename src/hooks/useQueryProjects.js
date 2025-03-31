@@ -1,206 +1,237 @@
 // src/hooks/useQueryProjects.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where 
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
 
-// Clave de caché para proyectos
 const PROJECTS_CACHE_KEY = 'projects';
 
-// Obtener todos los proyectos
 const fetchProjects = async (userId = null) => {
   let q = collection(db, 'projects');
-  
   if (userId) {
     q = query(q, where('userId', '==', userId));
   }
-  
   const querySnapshot = await getDocs(q);
-  
-  // MODIFICADO: No sobrescribir el campo 'id' personalizado
-  // En lugar de usar { id: doc.id, ...doc.data() }
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    // Aseguramos que el ID personalizado esté disponible tal cual viene de la BD
-    return {
-      firestoreId: doc.id, // Guardar el ID de Firestore en una propiedad separada
-      ...data // Incluir todos los datos, manteniendo el campo 'id' original
-    };
-  });
+  return querySnapshot.docs.map(doc => ({
+    firestoreId: doc.id,
+    ...doc.data()
+  }));
 };
 
-// Obtener un proyecto por ID
-const fetchProjectById = async (projectId) => {
-  if (!projectId) return null;
-  
-  // MODIFICADO: Intentar buscar primero por ID de Firestore
+const fetchProjectById = async (projectIdOrFirestoreId) => {
+  if (!projectIdOrFirestoreId) return null;
+
   try {
-    const docRef = doc(db, 'projects', projectId);
+    const docRef = doc(db, 'projects', projectIdOrFirestoreId);
     const docSnap = await getDoc(docRef);
-    
     if (docSnap.exists()) {
-      const data = docSnap.data();
-      return { 
+      return {
         firestoreId: docSnap.id,
-        ...data 
+        ...docSnap.data()
       };
     }
   } catch (error) {
-    console.error("Error buscando por ID de Firestore:", error);
+     // Ignore error if it's just not found by Firestore ID, we'll try custom ID next
+     if (error.code !== 'invalid-argument') { // Don't log if it's just an invalid path format
+        console.warn("Attempt to fetch by Firestore ID failed (may try custom ID next):", error);
+     }
   }
-  
-  // Si no se encuentra, intentar buscar por ID personalizado
+
   try {
-    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectId));
+    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectIdOrFirestoreId));
     const querySnapshot = await getDocs(projectsQuery);
-    
     if (!querySnapshot.empty) {
       const docSnap = querySnapshot.docs[0];
-      const data = docSnap.data();
-      return { 
+      return {
         firestoreId: docSnap.id,
-        ...data 
+        ...docSnap.data()
       };
     }
   } catch (error) {
-    console.error("Error buscando por ID personalizado:", error);
+    console.error("Error fetching project by custom ID:", error);
   }
-  
-  return null;
+
+  return null; // Return null if not found by either ID
 };
 
-// Hook para obtener proyectos
+
 export const useQueryProjects = (userId = null) => {
   return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, { userId }],
+    queryKey: [PROJECTS_CACHE_KEY, { userId: userId || 'all' }], // Ensure key changes if userId changes
     queryFn: () => fetchProjects(userId),
   });
 };
 
-// Hook para obtener un proyecto específico
-export const useQueryProject = (projectId) => {
-  return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, projectId],
-    queryFn: () => fetchProjectById(projectId),
-    enabled: !!projectId, // Solo ejecutar si hay un projectId
-  });
-};
 
-// Hook para agregar un proyecto
+export const useQueryProject = (projectIdOrFirestoreId) => {
+    return useQuery({
+      // Use a more specific key that includes the ID being queried
+      queryKey: [PROJECTS_CACHE_KEY, 'detail', projectIdOrFirestoreId],
+      queryFn: () => fetchProjectById(projectIdOrFirestoreId),
+      enabled: !!projectIdOrFirestoreId, // Only run if ID is provided
+    });
+  };
+
+
 export const useAddProject = () => {
   const queryClient = useQueryClient();
   const functions = getFunctions();
   const createProjectFunction = httpsCallable(functions, 'createProject');
-  
+
   return useMutation({
     mutationFn: async (projectData) => {
-      // Usar Cloud Function para validación y creación
       const result = await createProjectFunction(projectData);
       return result.data;
     },
-    // Invalidar cache al finalizar
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
     },
   });
 };
 
-// Hook para actualizar un proyecto
 export const useUpdateProject = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ projectId, data }) => {
-      // MODIFICADO: Asegurarse de usar el ID correcto de Firestore
-      const projectRef = doc(db, 'projects', projectId); // Usar firestoreId si está disponible
-      await updateDoc(projectRef, data);
-      return { id: projectId, ...data };
+    mutationFn: async ({ firestoreId, data }) => {
+      if (!firestoreId) {
+        throw new Error("firestoreId es requerido para actualizar.");
+      }
+      const projectRef = doc(db, 'projects', firestoreId);
+      const { firestoreId: _, ...updateData } = data;
+      await updateDoc(projectRef, updateData);
+      return { ...data, firestoreId: firestoreId };
     },
-    // Actualizar la caché optimistamente
-    onMutate: async ({ projectId, data }) => {
-      // Cancelar consultas pendientes
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      
-      // Guardar el estado previo
-      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, projectId]);
-      
-      // Actualizar la caché optimistamente
-      queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], old => ({
-        ...old,
-        ...data,
+    onMutate: async ({ firestoreId, data }) => {
+      if (!firestoreId) return;
+      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Use detailed key
+      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId]); // Use detailed key
+
+      // Optimistically update the specific project cache
+      queryClient.setQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId], old => ({
+          ...(old || {}),
+          ...data,
+          firestoreId: firestoreId
       }));
-      
-      // También actualizar la lista de proyectos
-      queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
-        if (!old) return old;
-        return old.map(project => 
-          project.firestoreId === projectId ? { ...project, ...data } : project
-        );
+
+      // Optimistically update the list cache
+      queryClient.setQueryData([PROJECTS_CACHE_KEY], (oldListData) => {
+          if (!oldListData) return [];
+          // Ensure we're working with the correct key structure if nested under userId
+          // This part might need adjustment based on how useQueryProjects structures its cache
+          if (Array.isArray(oldListData)) { // Simple array cache
+              return oldListData.map(project =>
+                  project.firestoreId === firestoreId ? { ...project, ...data, firestoreId: firestoreId } : project
+              );
+          } else if (oldListData && typeof oldListData === 'object' && oldListData.pages) { // Infinite query cache
+               return {
+                   ...oldListData,
+                   pages: oldListData.pages.map(page => ({
+                       ...page,
+                       items: page.items.map(project =>
+                           project.firestoreId === firestoreId ? { ...project, ...data, firestoreId: firestoreId } : project
+                       )
+                   }))
+               };
+          }
+          // Add handling for other cache structures if necessary
+          console.warn("Unrecognized cache structure for project list in onMutate");
+          return oldListData; // Return unchanged if structure is unknown
       });
-      
+
+
       return { previousProject };
     },
-    // En caso de error, restaurar el estado previo
-    onError: (err, { projectId }, context) => {
-      if (context?.previousProject) {
-        queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], context.previousProject);
+    onError: (err, { firestoreId }, context) => {
+      if (firestoreId && context?.previousProject) {
+        queryClient.setQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId], context.previousProject); // Use detailed key
       }
+      // Consider rolling back the list update as well
+       queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate list on error for safety
     },
-    // Invalidar cache al finalizar
-    onSettled: (data, error, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    onSettled: (data, error, { firestoreId }) => {
+        if (firestoreId) {
+            queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Use detailed key
+        }
+        // Always invalidate the main list query (or relevant list queries)
+        queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate potentially multiple list caches
     },
+
   });
 };
 
-// Hook para eliminar un proyecto
 export const useDeleteProject = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (projectId) => {
-      // Buscar el proyecto por ID dentro de los datos
-      const projects = await fetchProjects();
-      const project = projects.find(p => p.firestoreId === projectId);
-      
-      if (!project) {
-        throw new Error(`Proyecto con ID ${projectId} no encontrado`);
+    mutationFn: async (firestoreId) => { // Expect firestoreId directly
+      if (!firestoreId) {
+        throw new Error("firestoreId es requerido para eliminar.");
       }
-      
-      // Eliminar el documento de Firestore
-      await deleteDoc(doc(db, 'projects', project.firestoreId));
-      
-      return projectId;
+      await deleteDoc(doc(db, 'projects', firestoreId));
+      return firestoreId;
+    },
+    onMutate: async (firestoreId) => {
+        if (!firestoreId) return;
+        await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Cancel list queries
+        await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Cancel detail query
+
+        const previousDetail = queryClient.getQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId]);
+        queryClient.removeQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Remove detail cache
+
+        const previousListCache = queryClient.getQueryState([PROJECTS_CACHE_KEY]); // Get state to know structure
+
+        // Optimistically remove from the list cache
+        queryClient.setQueriesData(
+          { queryKey: [PROJECTS_CACHE_KEY] }, // Target list queries
+          (oldData) => {
+            if (!oldData) return [];
+            if (Array.isArray(oldData)) { // Simple array cache
+                return oldData.filter(project => project.firestoreId !== firestoreId);
+            } else if (oldData && typeof oldData === 'object' && oldData.pages) { // Infinite query cache
+                 return {
+                     ...oldData,
+                     pages: oldData.pages.map(page => ({
+                         ...page,
+                         items: page.items.filter(project => project.firestoreId !== firestoreId)
+                     }))
+                 };
+            }
+            console.warn("Unrecognized cache structure for project list in onMutate (delete)");
+            return oldData; // Return unchanged if structure is unknown
+          }
+        );
+
+
+        return { previousListCache, previousDetail }; // Return previous states if needed for rollback
     },
 
-    onMutate: async (projectId) => {
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-      const previousCacheData = queryClient.getQueryState([PROJECTS_CACHE_KEY]);
-
-      queryClient.setQueriesData(
-        { queryKey: [PROJECTS_CACHE_KEY] },
-        (oldData) => {
-          if (!oldData) return oldData;
-          return oldData.filter(project => project.firestoreId !== projectId);
-        }
-      );
-
-      return { previousCacheData };
+    onError: (err, firestoreId, context) => {
+        // Rollback logic if needed, using context.previousListCache, context.previousDetail
+         console.error("Error deleting project:", err);
+         // Invalidate caches to refetch correct state
+         if (firestoreId) {
+             queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] });
+         }
+         queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
     },
 
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    onSettled: (data, error, firestoreId) => { // data here is the returned firestoreId
+      // Invalidate relevant queries to ensure fresh data
+      if (firestoreId) {
+          queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] });
+      }
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate list(s)
     },
   });
 };

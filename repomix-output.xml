@@ -45,6 +45,7 @@ The content is organized as follows:
 <directory_structure>
 .firebaserc
 .gitignore
+.repomixignore
 cors.json
 firebase.json
 firestore.indexes.json
@@ -57,6 +58,7 @@ public/index.html
 public/manifest.json
 public/robots.txt
 README.md
+repomix.config.json
 src/__mocks__/fileMock.js
 src/__mocks__/styleMock.js
 src/App.css
@@ -89,6 +91,9 @@ src/components/ProjectForm.js
 src/components/ProjectSelector.js
 src/components/ProjectsViewer.js
 src/components/ReportPDFGenerator.js
+src/components/reports/details/ReportFixedAmountDetails.js
+src/components/reports/details/ReportLaborDetails.js
+src/components/reports/details/ReportMaterialsDetails.js
 src/components/reports/MaterialsEditor.js
 src/components/reports/PhotosEditor.js
 src/components/reports/ReportDeleteModal.js
@@ -103,6 +108,7 @@ src/components/WorkPerformedForm.js
 src/firebase.js
 src/hooks/__tests__/useCalculationsService.test.js
 src/hooks/__tests__/useFormValidation.test.js
+src/hooks/reports/_useReportSummary.js
 src/hooks/reports/useReportActions.js
 src/hooks/reports/useReportFilters.js
 src/hooks/reports/useReportSummary.js
@@ -141,95 +147,276 @@ storage.rules
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/hooks/useLocalStorage.js">
-// src/hooks/useLocalStorage.js - Hook para persistir datos en localStorage
-import { useState, useEffect } from 'react';
-
-/**
- * Hook personalizado para persistir datos en localStorage
- * @param {string} key - Clave para almacenar en localStorage
- * @param {any} initialValue - Valor inicial si no existe la clave
- * @returns {Array} - [storedValue, setValue] similar a useState
- */
-export const useLocalStorage = (key, initialValue) => {
-  // Estado para almacenar el valor
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      // Obtener del localStorage por la clave
-      const item = window.localStorage.getItem(key);
-      // Analizar el JSON almacenado o devolver initialValue
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      // Si hay error al leer localStorage, devolver initialValue
-      console.error(`Error al leer '${key}' de localStorage:`, error);
-      return initialValue;
-    }
-  });
-
-  // Función para actualizar localStorage y el estado
-  const setValue = (value) => {
-    try {
-      // Permitir que value sea una función como en useState
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value;
-      
-      // Guardar en el estado
-      setStoredValue(valueToStore);
-      
-      // Guardar en localStorage
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch (error) {
-      console.error(`Error al guardar '${key}' en localStorage:`, error);
-    }
-  };
-
-  // Efecto para actualizar localStorage si la clave cambia
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(`Error al sincronizar '${key}' con localStorage:`, error);
-    }
-  }, [key, storedValue]);
-
-  return [storedValue, setValue];
-};
-
-export default useLocalStorage;
+<file path=".repomixignore">
+# Add patterns to ignore here, one per line
+# Example:
+*.log
+tmp/
 </file>
 
-<file path="src/hooks/useQueryUser.js">
-// src/hooks/useQueryUser.js
-import { useQuery } from '@tanstack/react-query';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsableStyle": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "compress": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false,
+    "git": {
+      "sortByChanges": true,
+      "sortByChangesMaxCommits": 100
+    }
+  },
+  "include": [],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": []
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
+</file>
 
-/**
- * Hook para consultar usuarios desde Firestore
- * @returns {Object} Objeto con datos de usuarios, estado de carga y error
- */
-export const useQueryUser = () => {
-  return useQuery({
-    queryKey: ['users'],
-    queryFn: async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'users'));
-        return querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-      } catch (error) {
-        console.error("Error al consultar usuarios:", error);
-        return []; // Devolver array vacío en caso de error
-      }
-    },
-    // No refetch automáticamente, los usuarios no suelen cambiar con frecuencia
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-  });
+<file path="src/components/reports/details/ReportFixedAmountDetails.js">
+// src/components/reports/details/ReportFixedAmountDetails.js
+import React from "react";
+import { formatCurrency } from "../../../utils/calculationUtils";
+
+const ReportFixedAmountDetails = ({ label, amount }) => {
+  return (
+    <div className="fixed-budget-details">
+      <p><strong>{label}:</strong> {formatCurrency(amount)}</p>
+    </div>
+  );
 };
 
-export default useQueryUser;
+export default React.memo(ReportFixedAmountDetails);
+</file>
+
+<file path="src/components/reports/details/ReportLaborDetails.js">
+// src/components/reports/details/ReportLaborDetails.js
+import React from "react";
+import { formatNumber, formatCurrency } from "../../../utils/calculationUtils";
+
+const ReportLaborDetails = ({ laborCalcs }) => {
+  if (!laborCalcs) return null;
+
+  return (
+    <div className="labor-details">
+      <h5>Mano de obra</h5>
+      <p>Oficial: {formatNumber(laborCalcs.officialHours)} h - {formatCurrency(laborCalcs.officialCost)}</p>
+      <p>Peón: {formatNumber(laborCalcs.workerHours)} h - {formatCurrency(laborCalcs.workerCost)}</p>
+      <p>Total mano de obra: {formatCurrency(laborCalcs.totalLaborCost)}</p>
+    </div>
+  );
+};
+
+export default React.memo(ReportLaborDetails);
+</file>
+
+<file path="src/components/reports/details/ReportMaterialsDetails.js">
+// src/components/reports/details/ReportMaterialsDetails.js
+import React from "react";
+import { formatCurrency } from "../../../utils/calculationUtils";
+import { Link } from "@react-pdf/renderer"; // Importar Link si se usa directamente aquí
+
+// Helper interno para renderizar materiales
+const renderMaterialsList = (materials = []) => {
+  if (!materials || materials.length === 0) {
+    return <p>No hay materiales registrados.</p>;
+  }
+
+  return (
+    <div className="materials-list">
+      {materials.map((material, index) => (
+        <p key={material.id || index}>
+          {material.description} - {formatCurrency(material.cost)} (
+          {/* Nota: Link de @react-pdf/renderer no funcionará directamente en HTML.
+              Si esto se renderiza en web, necesitarías un <a> normal.
+              Asumiendo que esto es para la web por ahora. */}
+          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
+            Ver factura
+          </a>
+          )
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const ReportMaterialsDetails = ({ materials, materialsCalcs }) => {
+  if (!materialsCalcs) return null;
+
+  return (
+    <div className="materials-details">
+      <h5>Materiales</h5>
+      {renderMaterialsList(materials)}
+      <p>Total materiales: {formatCurrency(materialsCalcs.totalMaterialsCost)}</p>
+    </div>
+  );
+};
+
+export default React.memo(ReportMaterialsDetails);
+</file>
+
+<file path="src/hooks/reports/_useReportSummary.js">
+import { useMemo } from "react";
+
+/**
+ * Hook personalizado para calcular resúmenes y estadísticas de reportes
+ * @param {Array} reports - Lista de reportes
+ * @param {Array} projects - Lista de proyectos
+ * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
+ * @returns {Object} - Objeto con cálculos y estadísticas
+ */
+export const useReportSummary = (reports = [], projects = [], selectedProjectId = "") => {
+  // Filtrar por proyecto si es necesario
+  const filteredReports = useMemo(() => {
+    if (!selectedProjectId) return reports;
+    return reports.filter(report => report.projectId === selectedProjectId);
+  }, [reports, selectedProjectId]);
+
+  // Obtener tipo de proyecto
+  const projectType = useMemo(() => {
+    if (!selectedProjectId) return null;
+    const project = projects.find(p => p.id === selectedProjectId);
+    return project?.type || null;
+  }, [projects, selectedProjectId]);
+
+  // Calcular totales generales
+  const totals = useMemo(() => {
+    let totalLabor = 0;
+    let totalMaterials = 0;
+    let totalCost = 0;
+    let totalInvoiced = 0;
+    let totalHours = 0;
+
+    filteredReports.forEach(report => {
+      // Costos de mano de obra (proyectos por hora)
+      if (report.labor) {
+        totalLabor += report.labor.totalLaborCost || 0;
+        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
+      }
+      
+      // Costos de materiales
+      totalMaterials += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        totalCost += report.totalCost;
+      } else if (report.labor) {
+        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        totalInvoiced += report.invoicedAmount;
+      }
+    });
+
+    return {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced,
+      totalHours
+    };
+  }, [filteredReports]);
+
+  // Calcular resumen por semanas
+  const weeklySummary = useMemo(() => {
+    if (filteredReports.length === 0) return [];
+
+    const weekMap = {};
+    
+    filteredReports.forEach(report => {
+      const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
+      
+      if (!weekMap[weekKey]) {
+        weekMap[weekKey] = {
+          weekNumber: report.weekNumber,
+          year: new Date(report.reportDate).getFullYear(),
+          label: `Semana ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
+          laborCost: 0,
+          materialsCost: 0,
+          totalCost: 0,
+          invoicedAmount: 0,
+          reports: 0
+        };
+      }
+      
+      // Incrementar contadores
+      weekMap[weekKey].reports += 1;
+      
+      // Para proyectos por hora
+      if (report.labor) {
+        weekMap[weekKey].laborCost += report.labor.totalLaborCost || 0;
+      }
+      
+      weekMap[weekKey].materialsCost += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        weekMap[weekKey].totalCost += report.totalCost;
+      } else if (report.labor) {
+        weekMap[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+      
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        weekMap[weekKey].invoicedAmount += report.invoicedAmount;
+      }
+    });
+
+    // Convertir a array y ordenar por semana/año
+    return Object.values(weekMap).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.weekNumber - b.weekNumber;
+    });
+  }, [filteredReports]);
+
+  // Calcular presupuesto restante para proyectos de presupuesto cerrado
+  const budgetSummary = useMemo(() => {
+    if (projectType !== 'fixed' || !selectedProjectId) return null;
+    
+    const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return null;
+    
+    const budgetAmount = project.budgetAmount || 0;
+    const invoicedTotal = totals.totalInvoiced;
+    const remainingBudget = budgetAmount - invoicedTotal;
+    const progressPercentage = budgetAmount > 0 ? (invoicedTotal / budgetAmount) * 100 : 0;
+    
+    return {
+      budgetAmount,
+      invoicedTotal,
+      remainingBudget,
+      progressPercentage: Math.min(progressPercentage, 100), // Limitar a 100%
+      isOverBudget: remainingBudget < 0
+    };
+  }, [projectType, selectedProjectId, projects, totals.totalInvoiced]);
+
+  return {
+    totals,
+    weeklySummary,
+    budgetSummary,
+    projectType,
+    reportCount: filteredReports.length
+  };
+};
+
+export default useReportSummary;
 </file>
 
 <file path="functions/package.json">
@@ -2562,6 +2749,97 @@ export const useLabor = (labor, project) => {
     };
   }, [labor, project]);
 };
+</file>
+
+<file path="src/hooks/useLocalStorage.js">
+// src/hooks/useLocalStorage.js - Hook para persistir datos en localStorage
+import { useState, useEffect } from 'react';
+
+/**
+ * Hook personalizado para persistir datos en localStorage
+ * @param {string} key - Clave para almacenar en localStorage
+ * @param {any} initialValue - Valor inicial si no existe la clave
+ * @returns {Array} - [storedValue, setValue] similar a useState
+ */
+export const useLocalStorage = (key, initialValue) => {
+  // Estado para almacenar el valor
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      // Obtener del localStorage por la clave
+      const item = window.localStorage.getItem(key);
+      // Analizar el JSON almacenado o devolver initialValue
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      // Si hay error al leer localStorage, devolver initialValue
+      console.error(`Error al leer '${key}' de localStorage:`, error);
+      return initialValue;
+    }
+  });
+
+  // Función para actualizar localStorage y el estado
+  const setValue = (value) => {
+    try {
+      // Permitir que value sea una función como en useState
+      const valueToStore =
+        value instanceof Function ? value(storedValue) : value;
+      
+      // Guardar en el estado
+      setStoredValue(valueToStore);
+      
+      // Guardar en localStorage
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error(`Error al guardar '${key}' en localStorage:`, error);
+    }
+  };
+
+  // Efecto para actualizar localStorage si la clave cambia
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(storedValue));
+    } catch (error) {
+      console.error(`Error al sincronizar '${key}' con localStorage:`, error);
+    }
+  }, [key, storedValue]);
+
+  return [storedValue, setValue];
+};
+
+export default useLocalStorage;
+</file>
+
+<file path="src/hooks/useQueryUser.js">
+// src/hooks/useQueryUser.js
+import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+
+/**
+ * Hook para consultar usuarios desde Firestore
+ * @returns {Object} Objeto con datos de usuarios, estado de carga y error
+ */
+export const useQueryUser = () => {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'users'));
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } catch (error) {
+        console.error("Error al consultar usuarios:", error);
+        return []; // Devolver array vacío en caso de error
+      }
+    },
+    // No refetch automáticamente, los usuarios no suelen cambiar con frecuencia
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+};
+
+export default useQueryUser;
 </file>
 
 <file path="src/index.css">
@@ -5797,369 +6075,6 @@ const ProjectForm = ({ onProjectAdded }) => {
 export default ProjectForm;
 </file>
 
-<file path="src/components/reports/ReportFilters.js">
-// src/components/reports/ReportFilters.js - Componente mejorado con más filtros
-import React, { useCallback, useState } from "react";
-import { formatCurrency } from "../../utils/calculationUtils";
-
-const ReportFilters = ({
-  projects,
-  selectedProjectId,
-  dateRange,
-  onProjectChange,
-  onDateRangeChange,
-  onBilledStatusChange,
-  billedStatus,
-  // Nuevos props para filtros adicionales
-  onWorkTypeChange,
-  workType,
-  onUserChange,
-  selectedUserId,
-  users = [], // Lista de usuarios (opcional)
-  onAmountRangeChange,
-  amountRange = { min: "", max: "" },
-  // Ordenación
-  onSortChange,
-  sortField = "reportDate",
-  sortDirection = "desc",
-  // Props para UI mejorada
-  onSaveFilter,
-  onResetFilters,
-  savedFilters = []
-}) => {
-  // Estado para controlar panel de filtros expandible
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Manejadores existentes
-  const handleProjectSelect = useCallback((e) => {
-    onProjectChange(e.target.value);
-  }, [onProjectChange]);
-
-  const handleDateChange = useCallback((e) => {
-    const { name, value } = e.target;
-    onDateRangeChange({
-      ...dateRange,
-      [name]: value
-    });
-  }, [dateRange, onDateRangeChange]);
-
-  const handleBilledStatusSelect = useCallback((e) => {
-    onBilledStatusChange(e.target.value);
-  }, [onBilledStatusChange]);
-
-  // Nuevos manejadores
-  const handleWorkTypeSelect = useCallback((e) => {
-    if (onWorkTypeChange) {
-      onWorkTypeChange(e.target.value);
-    }
-  }, [onWorkTypeChange]);
-
-  const handleUserSelect = useCallback((e) => {
-    if (onUserChange) {
-      onUserChange(e.target.value);
-    }
-  }, [onUserChange]);
-
-  const handleAmountChange = useCallback((e) => {
-    const { name, value } = e.target;
-    if (onAmountRangeChange) {
-      onAmountRangeChange({
-        ...amountRange,
-        [name.replace("amount", "")]: value
-      });
-    }
-  }, [amountRange, onAmountRangeChange]);
-
-  const handleSortChange = useCallback((e) => {
-    if (onSortChange) {
-      onSortChange({
-        field: e.target.value,
-        direction: sortDirection
-      });
-    }
-  }, [onSortChange, sortDirection]);
-
-  const handleSortDirectionChange = useCallback((e) => {
-    if (onSortChange) {
-      onSortChange({
-        field: sortField,
-        direction: e.target.value
-      });
-    }
-  }, [onSortChange, sortField]);
-
-  const toggleExpand = () => setIsExpanded(!isExpanded);
-
-  const handleSaveCurrentFilter = () => {
-    if (onSaveFilter) {
-      const filterName = prompt("Nombre para guardar este filtro:");
-      if (filterName) {
-        onSaveFilter({
-          name: filterName,
-          filter: {
-            projectId: selectedProjectId,
-            dateRange,
-            billedStatus,
-            workType,
-            selectedUserId,
-            amountRange,
-            sort: { field: sortField, direction: sortDirection }
-          }
-        });
-      }
-    }
-  };
-
-  const handleReset = () => {
-    if (onResetFilters) {
-      onResetFilters();
-    }
-  };
-
-  // Verificar si hay filtros activos para resaltar
-  const hasActiveFilters = 
-    selectedProjectId || 
-    dateRange.startDate || 
-    dateRange.endDate || 
-    billedStatus || 
-    workType || 
-    selectedUserId || 
-    amountRange.min || 
-    amountRange.max;
-
-  return (
-    <div className={`filter-section ${hasActiveFilters ? 'has-active-filters' : ''}`}>
-      <div className="filter-header">
-        <h3>Filtros</h3>
-        <div className="filter-actions">
-          <button 
-            type="button" 
-            className="filter-action-button"
-            onClick={toggleExpand}
-          >
-            {isExpanded ? 'Contraer filtros' : 'Expandir filtros'}
-          </button>
-          <button 
-            type="button" 
-            className="filter-action-button save-button"
-            onClick={handleSaveCurrentFilter}
-            disabled={!hasActiveFilters}
-          >
-            Guardar filtro
-          </button>
-          <button 
-            type="button" 
-            className="filter-action-button reset-button"
-            onClick={handleReset}
-            disabled={!hasActiveFilters}
-          >
-            Limpiar filtros
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros básicos siempre visibles */}
-      <div className="basic-filters">
-        <div className="filter-group">
-          <label>Proyecto: </label>
-          <select value={selectedProjectId} onChange={handleProjectSelect}>
-            <option value="">Todos los proyectos</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.id} - {project.client}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="date-range">
-          <div className="date-field">
-            <label>Fecha de inicio:</label>
-            <input
-              type="date"
-              name="startDate"
-              value={dateRange.startDate}
-              onChange={handleDateChange}
-            />
-          </div>
-          <div className="date-field">
-            <label>Fecha de fin:</label>
-            <input
-              type="date"
-              name="endDate"
-              value={dateRange.endDate}
-              onChange={handleDateChange}
-            />
-          </div>
-        </div>
-
-        <div className="filter-group">
-          <label>Facturación:</label>
-          <select value={billedStatus} onChange={handleBilledStatusSelect}>
-            <option value="">Todos</option>
-            <option value="true">Facturados</option>
-            <option value="false">No facturados</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Filtros avanzados (expandibles) */}
-      {isExpanded && (
-        <div className="advanced-filters">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label>Tipo de trabajo:</label>
-              <select value={workType || ""} onChange={handleWorkTypeSelect}>
-                <option value="">Todos los tipos</option>
-                <option value="normal">Trabajo normal</option>
-                <option value="extra">Trabajo extra</option>
-                <option value="extra_hourly">Extra por horas</option>
-                <option value="extra_budget">Extra con presupuesto</option>
-              </select>
-            </div>
-            
-            {users.length > 0 && (
-              <div className="filter-group">
-                <label>Usuario:</label>
-                <select value={selectedUserId || ""} onChange={handleUserSelect}>
-                  <option value="">Todos los usuarios</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-row">
-            <div className="filter-group amount-range">
-              <label>Rango de importes:</label>
-              <div className="amount-inputs">
-                <div className="amount-field">
-                  <input
-                    type="number"
-                    name="amountmin"
-                    placeholder="Mínimo €"
-                    value={amountRange.min}
-                    onChange={handleAmountChange}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <span className="amount-separator">a</span>
-                <div className="amount-field">
-                  <input
-                    type="number"
-                    name="amountmax"
-                    placeholder="Máximo €"
-                    value={amountRange.max}
-                    onChange={handleAmountChange}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="filter-row sorting-options">
-            <div className="filter-group">
-              <label>Ordenar por:</label>
-              <select value={sortField} onChange={handleSortChange}>
-                <option value="reportDate">Fecha</option>
-                <option value="invoicedAmount">Importe facturado</option>
-                <option value="totalCost">Coste total</option>
-                <option value="projectId">Proyecto</option>
-                <option value="isBilled">Estado de facturación</option>
-              </select>
-            </div>
-            <div className="filter-group">
-              <label>Dirección:</label>
-              <select value={sortDirection} onChange={handleSortDirectionChange}>
-                <option value="asc">Ascendente</option>
-                <option value="desc">Descendente</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Sección de filtros guardados */}
-          {savedFilters.length > 0 && (
-            <div className="saved-filters">
-              <h4>Filtros guardados</h4>
-              <div className="saved-filters-list">
-                {savedFilters.map((filter, index) => (
-                  <button
-                    key={index}
-                    className="saved-filter-button"
-                    onClick={() => onSaveFilter(filter, true)} // true indica que es para aplicar, no guardar
-                  >
-                    {filter.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Indicador de filtros activos */}
-      {hasActiveFilters && (
-        <div className="active-filters-indicator">
-          <p>Filtros activos: </p>
-          <div className="active-filter-tags">
-            {selectedProjectId && (
-              <span className="filter-tag">
-                Proyecto: {projects.find(p => p.id === selectedProjectId)?.client || selectedProjectId}
-              </span>
-            )}
-            {dateRange.startDate && (
-              <span className="filter-tag">
-                Desde: {new Date(dateRange.startDate).toLocaleDateString()}
-              </span>
-            )}
-            {dateRange.endDate && (
-              <span className="filter-tag">
-                Hasta: {new Date(dateRange.endDate).toLocaleDateString()}
-              </span>
-            )}
-            {billedStatus && (
-              <span className="filter-tag">
-                {billedStatus === "true" ? "Facturados" : "No facturados"}
-              </span>
-            )}
-            {workType && (
-              <span className="filter-tag">
-                Tipo: {workType === "normal" ? "Normal" : "Extra"}
-              </span>
-            )}
-            {selectedUserId && (
-              <span className="filter-tag">
-                Usuario: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}
-              </span>
-            )}
-            {(amountRange.min || amountRange.max) && (
-              <span className="filter-tag">
-                Importe: {amountRange.min ? formatCurrency(amountRange.min) : "0€"} - 
-                {amountRange.max ? formatCurrency(amountRange.max) : "sin límite"}
-              </span>
-            )}
-            {(sortField !== "reportDate" || sortDirection !== "desc") && (
-              <span className="filter-tag">
-                Ordenado por: {sortField} ({sortDirection === "asc" ? "↑" : "↓"})
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default React.memo(ReportFilters);
-</file>
-
 <file path="src/components/reports/ReportSummary.js">
 // src/components/reports/ReportSummary.js - Refactorizado para usar useCalculationsService
 import React from "react";
@@ -6582,364 +6497,6 @@ export const useReportActions = () => {
     clearMessages
   };
 };
-</file>
-
-<file path="src/hooks/reports/useReportFilters.js">
-// src/hooks/reports/useReportFilters.js - Hook mejorado con más capacidades
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { useLocalStorage } from "../useLocalStorage"; // Necesitarás crear este hook
-
-/**
- * Hook personalizado para la gestión de filtros de reportes avanzados
- * @param {Object} initialFilters - Filtros iniciales
- * @returns {Object} - Objeto con estados y funciones para gestionar filtros
- */
-export const useReportFilters = (initialFilters = {}) => {
-  // Estado para filtros principales
-  const [filters, setFilters] = useState({
-    projectId: "",
-    startDate: "",
-    endDate: "",
-    isBilled: undefined,
-    // Nuevos filtros
-    workType: "",
-    userId: "",
-    amountMin: "",
-    amountMax: "",
-    ...initialFilters
-  });
-
-  // Estado para opciones de ordenación
-  const [sortOptions, setSortOptions] = useState({
-    field: "reportDate",
-    direction: "desc"
-  });
-
-  // Persistir filtros guardados en localStorage
-  const [savedFilters, setSavedFilters] = useLocalStorage("reportFilters", []);
-
-  // Detectar cambios de URL (si implementamos rutas)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const projectId = params.get("projectId") || "";
-    const startDate = params.get("startDate") || "";
-    const endDate = params.get("endDate") || "";
-    const isBilled = params.get("isBilled");
-    
-    // Solo actualizar si hay parámetros en la URL
-    if (projectId || startDate || endDate || isBilled !== null) {
-      setFilters(prev => ({
-        ...prev,
-        projectId,
-        startDate,
-        endDate,
-        isBilled: isBilled === "true" ? true : isBilled === "false" ? false : undefined
-      }));
-    }
-  }, []);
-
-  // Actualizar un filtro específico
-  const updateFilter = useCallback((key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-
-    // Actualizar URL si es necesario (opcional)
-    if (window.history && window.history.pushState) {
-      const url = new URL(window.location);
-      if (value === "" || value === undefined) {
-        url.searchParams.delete(key);
-      } else {
-        url.searchParams.set(key, value);
-      }
-      window.history.pushState({}, '', url);
-    }
-  }, []);
-
-  // Actualizar múltiples filtros a la vez
-  const updateFilters = useCallback((newFilters) => {
-    setFilters(prev => ({
-      ...prev,
-      ...newFilters
-    }));
-  }, []);
-
-  // Actualizar opciones de ordenación
-  const updateSortOptions = useCallback(({ field, direction }) => {
-    setSortOptions({
-      field: field || sortOptions.field,
-      direction: direction || sortOptions.direction
-    });
-  }, [sortOptions]);
-
-  // Restablecer todos los filtros
-  const resetFilters = useCallback(() => {
-    setFilters({
-      projectId: "",
-      startDate: "",
-      endDate: "",
-      isBilled: undefined,
-      workType: "",
-      userId: "",
-      amountMin: "",
-      amountMax: ""
-    });
-    setSortOptions({
-      field: "reportDate",
-      direction: "desc"
-    });
-
-    // Limpiar URL si es necesario
-    if (window.history && window.history.pushState) {
-      const url = new URL(window.location);
-      url.search = "";
-      window.history.pushState({}, '', url);
-    }
-  }, []);
-
-  // Guardar un filtro con nombre
-  const saveFilter = useCallback((filterData) => {
-    // Si es para aplicar un filtro guardado
-    if (filterData.filter && filterData.apply) {
-      setFilters(filterData.filter);
-      setSortOptions(filterData.filter.sort || { field: "reportDate", direction: "desc" });
-      return;
-    }
-
-    // Si es para guardar un nuevo filtro
-    setSavedFilters(prev => {
-      // Verificar si ya existe un filtro con el mismo nombre
-      const existingIndex = prev.findIndex(f => f.name === filterData.name);
-      if (existingIndex >= 0) {
-        // Actualizar filtro existente
-        const updated = [...prev];
-        updated[existingIndex] = filterData;
-        return updated;
-      }
-      // Añadir nuevo filtro
-      return [...prev, filterData];
-    });
-  }, [setSavedFilters]);
-
-  // Eliminar un filtro guardado
-  const deleteFilter = useCallback((filterName) => {
-    setSavedFilters(prev => prev.filter(f => f.name !== filterName));
-  }, [setSavedFilters]);
-
-  // Filtrar una lista de reportes basándose en los filtros actuales
-  const filterReports = useCallback((reports) => {
-    if (!Array.isArray(reports)) return [];
-    
-    return reports.filter(report => {
-      // Filtro por proyecto
-      if (filters.projectId && report.projectId !== filters.projectId) {
-        return false;
-      }
-      
-      // Filtro por fecha de inicio
-      if (filters.startDate && report.reportDate) {
-        const startDate = new Date(filters.startDate);
-        const reportDate = new Date(report.reportDate);
-        if (reportDate < startDate) {
-          return false;
-        }
-      }
-      
-      // Filtro por fecha final
-      if (filters.endDate && report.reportDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999); // Incluir todo el día
-        const reportDate = new Date(report.reportDate);
-        if (reportDate > endDate) {
-          return false;
-        }
-      }
-      
-      // Filtro por estado de facturación
-      if (filters.isBilled !== undefined) {
-        if (filters.isBilled !== !!report.isBilled) {
-          return false;
-        }
-      }
-      
-      // Filtro por tipo de trabajo
-      if (filters.workType) {
-        if (filters.workType === 'normal' && report.isExtraWork) {
-          return false;
-        }
-        if (filters.workType === 'extra' && !report.isExtraWork) {
-          return false;
-        }
-        if (filters.workType === 'extra_hourly' && 
-            (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
-          return false;
-        }
-        if (filters.workType === 'extra_budget' && 
-            (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
-          return false;
-        }
-      }
-      
-      // Filtro por usuario
-      if (filters.userId && report.userId !== filters.userId) {
-        return false;
-      }
-      
-      // Filtro por rango de importes
-      if (filters.amountMin || filters.amountMax) {
-        const amount = 
-          report.invoicedAmount || 
-          report.extraBudgetAmount || 
-          report.totalCost || 
-          0;
-        
-        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
-          return false;
-        }
-        
-        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-  }, [filters]);
-
-  // Ordenar reportes según las opciones actuales
-  const sortReports = useCallback((reports) => {
-    if (!Array.isArray(reports) || reports.length === 0) return [];
-    
-    const { field, direction } = sortOptions;
-    const sortedReports = [...reports];
-    
-    sortedReports.sort((a, b) => {
-      let valueA, valueB;
-      
-      // Extraer valores según el campo
-      switch (field) {
-        case 'reportDate':
-          valueA = new Date(a.reportDate || 0).getTime();
-          valueB = new Date(b.reportDate || 0).getTime();
-          break;
-        case 'invoicedAmount':
-          valueA = a.invoicedAmount || 0;
-          valueB = b.invoicedAmount || 0;
-          break;
-        case 'totalCost':
-          valueA = a.totalCost || 0;
-          valueB = b.totalCost || 0;
-          break;
-        case 'projectId':
-          valueA = a.projectId || '';
-          valueB = b.projectId || '';
-          break;
-        case 'isBilled':
-          valueA = a.isBilled ? 1 : 0;
-          valueB = b.isBilled ? 1 : 0;
-          break;
-        default:
-          valueA = a[field] || 0;
-          valueB = b[field] || 0;
-      }
-      
-      // Ordenar según dirección
-      if (direction === 'asc') {
-        return valueA > valueB ? 1 : -1;
-      } else {
-        return valueA < valueB ? 1 : -1;
-      }
-    });
-    
-    return sortedReports;
-  }, [sortOptions]);
-  
-  // Procesar reportes - aplicar filtros y ordenación
-  const processReports = useCallback((reports) => {
-    if (!Array.isArray(reports)) return [];
-    
-    const filtered = filterReports(reports);
-    return sortReports(filtered);
-  }, [filterReports, sortReports]);
-
-  // Verifica si hay filtros activos
-  const hasActiveFilters = useMemo(() => {
-    return filters.projectId !== "" || 
-           filters.startDate !== "" || 
-           filters.endDate !== "" || 
-           filters.isBilled !== undefined ||
-           filters.workType !== "" ||
-           filters.userId !== "" ||
-           filters.amountMin !== "" ||
-           filters.amountMax !== "";
-  }, [filters]);
-
-  // Crear una cadena de texto que describa los filtros actuales (para uso en mensajes o títulos)
-  const filtersDescription = useMemo(() => {
-    const parts = [];
-    
-    if (filters.projectId) {
-      parts.push(`Proyecto: ${filters.projectId}`);
-    }
-    
-    if (filters.startDate) {
-      parts.push(`Desde: ${new Date(filters.startDate).toLocaleDateString()}`);
-    }
-    
-    if (filters.endDate) {
-      parts.push(`Hasta: ${new Date(filters.endDate).toLocaleDateString()}`);
-    }
-    
-    if (filters.isBilled !== undefined) {
-      parts.push(filters.isBilled ? 'Facturados' : 'No facturados');
-    }
-    
-    if (filters.workType) {
-      parts.push(`Tipo: ${filters.workType}`);
-    }
-    
-    if (filters.userId) {
-      parts.push(`Usuario: ${filters.userId}`);
-    }
-    
-    if (filters.amountMin || filters.amountMax) {
-      const min = filters.amountMin ? `${filters.amountMin}€` : '0€';
-      const max = filters.amountMax ? `${filters.amountMax}€` : 'sin límite';
-      parts.push(`Importe: ${min} - ${max}`);
-    }
-    
-    if (sortOptions.field !== 'reportDate' || sortOptions.direction !== 'desc') {
-      parts.push(`Ordenado por: ${sortOptions.field} (${sortOptions.direction === 'asc' ? '↑' : '↓'})`);
-    }
-    
-    return parts.join(' · ') || 'Sin filtros aplicados';
-  }, [filters, sortOptions]);
-
-  return {
-    // Estados
-    filters,
-    sortOptions,
-    savedFilters,
-    // Actualizadores
-    updateFilter,
-    updateFilters,
-    updateSortOptions,
-    resetFilters,
-    // Gestión de filtros guardados
-    saveFilter,
-    deleteFilter,
-    // Procesamiento de reportes
-    filterReports,
-    sortReports,
-    processReports,
-    // Metadatos
-    hasActiveFilters,
-    filtersDescription
-  };
-};
-
-export default useReportFilters;
 </file>
 
 <file path="src/hooks/useFormValidation.js">
@@ -9638,719 +9195,367 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
 export default React.memo(MaterialsForm);
 </file>
 
-<file path="src/components/reports/Reports.css">
-/* Estilos para la tabla de resumen */
-.summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-.summary-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.summary-table td.amount {
-  text-align: right;
-  font-weight: 500;
-}
-
-.summary-table tr.total-row {
-  border-top: 2px solid #ddd;
-  font-weight: bold;
-  color: #333;
-}
-
-.summary-table tr.total-row td {
-  padding-top: 12px;
-}
-
-/* Estilos para el botón PDF */
-.pdf-button-container {
-  margin-bottom: 20px;
-}
-
-.pdf-button {
-  display: block;
-  width: 100%;
-  padding: 12px 20px;
-  background-color: #8D432D;
-  color: white;
-  text-align: center;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.3s;
-}
-
-.pdf-button:hover {
-  background-color: #7A3624;
-}
-
-.pdf-button.error-button {
-  background-color: #e74c3c;
-}
-
-.pdf-disabled-message {
-  color: #666;
-  font-style: italic;
-  margin-bottom: 20px;
-  text-align: center;
-  padding: 10px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-}
-
-/* CREANDO CLASES ESPECÍFICAS PARA EVITAR CONFLICTOS CON APP.CSS */
-/* Estilo para el overlay del modal */
-.modal-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  z-index: 1000 !important;
-  animation: fadeIn 0.3s ease;
-}
-
-/* Estilo para nuestro modal personalizado (usando una clase diferente) */
-.custom-modal {
-  position: relative !important;
-  background-color: white !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
-  width: 90% !important;
-  max-width: 800px !important;
-  height: auto !important;
-  max-height: 80vh !important;
-  overflow-y: auto !important;
-  padding: 30px !important;
-  margin: 0 auto !important;
-  animation: slideIn 0.3s ease;
-  
-  /* Aseguramos que no herede los estilos problemáticos del .modal en App.css */
-  top: auto !important;
-  left: auto !important;
-  transform: none !important;
-}
-
-/* Mantenemos la clase edit-modal para aplicar estilos específicos del formulario de edición */
-.edit-modal {
-  scrollbar-width: thin;
-  scrollbar-color: #d4d4d4 #f5f5f5;
-}
-
-/* Para Chrome, Safari, y Edge: estilizar la barra de desplazamiento */
-.edit-modal::-webkit-scrollbar {
-  width: 8px;
-}
-
-.edit-modal::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-
-.edit-modal::-webkit-scrollbar-thumb {
-  background-color: #d4d4d4;
-  border-radius: 4px;
-}
-
-/* Título del modal */
-.custom-modal h3 {
-  margin-top: 0 !important;
-  margin-bottom: 20px !important;
-  border-bottom: 1px solid #ddd !important;
-  padding-bottom: 10px !important;
-  font-family: "Cormorant", serif !important;
-  color: #2c3e50 !important;
-  position: sticky !important;
-  top: 0 !important;
-  background-color: white !important;
-  z-index: 1 !important;
-  padding-top: 5px !important;
-}
-
-/* Botón de cerrar en la esquina superior derecha */
-.custom-modal .close-button {
-  position: absolute !important;
-  top: 20px !important;
-  right: 20px !important;
-  background: none !important;
-  border: none !important;
-  font-size: 24px !important;
-  cursor: pointer !important;
-  color: #7f8c8d !important;
-  padding: 5px !important;
-  transition: color 0.3s ease !important;
-  z-index: 2 !important;
-}
-
-.custom-modal .close-button:hover {
-  color: #e74c3c !important;
-}
-
-/* Ajustar botones del formulario */
-.custom-modal .form-actions {
-  display: flex !important;
-  justify-content: flex-end !important;
-  gap: 10px !important;
-  margin-top: 20px !important;
-  padding-top: 15px !important;
-  border-top: 1px solid #eee !important;
-  position: sticky !important;
-  bottom: 0 !important;
-  background-color: white !important;
-  padding-bottom: 5px !important;
-  z-index: 1 !important;
-}
-
-/* Estilo para prevenir el scroll en el body cuando el modal está abierto */
-.body-no-scroll {
-  overflow: hidden !important;
-}
-
-/* Animaciones */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideIn {
-  from { transform: translateY(-30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* Estilos para el interior del formulario */
-.edit-form {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 15px !important;
-  padding-bottom: 20px !important;
-}
-
-.edit-form label {
-  font-weight: 500 !important;
-  display: block !important;
-  margin-bottom: 5px !important;
-}
-
-.edit-form input,
-.edit-form textarea,
-.edit-form select {
-  padding: 10px !important;
-  border: 1px solid #ddd !important;
-  border-radius: 4px !important;
-  font-size: 14px !important;
-  width: 100% !important;
-}
-
-.edit-form textarea {
-  min-height: 100px !important;
-  resize: vertical !important;
-}
-
-.edit-form h4 {
-  margin-top: 15px !important;
-  margin-bottom: 8px !important;
-  color: #2c3e50 !important;
-  font-family: "Cormorant", serif !important;
-}
-
-/* Estilos responsivos para el modal */
-@media (max-width: 768px) {
-  .custom-modal {
-    width: 95% !important;
-    max-height: 85vh !important;
-    padding: 20px 15px !important;
-  }
-  
-  .custom-modal .form-actions {
-    flex-direction: column !important;
-  }
-  
-  .custom-modal .form-actions button {
-    width: 100% !important;
-  }
-}
-
-/* Estilos para controlar el tamaño de las imágenes en el modal de edición */
-
-/* Contenedor de fotos con grid responsivo */
-.photos-container {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-  margin-top: 15px !important;
-  width: 100% !important;
-}
-
-/* Contenedor individual de cada foto */
-.photo-container {
-  position: relative !important;
-  width: 100% !important;
-  height: 120px !important;
-  border: 1px solid #ddd !important;
-  border-radius: 4px !important;
-  overflow: hidden !important;
-}
-
-/* Estilos para las imágenes dentro de los contenedores */
-.photo-container img,
-.photo-thumbnail {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-  transition: transform 0.2s ease !important;
-}
-
-.photo-container:hover img {
-  transform: scale(1.05) !important;
-}
-
-/* Botón para eliminar foto */
-.remove-photo-button {
-  position: absolute !important;
-  top: 5px !important;
-  right: 5px !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 50% !important;
-  width: 25px !important;
-  height: 25px !important;
-  font-size: 14px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  opacity: 0.8 !important;
-  transition: opacity 0.3s ease !important;
-}
-
-.remove-photo-button:hover {
-  opacity: 1 !important;
-}
-
-/* Estilos para el contenedor de imágenes existentes */
-.existing-images {
-  margin-top: 20px !important;
-}
-
-/* Estilos para vista previa de imágenes */
-.preview-item {
-  position: relative !important;
-  width: 140px !important;
-  height: 120px !important;
-  border-radius: 4px !important;
-  overflow: hidden !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-  background-color: white !important;
-}
-
-.preview-item img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-/* Estilos responsivos para pantallas pequeñas */
-@media (max-width: 768px) {
-  .photos-container {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* Vista más limpia para muchas imágenes */
-.photos-editor {
-  margin-bottom: 20px !important;
-  padding-bottom: 10px !important;
-  border-bottom: 1px solid #eee !important;
-}
-
-/* Estilos específicos para el ImageUploader */
-.image-uploader .previews {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-  margin-top: 10px !important;
-  margin-bottom: 15px !important;
-}
-
-.image-uploader .existing-images .previews {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-  gap: 15px !important;
-}
-
-/* Añadir estos estilos a src/components/reports/Reports.css */
-
-/* Espaciado para los botones de acción en los partes diarios */
-.report-actions {
-  display: flex;
-  gap: 10px; /* Espacio entre los botones */
-  margin-top: 15px;
-}
-
-.report-actions button {
-  padding: 8px 15px;
-  min-width: 100px;
-  border: none;
-  border-radius: 0px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-}
-
-.report-actions .edit-button {
-  background-color: #8D432D;
-  color: white;
-}
-
-.report-actions .edit-button:hover {
-  background-color: #7A3624;
-}
-
-.report-actions .delete-button {
-  background-color: #e74c3c;
-  color: white;
-}
-
-.report-actions .delete-button:hover {
-  background-color: #c0392b;
-}
-
-/* Eliminar subrayado del enlace de descarga PDF */
-.pdf-button-container a {
-  text-decoration: none;
-}
-
-/* Estilos para mejorar el checkbox de facturación */
-.billing-checkbox-container {
-  margin: 10px 0;
-  padding: 8px 10px;
-  background-color: #f9f9f9;
-  border-radius: 5px;
-  border-left: 3px solid #8D432D;
-  display: flex;
-  align-items: center;
-}
-
-.billing-checkbox-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.billing-checkbox {
-  margin: 0;
-  margin-right: 8px;
-  width: 16px;
-  height: 16px;
-}
-
-.billing-checkbox-text {
-  font-weight: 500;
-  color: #2c3e50;
-}
-
-/* Estilos adicionales para los nuevos filtros en Reports.css */
-
-/* Mejoras al contenedor de filtros */
-.filter-section {
-  margin-bottom: 20px;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  border-left: 4px solid #8D432D;
-  transition: all 0.3s ease;
-}
-
-.filter-section.has-active-filters {
-  background-color: #f2f6fa;
-  border-left-color: #3498db;
-}
-
-/* Encabezado de filtros con botones de acción */
-.filter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.filter-header h3 {
-  margin: 0;
-  font-family: "Cormorant", serif;
-  color: #2c3e50;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.filter-action-button {
-  background-color: #f0f0f0;
-  color: #333;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.filter-action-button:hover {
-  background-color: #e0e0e0;
-}
-
-.filter-action-button.save-button {
-  background-color: #2ecc71;
-  color: white;
-}
-
-.filter-action-button.save-button:hover {
-  background-color: #27ae60;
-}
-
-.filter-action-button.reset-button {
-  background-color: #e74c3c;
-  color: white;
-}
-
-.filter-action-button.reset-button:hover {
-  background-color: #c0392b;
-}
-
-.filter-action-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Secciones de filtros */
-.basic-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.advanced-filters {
-  background-color: #f5f5f5;
-  padding: 15px;
-  border-radius: 6px;
-  margin-top: 10px;
-  border-left: 3px solid #3498db;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-/* Grupo de filtros específicos */
-.filter-group {
-  flex: 1;
-  min-width: 200px;
-}
-
-.filter-group label {
-  display: block;
-  margin-bottom: 5px;
-  color: #7f8c8d;
-  font-size: 14px;
-}
-
-.filter-group select,
-.filter-group input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-/* Filtro de rango de importes */
-.amount-range {
-  display: flex;
-  flex-direction: column;
-}
-
-.amount-inputs {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.amount-field {
-  flex: 1;
-}
-
-.amount-separator {
-  font-size: 14px;
-  color: #7f8c8d;
-}
-
-/* Opciones de ordenación */
-.sorting-options {
-  background-color: #f0f8ff;
-  padding: 10px;
-  border-radius: 6px;
-}
-
-/* Filtros guardados */
-.saved-filters {
-  margin-top: 20px;
-}
-
-.saved-filters h4 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-family: "Cormorant", serif;
-  font-size: 16px;
-  color: #2c3e50;
-}
-
-.saved-filters-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.saved-filter-button {
-  background-color: #3498db;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.saved-filter-button:hover {
-  background-color: #2980b9;
-}
-
-/* Indicador de filtros activos */
-.active-filters-indicator {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: #f0f9ff;
-  border-radius: 6px;
-  border-left: 3px solid #3498db;
-}
-
-.active-filters-indicator p {
-  margin: 0 0 5px 0;
-  font-weight: 500;
-  color: #2c3e50;
-}
-
-.active-filter-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.filter-tag {
-  background-color: #e1f0fa;
-  color: #2980b9;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  display: inline-block;
-}
-
-/* Resumen de filtros */
-.filters-summary {
-  margin-bottom: 15px;
-  font-style: italic;
-  color: #7f8c8d;
-}
-
-/* Contenedor para el botón de cargar más */
-.load-more-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-.load-more-button {
-  background-color: #8D432D;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.load-more-button:hover {
-  background-color: #7A3624;
-}
-
-.load-more-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-/* Adaptaciones para móviles */
-@media (max-width: 768px) {
-  .filter-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .filter-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .basic-filters,
-  .filter-row {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .filter-group {
-    width: 100%;
-  }
-  
-  .amount-inputs {
-    flex-direction: column;
-    gap: 5px;
-    align-items: stretch;
-  }
-  
-  .amount-separator {
-    display: none;
-  }
-  
-  .active-filter-tags {
-    flex-direction: column;
-    gap: 4px;
-  }
-}
+<file path="src/components/reports/ReportFilters.js">
+// src/components/reports/ReportFilters.js - Componente mejorado con más filtros
+import React, { useCallback, useState } from "react";
+import { formatCurrency } from "../../utils/calculationUtils";
+
+const ReportFilters = ({
+  projects,
+  selectedProjectId,
+  dateRange,
+  onProjectChange,
+  onDateRangeChange,
+  onBilledStatusChange,
+  billedStatus,
+  // Nuevos props para filtros adicionales
+  onWorkTypeChange,
+  workType,
+  onUserChange,
+  selectedUserId,
+  users = [], // Lista de usuarios (opcional)
+  onAmountRangeChange,
+  amountRange = { min: "", max: "" },
+  // Ordenación
+  onSortChange,
+  sortField = "reportDate",
+  sortDirection = "desc",
+  // Props para UI mejorada
+  onSaveFilter,
+  onResetFilters,
+  savedFilters = []
+}) => {
+  // Estado para controlar panel de filtros expandible
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Manejadores existentes
+  const handleProjectSelect = useCallback((e) => {
+    onProjectChange(e.target.value);
+  }, [onProjectChange]);
+
+  const handleDateChange = useCallback((e) => {
+    const { name, value } = e.target;
+    onDateRangeChange({
+      ...dateRange,
+      [name]: value
+    });
+  }, [dateRange, onDateRangeChange]);
+
+  const handleBilledStatusSelect = useCallback((e) => {
+    onBilledStatusChange(e.target.value);
+  }, [onBilledStatusChange]);
+
+  // Nuevos manejadores
+  const handleWorkTypeSelect = useCallback((e) => {
+    if (onWorkTypeChange) {
+      onWorkTypeChange(e.target.value);
+    }
+  }, [onWorkTypeChange]);
+
+  const handleUserSelect = useCallback((e) => {
+    if (onUserChange) {
+      onUserChange(e.target.value);
+    }
+  }, [onUserChange]);
+
+  const handleAmountChange = useCallback((e) => {
+    const { name, value } = e.target;
+    if (onAmountRangeChange) {
+      onAmountRangeChange({
+        ...amountRange,
+        [name.replace("amount", "")]: value
+      });
+    }
+  }, [amountRange, onAmountRangeChange]);
+
+  const handleSortChange = useCallback((e) => {
+    if (onSortChange) {
+      onSortChange({
+        field: e.target.value,
+        direction: sortDirection
+      });
+    }
+  }, [onSortChange, sortDirection]);
+
+  const handleSortDirectionChange = useCallback((e) => {
+    if (onSortChange) {
+      onSortChange({
+        field: sortField,
+        direction: e.target.value
+      });
+    }
+  }, [onSortChange, sortField]);
+
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+
+  const handleSaveCurrentFilter = () => {
+    if (onSaveFilter) {
+      const filterName = prompt("Nombre para guardar este filtro:");
+      if (filterName) {
+        onSaveFilter({
+          name: filterName,
+          filter: {
+            projectId: selectedProjectId,
+            dateRange,
+            billedStatus,
+            workType,
+            selectedUserId,
+            amountRange,
+            sort: { field: sortField, direction: sortDirection }
+          }
+        });
+      }
+    }
+  };
+
+  const handleReset = () => {
+    if (onResetFilters) {
+      onResetFilters();
+    }
+  };
+
+  // Verificar si hay filtros activos para resaltar
+  const hasActiveFilters = 
+    selectedProjectId || 
+    dateRange.startDate || 
+    dateRange.endDate || 
+    billedStatus || 
+    workType || 
+    selectedUserId || 
+    amountRange.min || 
+    amountRange.max;
+
+  return (
+    <div className={`filter-section ${hasActiveFilters ? 'has-active-filters' : ''}`}>
+      <div className="filter-header">
+        <h3>Filtros</h3>
+        <div className="filter-actions">
+          <button 
+            type="button" 
+            className="filter-action-button"
+            onClick={toggleExpand}
+          >
+            {isExpanded ? 'Contraer filtros' : 'Expandir filtros'}
+          </button>
+          <button 
+            type="button" 
+            className="filter-action-button save-button"
+            onClick={handleSaveCurrentFilter}
+            disabled={!hasActiveFilters}
+          >
+            Guardar filtro
+          </button>
+          <button 
+            type="button" 
+            className="filter-action-button reset-button"
+            onClick={handleReset}
+            disabled={!hasActiveFilters}
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros básicos siempre visibles */}
+      <div className="basic-filters">
+        <div className="filter-group">
+          <label>Proyecto: </label>
+          <select value={selectedProjectId} onChange={handleProjectSelect}>
+            <option value="">Todos los proyectos</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.id} - {project.client}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="date-range">
+          <div className="date-field">
+            <label>Fecha de inicio:</label>
+            <input
+              type="date"
+              name="startDate"
+              value={dateRange.startDate}
+              onChange={handleDateChange}
+            />
+          </div>
+          <div className="date-field">
+            <label>Fecha de fin:</label>
+            <input
+              type="date"
+              name="endDate"
+              value={dateRange.endDate}
+              onChange={handleDateChange}
+            />
+          </div>
+        </div>
+
+        <div className="filter-group">
+          <label>Facturación:</label>
+          <select value={billedStatus} onChange={handleBilledStatusSelect}>
+            <option value="">Todos</option>
+            <option value="true">Facturados</option>
+            <option value="false">No facturados</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Filtros avanzados (expandibles) */}
+      {isExpanded && (
+        <div className="advanced-filters">
+          <div className="filter-row">
+            <div className="filter-group">
+              <label>Tipo de trabajo:</label>
+              <select value={workType || ""} onChange={handleWorkTypeSelect}>
+                <option value="">Todos los tipos</option>
+                <option value="normal">Trabajo normal</option>
+                <option value="extra">Trabajo extra</option>
+                <option value="extra_hourly">Extra por horas</option>
+                <option value="extra_budget">Extra con presupuesto</option>
+              </select>
+            </div>
+            
+            {users.length > 0 && (
+              <div className="filter-group">
+                <label>Usuario:</label>
+                <select value={selectedUserId || ""} onChange={handleUserSelect}>
+                  <option value="">Todos los usuarios</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="filter-row">
+            <div className="filter-group amount-range">
+              <label>Rango de importes:</label>
+              <div className="amount-inputs">
+                <div className="amount-field">
+                  <input
+                    type="number"
+                    name="amountmin"
+                    placeholder="Mínimo €"
+                    value={amountRange.min}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <span className="amount-separator">a</span>
+                <div className="amount-field">
+                  <input
+                    type="number"
+                    name="amountmax"
+                    placeholder="Máximo €"
+                    value={amountRange.max}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="filter-row sorting-options">
+            <div className="filter-group">
+              <label>Ordenar por:</label>
+              <select value={sortField} onChange={handleSortChange}>
+                <option value="reportDate">Fecha</option>
+                <option value="invoicedAmount">Importe facturado</option>
+                <option value="totalCost">Coste total</option>
+                <option value="projectId">Proyecto</option>
+                <option value="isBilled">Estado de facturación</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label>Dirección:</label>
+              <select value={sortDirection} onChange={handleSortDirectionChange}>
+                <option value="asc">Ascendente</option>
+                <option value="desc">Descendente</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sección de filtros guardados */}
+          {savedFilters.length > 0 && (
+            <div className="saved-filters">
+              <h4>Filtros guardados</h4>
+              <div className="saved-filters-list">
+                {savedFilters.map((filter, index) => (
+                  <button
+                    key={index}
+                    className="saved-filter-button"
+                    onClick={() => onSaveFilter(filter, true)} // true indica que es para aplicar, no guardar
+                  >
+                    {filter.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Indicador de filtros activos */}
+      {hasActiveFilters && (
+        <div className="active-filters-indicator">
+          <p>Filtros activos: </p>
+          <div className="active-filter-tags">
+            {selectedProjectId && (
+              <span className="filter-tag">
+                Proyecto: {projects.find(p => p.id === selectedProjectId)?.client || selectedProjectId}
+              </span>
+            )}
+            {dateRange.startDate && (
+              <span className="filter-tag">
+                Desde: {new Date(dateRange.startDate).toLocaleDateString()}
+              </span>
+            )}
+            {dateRange.endDate && (
+              <span className="filter-tag">
+                Hasta: {new Date(dateRange.endDate).toLocaleDateString()}
+              </span>
+            )}
+            {billedStatus && (
+              <span className="filter-tag">
+                {billedStatus === "true" ? "Facturados" : "No facturados"}
+              </span>
+            )}
+            {workType && (
+              <span className="filter-tag">
+                Tipo: {workType === "normal" ? "Normal" : "Extra"}
+              </span>
+            )}
+            {selectedUserId && (
+              <span className="filter-tag">
+                Usuario: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}
+              </span>
+            )}
+            {(amountRange.min || amountRange.max) && (
+              <span className="filter-tag">
+                Importe: {amountRange.min ? formatCurrency(amountRange.min) : "0€"} - 
+                {amountRange.max ? formatCurrency(amountRange.max) : "sin límite"}
+              </span>
+            )}
+            {(sortField !== "reportDate" || sortDirection !== "desc") && (
+              <span className="filter-tag">
+                Ordenado por: {sortField} ({sortDirection === "asc" ? "↑" : "↓"})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default React.memo(ReportFilters);
 </file>
 
 <file path="src/components/WorkPerformedForm.js">
@@ -10408,6 +9613,364 @@ const WorkPerformedForm = ({ workPerformed, onWorkPerformedChange, projectId, re
 };
 
 export default React.memo(WorkPerformedForm);
+</file>
+
+<file path="src/hooks/reports/useReportFilters.js">
+// src/hooks/reports/useReportFilters.js - Hook mejorado con más capacidades
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useLocalStorage } from "../useLocalStorage"; // Necesitarás crear este hook
+
+/**
+ * Hook personalizado para la gestión de filtros de reportes avanzados
+ * @param {Object} initialFilters - Filtros iniciales
+ * @returns {Object} - Objeto con estados y funciones para gestionar filtros
+ */
+export const useReportFilters = (initialFilters = {}) => {
+  // Estado para filtros principales
+  const [filters, setFilters] = useState({
+    projectId: "",
+    startDate: "",
+    endDate: "",
+    isBilled: undefined,
+    // Nuevos filtros
+    workType: "",
+    userId: "",
+    amountMin: "",
+    amountMax: "",
+    ...initialFilters
+  });
+
+  // Estado para opciones de ordenación
+  const [sortOptions, setSortOptions] = useState({
+    field: "reportDate",
+    direction: "desc"
+  });
+
+  // Persistir filtros guardados en localStorage
+  const [savedFilters, setSavedFilters] = useLocalStorage("reportFilters", []);
+
+  // Detectar cambios de URL (si implementamos rutas)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get("projectId") || "";
+    const startDate = params.get("startDate") || "";
+    const endDate = params.get("endDate") || "";
+    const isBilled = params.get("isBilled");
+    
+    // Solo actualizar si hay parámetros en la URL
+    if (projectId || startDate || endDate || isBilled !== null) {
+      setFilters(prev => ({
+        ...prev,
+        projectId,
+        startDate,
+        endDate,
+        isBilled: isBilled === "true" ? true : isBilled === "false" ? false : undefined
+      }));
+    }
+  }, []);
+
+  // Actualizar un filtro específico
+  const updateFilter = useCallback((key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+
+    // Actualizar URL si es necesario (opcional)
+    if (window.history && window.history.pushState) {
+      const url = new URL(window.location);
+      if (value === "" || value === undefined) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, value);
+      }
+      window.history.pushState({}, '', url);
+    }
+  }, []);
+
+  // Actualizar múltiples filtros a la vez
+  const updateFilters = useCallback((newFilters) => {
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters
+    }));
+  }, []);
+
+  // Actualizar opciones de ordenación
+  const updateSortOptions = useCallback(({ field, direction }) => {
+    setSortOptions({
+      field: field || sortOptions.field,
+      direction: direction || sortOptions.direction
+    });
+  }, [sortOptions]);
+
+  // Restablecer todos los filtros
+  const resetFilters = useCallback(() => {
+    setFilters({
+      projectId: "",
+      startDate: "",
+      endDate: "",
+      isBilled: undefined,
+      workType: "",
+      userId: "",
+      amountMin: "",
+      amountMax: ""
+    });
+    setSortOptions({
+      field: "reportDate",
+      direction: "desc"
+    });
+
+    // Limpiar URL si es necesario
+    if (window.history && window.history.pushState) {
+      const url = new URL(window.location);
+      url.search = "";
+      window.history.pushState({}, '', url);
+    }
+  }, []);
+
+  // Guardar un filtro con nombre
+  const saveFilter = useCallback((filterData) => {
+    // Si es para aplicar un filtro guardado
+    if (filterData.filter && filterData.apply) {
+      setFilters(filterData.filter);
+      setSortOptions(filterData.filter.sort || { field: "reportDate", direction: "desc" });
+      return;
+    }
+
+    // Si es para guardar un nuevo filtro
+    setSavedFilters(prev => {
+      // Verificar si ya existe un filtro con el mismo nombre
+      const existingIndex = prev.findIndex(f => f.name === filterData.name);
+      if (existingIndex >= 0) {
+        // Actualizar filtro existente
+        const updated = [...prev];
+        updated[existingIndex] = filterData;
+        return updated;
+      }
+      // Añadir nuevo filtro
+      return [...prev, filterData];
+    });
+  }, [setSavedFilters]);
+
+  // Eliminar un filtro guardado
+  const deleteFilter = useCallback((filterName) => {
+    setSavedFilters(prev => prev.filter(f => f.name !== filterName));
+  }, [setSavedFilters]);
+
+  // Filtrar una lista de reportes basándose en los filtros actuales
+  const filterReports = useCallback((reports) => {
+    if (!Array.isArray(reports)) return [];
+    
+    return reports.filter(report => {
+      // Filtro por proyecto
+      if (filters.projectId && report.projectId !== filters.projectId) {
+        return false;
+      }
+      
+      // Filtro por fecha de inicio
+      if (filters.startDate && report.reportDate) {
+        const startDate = new Date(filters.startDate);
+        const reportDate = new Date(report.reportDate);
+        if (reportDate < startDate) {
+          return false;
+        }
+      }
+      
+      // Filtro por fecha final
+      if (filters.endDate && report.reportDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999); // Incluir todo el día
+        const reportDate = new Date(report.reportDate);
+        if (reportDate > endDate) {
+          return false;
+        }
+      }
+      
+      // Filtro por estado de facturación
+      if (filters.isBilled !== undefined) {
+        if (filters.isBilled !== !!report.isBilled) {
+          return false;
+        }
+      }
+      
+      // Filtro por tipo de trabajo
+      if (filters.workType) {
+        if (filters.workType === 'normal' && report.isExtraWork) {
+          return false;
+        }
+        if (filters.workType === 'extra' && !report.isExtraWork) {
+          return false;
+        }
+        if (filters.workType === 'extra_hourly' && 
+            (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
+          return false;
+        }
+        if (filters.workType === 'extra_budget' && 
+            (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
+          return false;
+        }
+      }
+      
+      // Filtro por usuario
+      if (filters.userId && report.userId !== filters.userId) {
+        return false;
+      }
+      
+      // Filtro por rango de importes
+      if (filters.amountMin || filters.amountMax) {
+        const amount = 
+          report.invoicedAmount || 
+          report.extraBudgetAmount || 
+          report.totalCost || 
+          0;
+        
+        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
+          return false;
+        }
+        
+        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [filters]);
+
+  // Ordenar reportes según las opciones actuales
+  const sortReports = useCallback((reports) => {
+    if (!Array.isArray(reports) || reports.length === 0) return [];
+    
+    const { field, direction } = sortOptions;
+    const sortedReports = [...reports];
+    
+    sortedReports.sort((a, b) => {
+      let valueA, valueB;
+      
+      // Extraer valores según el campo
+      switch (field) {
+        case 'reportDate':
+          valueA = new Date(a.reportDate || 0).getTime();
+          valueB = new Date(b.reportDate || 0).getTime();
+          break;
+        case 'invoicedAmount':
+          valueA = a.invoicedAmount || 0;
+          valueB = b.invoicedAmount || 0;
+          break;
+        case 'totalCost':
+          valueA = a.totalCost || 0;
+          valueB = b.totalCost || 0;
+          break;
+        case 'projectId':
+          valueA = a.projectId || '';
+          valueB = b.projectId || '';
+          break;
+        case 'isBilled':
+          valueA = a.isBilled ? 1 : 0;
+          valueB = b.isBilled ? 1 : 0;
+          break;
+        default:
+          valueA = a[field] || 0;
+          valueB = b[field] || 0;
+      }
+      
+      // Ordenar según dirección
+      if (direction === 'asc') {
+        return valueA > valueB ? 1 : -1;
+      } else {
+        return valueA < valueB ? 1 : -1;
+      }
+    });
+    
+    return sortedReports;
+  }, [sortOptions]);
+  
+  // Procesar reportes - aplicar filtros y ordenación
+  const processReports = useCallback((reports) => {
+    if (!Array.isArray(reports)) return [];
+    
+    const filtered = filterReports(reports);
+    return sortReports(filtered);
+  }, [filterReports, sortReports]);
+
+  // Verifica si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return filters.projectId !== "" || 
+           filters.startDate !== "" || 
+           filters.endDate !== "" || 
+           filters.isBilled !== undefined ||
+           filters.workType !== "" ||
+           filters.userId !== "" ||
+           filters.amountMin !== "" ||
+           filters.amountMax !== "";
+  }, [filters]);
+
+  // Crear una cadena de texto que describa los filtros actuales (para uso en mensajes o títulos)
+  const filtersDescription = useMemo(() => {
+    const parts = [];
+    
+    if (filters.projectId) {
+      parts.push(`Proyecto: ${filters.projectId}`);
+    }
+    
+    if (filters.startDate) {
+      parts.push(`Desde: ${new Date(filters.startDate).toLocaleDateString()}`);
+    }
+    
+    if (filters.endDate) {
+      parts.push(`Hasta: ${new Date(filters.endDate).toLocaleDateString()}`);
+    }
+    
+    if (filters.isBilled !== undefined) {
+      parts.push(filters.isBilled ? 'Facturados' : 'No facturados');
+    }
+    
+    if (filters.workType) {
+      parts.push(`Tipo: ${filters.workType}`);
+    }
+    
+    if (filters.userId) {
+      parts.push(`Usuario: ${filters.userId}`);
+    }
+    
+    if (filters.amountMin || filters.amountMax) {
+      const min = filters.amountMin ? `${filters.amountMin}€` : '0€';
+      const max = filters.amountMax ? `${filters.amountMax}€` : 'sin límite';
+      parts.push(`Importe: ${min} - ${max}`);
+    }
+    
+    if (sortOptions.field !== 'reportDate' || sortOptions.direction !== 'desc') {
+      parts.push(`Ordenado por: ${sortOptions.field} (${sortOptions.direction === 'asc' ? '↑' : '↓'})`);
+    }
+    
+    return parts.join(' · ') || 'Sin filtros aplicados';
+  }, [filters, sortOptions]);
+
+  return {
+    // Estados
+    filters,
+    sortOptions,
+    savedFilters,
+    // Actualizadores
+    updateFilter,
+    updateFilters,
+    updateSortOptions,
+    resetFilters,
+    // Gestión de filtros guardados
+    saveFilter,
+    deleteFilter,
+    // Procesamiento de reportes
+    filterReports,
+    sortReports,
+    processReports,
+    // Metadatos
+    hasActiveFilters,
+    filtersDescription
+  };
+};
+
+export default useReportFilters;
 </file>
 
 <file path="package.json">
@@ -11620,6 +11183,721 @@ function renderPhotos(photos = []) {
 }
 
 export default React.memo(ReportItem);
+</file>
+
+<file path="src/components/reports/Reports.css">
+/* Estilos para la tabla de resumen */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.summary-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-table td.amount {
+  text-align: right;
+  font-weight: 500;
+}
+
+.summary-table tr.total-row {
+  border-top: 2px solid #ddd;
+  font-weight: bold;
+  color: #333;
+}
+
+.summary-table tr.total-row td {
+  padding-top: 12px;
+}
+
+/* Estilos para el botón PDF */
+.pdf-button-container {
+  margin-bottom: 20px;
+}
+
+.pdf-button {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background-color: #8D432D;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.pdf-button:hover {
+  background-color: #7A3624;
+}
+
+.pdf-button.error-button {
+  background-color: #e74c3c;
+}
+
+.pdf-disabled-message {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 20px;
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+/* CREANDO CLASES ESPECÍFICAS PARA EVITAR CONFLICTOS CON APP.CSS */
+/* Estilo para el overlay del modal */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 1000 !important;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Estilo para nuestro modal personalizado (usando una clase diferente) */
+.custom-modal {
+  position: relative !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
+  width: 90% !important;
+  max-width: 800px !important;
+  height: auto !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  padding: 30px !important;
+  margin: 0 auto !important;
+  animation: slideIn 0.3s ease;
+  
+  /* Aseguramos que no herede los estilos problemáticos del .modal en App.css */
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+}
+
+/* Mantenemos la clase edit-modal para aplicar estilos específicos del formulario de edición */
+.edit-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 #f5f5f5;
+}
+
+/* Para Chrome, Safari, y Edge: estilizar la barra de desplazamiento */
+.edit-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.edit-modal::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.edit-modal::-webkit-scrollbar-thumb {
+  background-color: #d4d4d4;
+  border-radius: 4px;
+}
+
+/* Título del modal */
+.custom-modal h3 {
+  margin-top: 0 !important;
+  margin-bottom: 20px !important;
+  border-bottom: 1px solid #ddd !important;
+  padding-bottom: 10px !important;
+  font-family: "Cormorant", serif !important;
+  color: #2c3e50 !important;
+  position: sticky !important;
+  top: 0 !important;
+  background-color: white !important;
+  z-index: 1 !important;
+  padding-top: 5px !important;
+}
+
+/* Botón de cerrar en la esquina superior derecha */
+.custom-modal .close-button {
+  position: absolute !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: none !important;
+  border: none !important;
+  font-size: 24px !important;
+  cursor: pointer !important;
+  color: #7f8c8d !important;
+  padding: 5px !important;
+  transition: color 0.3s ease !important;
+  z-index: 2 !important;
+}
+
+.custom-modal .close-button:hover {
+  color: #e74c3c !important;
+}
+
+/* Ajustar botones del formulario */
+.custom-modal .form-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  margin-top: 20px !important;
+  padding-top: 15px !important;
+  border-top: 1px solid #eee !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  background-color: white !important;
+  padding-bottom: 5px !important;
+  z-index: 1 !important;
+}
+
+/* Estilo para prevenir el scroll en el body cuando el modal está abierto */
+.body-no-scroll {
+  overflow: hidden !important;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Estilos para el interior del formulario */
+.edit-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  padding-bottom: 20px !important;
+}
+
+.edit-form label {
+  font-weight: 500 !important;
+  display: block !important;
+  margin-bottom: 5px !important;
+}
+
+.edit-form input,
+.edit-form textarea,
+.edit-form select {
+  padding: 10px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  width: 100% !important;
+}
+
+.edit-form textarea {
+  min-height: 100px !important;
+  resize: vertical !important;
+}
+
+.edit-form h4 {
+  margin-top: 15px !important;
+  margin-bottom: 8px !important;
+  color: #2c3e50 !important;
+  font-family: "Cormorant", serif !important;
+}
+
+/* Estilos responsivos para el modal */
+@media (max-width: 768px) {
+  .custom-modal {
+    width: 95% !important;
+    max-height: 85vh !important;
+    padding: 20px 15px !important;
+  }
+  
+  .custom-modal .form-actions {
+    flex-direction: column !important;
+  }
+  
+  .custom-modal .form-actions button {
+    width: 100% !important;
+  }
+}
+
+/* Estilos para controlar el tamaño de las imágenes en el modal de edición */
+
+/* Contenedor de fotos con grid responsivo */
+.photos-container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 15px !important;
+  width: 100% !important;
+}
+
+/* Contenedor individual de cada foto */
+.photo-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 120px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+}
+
+/* Estilos para las imágenes dentro de los contenedores */
+.photo-container img,
+.photo-thumbnail {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.2s ease !important;
+}
+
+.photo-container:hover img {
+  transform: scale(1.05) !important;
+}
+
+/* Botón para eliminar foto */
+.remove-photo-button {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 25px !important;
+  height: 25px !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.3s ease !important;
+}
+
+.remove-photo-button:hover {
+  opacity: 1 !important;
+}
+
+/* Estilos para el contenedor de imágenes existentes */
+.existing-images {
+  margin-top: 20px !important;
+}
+
+/* Estilos para vista previa de imágenes */
+.preview-item {
+  position: relative !important;
+  width: 140px !important;
+  height: 120px !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  background-color: white !important;
+}
+
+.preview-item img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* Estilos responsivos para pantallas pequeñas */
+@media (max-width: 768px) {
+  .photos-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Vista más limpia para muchas imágenes */
+.photos-editor {
+  margin-bottom: 20px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid #eee !important;
+}
+
+/* Estilos específicos para el ImageUploader */
+.image-uploader .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+  margin-top: 10px !important;
+  margin-bottom: 15px !important;
+}
+
+.image-uploader .existing-images .previews {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 15px !important;
+}
+
+/* Añadir estos estilos a src/components/reports/Reports.css */
+
+/* Espaciado para los botones de acción en los partes diarios */
+.report-actions {
+  display: flex;
+  gap: 10px; /* Espacio entre los botones */
+  margin-top: 15px;
+}
+
+.report-actions button {
+  padding: 8px 15px;
+  min-width: 100px;
+  border: none;
+  border-radius: 0px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.report-actions .edit-button {
+  background-color: #8D432D;
+  color: white;
+}
+
+.report-actions .edit-button:hover {
+  background-color: #7A3624;
+}
+
+.report-actions .delete-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.report-actions .delete-button:hover {
+  background-color: #c0392b;
+}
+
+/* Eliminar subrayado del enlace de descarga PDF */
+.pdf-button-container a {
+  text-decoration: none;
+}
+
+/* Estilos para mejorar el checkbox de facturación */
+.billing-checkbox-container {
+  margin: 10px 0;
+  padding: 8px 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  border-left: 3px solid #8D432D;
+  display: flex;
+  align-items: center;
+}
+
+.billing-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.billing-checkbox {
+  margin: 0;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.billing-checkbox-text {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+/* Estilos adicionales para los nuevos filtros en Reports.css */
+
+/* Mejoras al contenedor de filtros */
+.filter-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #8D432D;
+  transition: all 0.3s ease;
+}
+
+.filter-section.has-active-filters {
+  background-color: #f2f6fa;
+  border-left-color: #3498db;
+}
+
+/* Encabezado de filtros con botones de acción */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-family: "Cormorant", serif;
+  color: #2c3e50;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-action-button {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-action-button:hover {
+  background-color: #e0e0e0;
+}
+
+.filter-action-button.save-button {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.filter-action-button.save-button:hover {
+  background-color: #27ae60;
+}
+
+.filter-action-button.reset-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.filter-action-button.reset-button:hover {
+  background-color: #c0392b;
+}
+
+.filter-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secciones de filtros */
+.basic-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.advanced-filters {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 10px;
+  border-left: 3px solid #3498db;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* Grupo de filtros específicos */
+.filter-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.filter-group select,
+.filter-group input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Filtro de rango de importes */
+.amount-range {
+  display: flex;
+  flex-direction: column;
+}
+
+.amount-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amount-field {
+  flex: 1;
+}
+
+.amount-separator {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+/* Opciones de ordenación */
+.sorting-options {
+  background-color: #f0f8ff;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+/* Filtros guardados */
+.saved-filters {
+  margin-top: 20px;
+}
+
+.saved-filters h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-family: "Cormorant", serif;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.saved-filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-filter-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-filter-button:hover {
+  background-color: #2980b9;
+}
+
+/* Indicador de filtros activos */
+.active-filters-indicator {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  border-left: 3px solid #3498db;
+}
+
+.active-filters-indicator p {
+  margin: 0 0 5px 0;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.active-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-tag {
+  background-color: #e1f0fa;
+  color: #2980b9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: inline-block;
+}
+
+/* Resumen de filtros */
+.filters-summary {
+  margin-bottom: 15px;
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+/* Contenedor para el botón de cargar más */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.load-more-button {
+  background-color: #8D432D;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-button:hover {
+  background-color: #7A3624;
+}
+
+.load-more-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Adaptaciones para móviles */
+@media (max-width: 768px) {
+  .filter-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .filter-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .basic-filters,
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .amount-inputs {
+    flex-direction: column;
+    gap: 5px;
+    align-items: stretch;
+  }
+  
+  .amount-separator {
+    display: none;
+  }
+  
+  .active-filter-tags {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
 </file>
 
 <file path="src/components/reports/ReportsViewer.js">

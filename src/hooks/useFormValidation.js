@@ -10,99 +10,117 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValid, setIsValid] = useState(false);
 
-  // Validar el formulario completo
+  // La definición de validateFormData con useCallback sigue siendo útil
+  // si necesitas llamar a esta función desde otros lugares (ej. manualmente).
   const validateFormData = useCallback(() => {
-  // Ensure we handle potential undefined returns
-  const result = validateForm(values, validationSchema, contextData) || { errors: {}, isValid: false };
-  setErrors(result.errors || {});
-  setIsValid(result.isValid || false);
-  return result;
-}, [values, validationSchema, contextData]);
+    // console.log("Running validateFormData with values:", values); // Log para depurar
+    const result = validateForm(values, validationSchema, contextData) || { errors: {}, isValid: false };
+    // Solo actualiza el estado si los errores o la validez realmente cambian
+    // Esto puede ayudar a prevenir re-renderizados innecesarios, aunque el problema principal suele ser el trigger del useEffect
+    setErrors(prevErrors => {
+        // Comparación superficial, podría necesitarse una comparación profunda si los errores son complejos
+        if (JSON.stringify(prevErrors) !== JSON.stringify(result.errors || {})) {
+            return result.errors || {};
+        }
+        return prevErrors;
+    });
+    setIsValid(prevIsValid => {
+        if (prevIsValid !== (result.isValid || false)) {
+            return result.isValid || false;
+        }
+        return prevIsValid;
+    });
+    return result;
+  }, [values, validationSchema, contextData]);
 
-  // Efecto para validar cuando cambian los valores
+  // *** CAMBIO PRINCIPAL AQUÍ ***
+  // Hacer que el efecto dependa directamente de los datos y las reglas,
+  // no de la función `validateFormData` memoizada.
   useEffect(() => {
+    // console.log("Running validation useEffect due to change in values/schema/context"); // Log para depurar
     validateFormData();
-  }, [validateFormData]);
+  }, [values, validationSchema, contextData]); // <--- Dependencias directas
 
-  // Manejar cambios en campos
+  // --- El resto de los hooks useCallback (handleChange, handleBlur, etc.) sin cambios ---
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
-    
-    // Manejar diferentes tipos de input
     const inputValue = type === 'checkbox' ? checked : value;
-    
+
     setValues(prevValues => {
-      // Manejar campos anidados (e.g., 'labor.officialEntry')
       if (name.includes('.')) {
         const parts = name.split('.');
         const newValues = { ...prevValues };
         let current = newValues;
-        
-        // Navegar hasta el penúltimo nivel
         for (let i = 0; i < parts.length - 1; i++) {
-          // Crear objeto si no existe
           if (!current[parts[i]]) {
             current[parts[i]] = {};
           }
           current = current[parts[i]];
         }
-        
-        // Asignar valor al último nivel
         current[parts[parts.length - 1]] = inputValue;
         return newValues;
       }
-      
-      // Caso simple: campo no anidado
       return { ...prevValues, [name]: inputValue };
     });
-    
-    // Marcar el campo como tocado
     setTouchedFields(prev => ({ ...prev, [name]: true }));
   }, []);
 
-  // Manejar eventos blur para validación
   const handleBlur = useCallback((e) => {
     const { name } = e.target;
     setTouchedFields(prev => ({ ...prev, [name]: true }));
   }, []);
 
-  // Verificar si un campo tiene error y ha sido tocado
   const hasError = useCallback((fieldName) => {
-  return Boolean(touchedFields[fieldName] && errors[fieldName]);
-}, [touchedFields, errors]);
+    // Considerar campos anidados si es necesario
+    const fieldParts = fieldName.split('.');
+    let errorValue = errors;
+    for (const part of fieldParts) {
+        errorValue = errorValue?.[part];
+        if (errorValue === undefined) break;
+    }
+    return Boolean(touchedFields[fieldName.split('.')[0]] && errorValue); // Comprobar touched en el campo base
+  }, [touchedFields, errors]);
 
-  // Obtener el mensaje de error para un campo
+
   const getError = useCallback((fieldName) => {
-    return hasError(fieldName) ? errors[fieldName] : null;
-  }, [hasError, errors]);
+    // Considerar campos anidados
+     const fieldParts = fieldName.split('.');
+     let errorValue = errors;
+     for (const part of fieldParts) {
+         errorValue = errorValue?.[part];
+         if (errorValue === undefined) break;
+     }
+    return hasError(fieldName) ? errorValue : null;
+  }, [hasError, errors]); // Dependencia correcta
 
-  // Manejar envío del formulario
   const handleSubmit = useCallback((onSubmit) => async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Marcar todos los campos como tocados para mostrar todos los errores
-    const allFields = Object.keys(validationSchema).reduce((acc, key) => {
-      acc[key] = true;
-      return acc;
+
+    const allFieldsTouched = Object.keys(validationSchema).reduce((acc, key) => {
+        acc[key.split('.')[0]] = true;
+        return acc;
     }, {});
-    setTouchedFields(allFields);
-    
-    // Validar antes de enviar
-    const validationResult = validateFormData();
-    
+    setTouchedFields(allFieldsTouched);
+
+    // Re-validar explícitamente justo antes de enviar
+    const validationResult = validateForm(values, validationSchema, contextData);
+     setErrors(validationResult.errors || {});
+     setIsValid(validationResult.isValid || false);
+
+
     if (validationResult.isValid) {
       try {
         await onSubmit(values);
       } catch (error) {
-        console.error('Error en envío del formulario:', error);
+        console.error('Error on form submission:', error);
       }
     }
-    
-    setIsSubmitting(false);
-  }, [values, validateFormData, validationSchema]);
 
-  // Resetear el formulario
+    setIsSubmitting(false);
+  }, [values, validationSchema, contextData]); // Asegúrate que las deps están bien aquí también
+
+
   const resetForm = useCallback((newValues = initialValues) => {
     setValues(newValues);
     setErrors({});
@@ -110,26 +128,22 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
     setIsSubmitting(false);
   }, [initialValues]);
 
-  // Actualizar un valor específico programáticamente
+
   const setValue = useCallback((name, value) => {
     setValues(prevValues => {
-      // Manejar campos anidados
       if (name.includes('.')) {
         const parts = name.split('.');
         const newValues = { ...prevValues };
         let current = newValues;
-        
         for (let i = 0; i < parts.length - 1; i++) {
           if (!current[parts[i]]) {
             current[parts[i]] = {};
           }
           current = current[parts[i]];
         }
-        
         current[parts[parts.length - 1]] = value;
         return newValues;
       }
-      
       return { ...prevValues, [name]: value };
     });
   }, []);

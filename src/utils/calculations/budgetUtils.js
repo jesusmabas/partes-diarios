@@ -1,43 +1,38 @@
 // src/utils/calculations/budgetUtils.js
 
-/**
- * Calcula los datos relacionados con presupuestos
- * 
- * @param {Object} project - Datos del proyecto (presupuesto)
- * @param {Array} reports - Lista de reportes con importes facturados
- * @returns {Object} Resultados de los cálculos de presupuesto
- */
 export function calculateBudget(project = {}, reports = []) {
-  if (!project || !reports || !Array.isArray(reports)) {
-    return {
-      budgetAmount: 0,
-      invoicedTotal: 0,
-      remainingBudget: 0,
-      progressPercentage: 0,
-      isOverBudget: false
-    };
+  if (!project || typeof project !== 'object') {
+    project = {};
+  }
+  if (!Array.isArray(reports)) {
+    reports = [];
   }
 
-  const budgetAmount = project.budgetAmount || 0;
-  
-  // Calcular total facturado (solo para reportes que no son trabajo extra)
-  const invoicedTotal = reports
-    .filter(report => report.projectId === project.id && !report.isExtraWork)
-    .reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
-  
-  // Calcular presupuesto restante
+  const budgetAmount = parseFloat(project.budgetAmount) || 0;
+  let invoicedTotal = 0;
+
+  if (project.type === 'fixed') {
+    if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
+        invoicedTotal = parseFloat(project.totalInvoicedAmount) || 0;
+    } else {
+        console.warn(`calculateBudget: Fallback for project ${project.id}.`);
+        invoicedTotal = reports
+            .filter(report => report.projectId === project.id && !report.isExtraWork)
+            .reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
+    }
+  }
+
   const remainingBudget = budgetAmount - invoicedTotal;
-  
-  // Calcular porcentaje de progreso
-  const progressPercentage = budgetAmount > 0 
-    ? Math.min((invoicedTotal / budgetAmount) * 100, 100) 
+
+  const progressPercentage = budgetAmount > 0
+    ? Math.min(Math.max((invoicedTotal / budgetAmount) * 100, 0), 100)
     : 0;
-  
+
   return {
     budgetAmount,
     invoicedTotal,
     remainingBudget,
-    progressPercentage,
+    progressPercentage: parseFloat(progressPercentage.toFixed(2)),
     isOverBudget: remainingBudget < 0
   };
 }

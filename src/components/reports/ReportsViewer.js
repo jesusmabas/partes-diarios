@@ -58,6 +58,7 @@ const ReportsViewer = () => {
 
   // Consultar proyectos y usuarios
   const { data: projects = [] } = useQueryProjects();
+  
   const { data: users = [], isLoading: usersLoading } = useQueryUser();
 
   // Consulta de reportes con React Query - usando los filtros nuevos

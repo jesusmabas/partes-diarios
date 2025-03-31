@@ -12,8 +12,8 @@ const isBoolean = (value) => typeof value === 'boolean';
 // Esquema para proyectos (actualizado)
 export const projectSchema = {
   id: {
-    validator: (value) => isRequired(value) && /^[a-zA-Z0-9-_]+$/.test(value),
-    message: "El ID es obligatorio y solo puede contener letras, números, guiones y guiones bajos.",
+    validator: (value) => isRequired(value) && /^[a-zA-Z0-9 .-]+$/.test(value), 
+    message: "El ID es obligatorio y solo puede contener letras, números, espacios, puntos y guiones.", 
   },
   client: {
     validator: isRequired,
