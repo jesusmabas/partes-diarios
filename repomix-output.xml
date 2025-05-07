@@ -14,6 +14,7 @@ The content is organized as follows:
 1. This summary section
 2. Repository information
 3. Directory structure
+4. Repository files (if enabled)
 4. Repository files, each consisting of:
   - File path as an attribute
   - Full contents of the file
@@ -154,294 +155,6 @@ This section contains the contents of the repository's files.
 tmp/
 </file>
 
-<file path="repomix.config.json">
-{
-  "output": {
-    "filePath": "repomix-output.xml",
-    "style": "xml",
-    "parsableStyle": false,
-    "fileSummary": true,
-    "directoryStructure": true,
-    "removeComments": false,
-    "removeEmptyLines": false,
-    "compress": false,
-    "topFilesLength": 5,
-    "showLineNumbers": false,
-    "copyToClipboard": false,
-    "git": {
-      "sortByChanges": true,
-      "sortByChangesMaxCommits": 100
-    }
-  },
-  "include": [],
-  "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": []
-  },
-  "security": {
-    "enableSecurityCheck": true
-  },
-  "tokenCount": {
-    "encoding": "o200k_base"
-  }
-}
-</file>
-
-<file path="src/components/reports/details/ReportFixedAmountDetails.js">
-// src/components/reports/details/ReportFixedAmountDetails.js
-import React from "react";
-import { formatCurrency } from "../../../utils/calculationUtils";
-
-const ReportFixedAmountDetails = ({ label, amount }) => {
-  return (
-    <div className="fixed-budget-details">
-      <p><strong>{label}:</strong> {formatCurrency(amount)}</p>
-    </div>
-  );
-};
-
-export default React.memo(ReportFixedAmountDetails);
-</file>
-
-<file path="src/components/reports/details/ReportLaborDetails.js">
-// src/components/reports/details/ReportLaborDetails.js
-import React from "react";
-import { formatNumber, formatCurrency } from "../../../utils/calculationUtils";
-
-const ReportLaborDetails = ({ laborCalcs }) => {
-  if (!laborCalcs) return null;
-
-  return (
-    <div className="labor-details">
-      <h5>Mano de obra</h5>
-      <p>Oficial: {formatNumber(laborCalcs.officialHours)} h - {formatCurrency(laborCalcs.officialCost)}</p>
-      <p>Peón: {formatNumber(laborCalcs.workerHours)} h - {formatCurrency(laborCalcs.workerCost)}</p>
-      <p>Total mano de obra: {formatCurrency(laborCalcs.totalLaborCost)}</p>
-    </div>
-  );
-};
-
-export default React.memo(ReportLaborDetails);
-</file>
-
-<file path="src/components/reports/details/ReportMaterialsDetails.js">
-// src/components/reports/details/ReportMaterialsDetails.js
-import React from "react";
-import { formatCurrency } from "../../../utils/calculationUtils";
-import { Link } from "@react-pdf/renderer"; // Importar Link si se usa directamente aquí
-
-// Helper interno para renderizar materiales
-const renderMaterialsList = (materials = []) => {
-  if (!materials || materials.length === 0) {
-    return <p>No hay materiales registrados.</p>;
-  }
-
-  return (
-    <div className="materials-list">
-      {materials.map((material, index) => (
-        <p key={material.id || index}>
-          {material.description} - {formatCurrency(material.cost)} (
-          {/* Nota: Link de @react-pdf/renderer no funcionará directamente en HTML.
-              Si esto se renderiza en web, necesitarías un <a> normal.
-              Asumiendo que esto es para la web por ahora. */}
-          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
-            Ver factura
-          </a>
-          )
-        </p>
-      ))}
-    </div>
-  );
-};
-
-const ReportMaterialsDetails = ({ materials, materialsCalcs }) => {
-  if (!materialsCalcs) return null;
-
-  return (
-    <div className="materials-details">
-      <h5>Materiales</h5>
-      {renderMaterialsList(materials)}
-      <p>Total materiales: {formatCurrency(materialsCalcs.totalMaterialsCost)}</p>
-    </div>
-  );
-};
-
-export default React.memo(ReportMaterialsDetails);
-</file>
-
-<file path="src/hooks/reports/_useReportSummary.js">
-import { useMemo } from "react";
-
-/**
- * Hook personalizado para calcular resúmenes y estadísticas de reportes
- * @param {Array} reports - Lista de reportes
- * @param {Array} projects - Lista de proyectos
- * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
- * @returns {Object} - Objeto con cálculos y estadísticas
- */
-export const useReportSummary = (reports = [], projects = [], selectedProjectId = "") => {
-  // Filtrar por proyecto si es necesario
-  const filteredReports = useMemo(() => {
-    if (!selectedProjectId) return reports;
-    return reports.filter(report => report.projectId === selectedProjectId);
-  }, [reports, selectedProjectId]);
-
-  // Obtener tipo de proyecto
-  const projectType = useMemo(() => {
-    if (!selectedProjectId) return null;
-    const project = projects.find(p => p.id === selectedProjectId);
-    return project?.type || null;
-  }, [projects, selectedProjectId]);
-
-  // Calcular totales generales
-  const totals = useMemo(() => {
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalCost = 0;
-    let totalInvoiced = 0;
-    let totalHours = 0;
-
-    filteredReports.forEach(report => {
-      // Costos de mano de obra (proyectos por hora)
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
-      }
-      
-      // Costos de materiales
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // Coste total
-      if (report.totalCost) {
-        totalCost += report.totalCost;
-      } else if (report.labor) {
-        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    return {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced,
-      totalHours
-    };
-  }, [filteredReports]);
-
-  // Calcular resumen por semanas
-  const weeklySummary = useMemo(() => {
-    if (filteredReports.length === 0) return [];
-
-    const weekMap = {};
-    
-    filteredReports.forEach(report => {
-      const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
-      
-      if (!weekMap[weekKey]) {
-        weekMap[weekKey] = {
-          weekNumber: report.weekNumber,
-          year: new Date(report.reportDate).getFullYear(),
-          label: `Semana ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
-          laborCost: 0,
-          materialsCost: 0,
-          totalCost: 0,
-          invoicedAmount: 0,
-          reports: 0
-        };
-      }
-      
-      // Incrementar contadores
-      weekMap[weekKey].reports += 1;
-      
-      // Para proyectos por hora
-      if (report.labor) {
-        weekMap[weekKey].laborCost += report.labor.totalLaborCost || 0;
-      }
-      
-      weekMap[weekKey].materialsCost += report.totalMaterialsCost || 0;
-      
-      // Coste total
-      if (report.totalCost) {
-        weekMap[weekKey].totalCost += report.totalCost;
-      } else if (report.labor) {
-        weekMap[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-      
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        weekMap[weekKey].invoicedAmount += report.invoicedAmount;
-      }
-    });
-
-    // Convertir a array y ordenar por semana/año
-    return Object.values(weekMap).sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.weekNumber - b.weekNumber;
-    });
-  }, [filteredReports]);
-
-  // Calcular presupuesto restante para proyectos de presupuesto cerrado
-  const budgetSummary = useMemo(() => {
-    if (projectType !== 'fixed' || !selectedProjectId) return null;
-    
-    const project = projects.find(p => p.id === selectedProjectId);
-    if (!project) return null;
-    
-    const budgetAmount = project.budgetAmount || 0;
-    const invoicedTotal = totals.totalInvoiced;
-    const remainingBudget = budgetAmount - invoicedTotal;
-    const progressPercentage = budgetAmount > 0 ? (invoicedTotal / budgetAmount) * 100 : 0;
-    
-    return {
-      budgetAmount,
-      invoicedTotal,
-      remainingBudget,
-      progressPercentage: Math.min(progressPercentage, 100), // Limitar a 100%
-      isOverBudget: remainingBudget < 0
-    };
-  }, [projectType, selectedProjectId, projects, totals.totalInvoiced]);
-
-  return {
-    totals,
-    weeklySummary,
-    budgetSummary,
-    projectType,
-    reportCount: filteredReports.length
-  };
-};
-
-export default useReportSummary;
-</file>
-
-<file path="functions/package.json">
-{
-  "name": "functions",
-  "description": "Cloud Functions para la aplicación Partes Diarios",
-  "scripts": {
-    "serve": "firebase emulators:start --only functions",
-    "shell": "firebase functions:shell",
-    "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
-  },
-  "engines": {
-    "node": "18"
-  },
-  "main": "index.js",
-  "dependencies": {
-  "firebase-admin": "^12.0.0",
-  "firebase-functions": "^5.1.0"
-},
-  "private": true
-}
-</file>
-
 <file path="jest.config.js">
 module.exports = {
   testEnvironment: 'jsdom',
@@ -485,6 +198,40 @@ module.exports = {
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Disallow:
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsableStyle": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "compress": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false,
+    "git": {
+      "sortByChanges": true,
+      "sortByChangesMaxCommits": 100
+    }
+  },
+  "include": [],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": []
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
 </file>
 
 <file path="src/__mocks__/fileMock.js">
@@ -1700,6 +1447,88 @@ export default React.memo(ExtraWorkForm);
 }
 </file>
 
+<file path="src/components/reports/details/ReportFixedAmountDetails.js">
+// src/components/reports/details/ReportFixedAmountDetails.js
+import React from "react";
+import { formatCurrency } from "../../../utils/calculationUtils";
+
+const ReportFixedAmountDetails = ({ label, amount }) => {
+  return (
+    <div className="fixed-budget-details">
+      <p><strong>{label}:</strong> {formatCurrency(amount)}</p>
+    </div>
+  );
+};
+
+export default React.memo(ReportFixedAmountDetails);
+</file>
+
+<file path="src/components/reports/details/ReportLaborDetails.js">
+// src/components/reports/details/ReportLaborDetails.js
+import React from "react";
+import { formatNumber, formatCurrency } from "../../../utils/calculationUtils";
+
+const ReportLaborDetails = ({ laborCalcs }) => {
+  if (!laborCalcs) return null;
+
+  return (
+    <div className="labor-details">
+      <h5>Mano de obra</h5>
+      <p>Oficial: {formatNumber(laborCalcs.officialHours)} h - {formatCurrency(laborCalcs.officialCost)}</p>
+      <p>Peón: {formatNumber(laborCalcs.workerHours)} h - {formatCurrency(laborCalcs.workerCost)}</p>
+      <p>Total mano de obra: {formatCurrency(laborCalcs.totalLaborCost)}</p>
+    </div>
+  );
+};
+
+export default React.memo(ReportLaborDetails);
+</file>
+
+<file path="src/components/reports/details/ReportMaterialsDetails.js">
+// src/components/reports/details/ReportMaterialsDetails.js
+import React from "react";
+import { formatCurrency } from "../../../utils/calculationUtils";
+import { Link } from "@react-pdf/renderer"; // Importar Link si se usa directamente aquí
+
+// Helper interno para renderizar materiales
+const renderMaterialsList = (materials = []) => {
+  if (!materials || materials.length === 0) {
+    return <p>No hay materiales registrados.</p>;
+  }
+
+  return (
+    <div className="materials-list">
+      {materials.map((material, index) => (
+        <p key={material.id || index}>
+          {material.description} - {formatCurrency(material.cost)} (
+          {/* Nota: Link de @react-pdf/renderer no funcionará directamente en HTML.
+              Si esto se renderiza en web, necesitarías un <a> normal.
+              Asumiendo que esto es para la web por ahora. */}
+          <a href={material.invoiceUrl} target="_blank" rel="noopener noreferrer">
+            Ver factura
+          </a>
+          )
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const ReportMaterialsDetails = ({ materials, materialsCalcs }) => {
+  if (!materialsCalcs) return null;
+
+  return (
+    <div className="materials-details">
+      <h5>Materiales</h5>
+      {renderMaterialsList(materials)}
+      <p>Total materiales: {formatCurrency(materialsCalcs.totalMaterialsCost)}</p>
+    </div>
+  );
+};
+
+export default React.memo(ReportMaterialsDetails);
+</file>
+
 <file path="src/components/reports/MaterialsEditor.js">
 import React, { useState } from "react";
 import { formatCurrency } from "../../utils/formatters";
@@ -2472,6 +2301,155 @@ const useFormValidation = (initialValues, validationSchema, contextData = {}) =>
 };
 
 export default useFormValidation;
+</file>
+
+<file path="src/hooks/reports/_useReportSummary.js">
+import { useMemo } from "react";
+
+/**
+ * Hook personalizado para calcular resúmenes y estadísticas de reportes
+ * @param {Array} reports - Lista de reportes
+ * @param {Array} projects - Lista de proyectos
+ * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
+ * @returns {Object} - Objeto con cálculos y estadísticas
+ */
+export const useReportSummary = (reports = [], projects = [], selectedProjectId = "") => {
+  // Filtrar por proyecto si es necesario
+  const filteredReports = useMemo(() => {
+    if (!selectedProjectId) return reports;
+    return reports.filter(report => report.projectId === selectedProjectId);
+  }, [reports, selectedProjectId]);
+
+  // Obtener tipo de proyecto
+  const projectType = useMemo(() => {
+    if (!selectedProjectId) return null;
+    const project = projects.find(p => p.id === selectedProjectId);
+    return project?.type || null;
+  }, [projects, selectedProjectId]);
+
+  // Calcular totales generales
+  const totals = useMemo(() => {
+    let totalLabor = 0;
+    let totalMaterials = 0;
+    let totalCost = 0;
+    let totalInvoiced = 0;
+    let totalHours = 0;
+
+    filteredReports.forEach(report => {
+      // Costos de mano de obra (proyectos por hora)
+      if (report.labor) {
+        totalLabor += report.labor.totalLaborCost || 0;
+        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
+      }
+      
+      // Costos de materiales
+      totalMaterials += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        totalCost += report.totalCost;
+      } else if (report.labor) {
+        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        totalInvoiced += report.invoicedAmount;
+      }
+    });
+
+    return {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced,
+      totalHours
+    };
+  }, [filteredReports]);
+
+  // Calcular resumen por semanas
+  const weeklySummary = useMemo(() => {
+    if (filteredReports.length === 0) return [];
+
+    const weekMap = {};
+    
+    filteredReports.forEach(report => {
+      const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
+      
+      if (!weekMap[weekKey]) {
+        weekMap[weekKey] = {
+          weekNumber: report.weekNumber,
+          year: new Date(report.reportDate).getFullYear(),
+          label: `Semana ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
+          laborCost: 0,
+          materialsCost: 0,
+          totalCost: 0,
+          invoicedAmount: 0,
+          reports: 0
+        };
+      }
+      
+      // Incrementar contadores
+      weekMap[weekKey].reports += 1;
+      
+      // Para proyectos por hora
+      if (report.labor) {
+        weekMap[weekKey].laborCost += report.labor.totalLaborCost || 0;
+      }
+      
+      weekMap[weekKey].materialsCost += report.totalMaterialsCost || 0;
+      
+      // Coste total
+      if (report.totalCost) {
+        weekMap[weekKey].totalCost += report.totalCost;
+      } else if (report.labor) {
+        weekMap[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
+      }
+      
+      // Para proyectos de presupuesto cerrado
+      if (report.invoicedAmount) {
+        weekMap[weekKey].invoicedAmount += report.invoicedAmount;
+      }
+    });
+
+    // Convertir a array y ordenar por semana/año
+    return Object.values(weekMap).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.weekNumber - b.weekNumber;
+    });
+  }, [filteredReports]);
+
+  // Calcular presupuesto restante para proyectos de presupuesto cerrado
+  const budgetSummary = useMemo(() => {
+    if (projectType !== 'fixed' || !selectedProjectId) return null;
+    
+    const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return null;
+    
+    const budgetAmount = project.budgetAmount || 0;
+    const invoicedTotal = totals.totalInvoiced;
+    const remainingBudget = budgetAmount - invoicedTotal;
+    const progressPercentage = budgetAmount > 0 ? (invoicedTotal / budgetAmount) * 100 : 0;
+    
+    return {
+      budgetAmount,
+      invoicedTotal,
+      remainingBudget,
+      progressPercentage: Math.min(progressPercentage, 100), // Limitar a 100%
+      isOverBudget: remainingBudget < 0
+    };
+  }, [projectType, selectedProjectId, projects, totals.totalInvoiced]);
+
+  return {
+    totals,
+    weeklySummary,
+    budgetSummary,
+    projectType,
+    reportCount: filteredReports.length
+  };
+};
+
+export default useReportSummary;
 </file>
 
 <file path="src/hooks/reports/useReportSummary.js">
@@ -4240,52 +4218,6 @@ describe('reportSummaryUtils - calculateReportSummary', () => {
 });
 </file>
 
-<file path="src/utils/calculations/budgetUtils.js">
-// src/utils/calculations/budgetUtils.js
-
-/**
- * Calcula los datos relacionados con presupuestos
- * 
- * @param {Object} project - Datos del proyecto (presupuesto)
- * @param {Array} reports - Lista de reportes con importes facturados
- * @returns {Object} Resultados de los cálculos de presupuesto
- */
-export function calculateBudget(project = {}, reports = []) {
-  if (!project || !reports || !Array.isArray(reports)) {
-    return {
-      budgetAmount: 0,
-      invoicedTotal: 0,
-      remainingBudget: 0,
-      progressPercentage: 0,
-      isOverBudget: false
-    };
-  }
-
-  const budgetAmount = project.budgetAmount || 0;
-  
-  // Calcular total facturado (solo para reportes que no son trabajo extra)
-  const invoicedTotal = reports
-    .filter(report => report.projectId === project.id && !report.isExtraWork)
-    .reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
-  
-  // Calcular presupuesto restante
-  const remainingBudget = budgetAmount - invoicedTotal;
-  
-  // Calcular porcentaje de progreso
-  const progressPercentage = budgetAmount > 0 
-    ? Math.min((invoicedTotal / budgetAmount) * 100, 100) 
-    : 0;
-  
-  return {
-    budgetAmount,
-    invoicedTotal,
-    remainingBudget,
-    progressPercentage,
-    isOverBudget: remainingBudget < 0
-  };
-}
-</file>
-
 <file path="src/utils/calculations/extraWorkUtils.js">
 // src/utils/calculations/extraWorkUtils.js
 
@@ -4425,235 +4357,6 @@ export function calculateMaterials(materials = []) {
   return {
     totalMaterialsCost,
     materialItems
-  };
-}
-</file>
-
-<file path="src/utils/calculations/reportSummaryUtils.js">
-// src/utils/calculations/reportSummaryUtils.js
-
-/**
- * Calcula resúmenes y estadísticas de reportes
- * 
- * @param {Array} reports - Lista de reportes
- * @param {Array} projects - Lista de proyectos
- * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
- * @returns {Object} Resultados de los cálculos de resumen
- */
-export function calculateReportSummary(reports = [], projects = [], selectedProjectId = "") {
-  if (!reports || !Array.isArray(reports) || !projects || !Array.isArray(projects)) {
-    return {
-      totals: {
-        totalLabor: 0,
-        totalMaterials: 0,
-        totalCost: 0,
-        totalInvoiced: 0,
-        totalHours: 0,
-        totalIncome: 0,
-        totalExtraBudget: 0,
-        totalExtraCost: 0,
-        grandTotal: 0 // Initialize grandTotal
-      },
-      byWeek: [],
-      byProject: []
-    };
-  }
-
-  // Filtrar reportes por proyecto si es necesario
-  const filteredReports = selectedProjectId 
-    ? reports.filter(report => report.projectId === selectedProjectId)
-    : reports;
-
-  // Calcular totales
-  let totalLabor = 0;
-  let totalMaterials = 0;
-  let totalCost = 0;
-  let totalInvoiced = 0;
-  let totalHours = 0;
-  let totalIncome = 0;
-  let totalExtraBudget = 0;
-  let totalExtraCost = 0;
-
-  // Agrupaciones para análisis
-  const reportsByWeek = {};
-  const reportsByProject = {};
-
-  filteredReports.forEach(report => {
-    // Obtener tipo de proyecto
-    const project = projects.find(p => p.id === report.projectId);
-    const projectType = project ? project.type : 'hourly'; // Default a hourly si no se encuentra
-    
-    // Determinar si es un trabajo extra
-    const isExtraWork = report.isExtraWork;
-    
-    if (isExtraWork) {
-      // Proceso de trabajos extra
-      if (report.extraWorkType === 'hourly') {
-        // Trabajo extra por horas
-        if (report.labor) {
-          totalExtraCost += report.labor.totalLaborCost || 0;
-        }
-        
-        totalExtraCost += report.totalMaterialsCost || 0;
-      } else {
-        // Trabajo extra con presupuesto adicional
-        totalExtraBudget += report.extraBudgetAmount || 0;
-      }
-    } else {
-      // Procesar trabajos regulares
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
-        
-        // Si es proyecto por horas, la mano de obra cuenta como ingreso
-        if (projectType === 'hourly') {
-          totalIncome += report.labor.totalLaborCost || 0;
-        }
-      }
-      
-      // Materiales
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // Coste total
-      // Removed the condition, always sum labor and materials if present
-        totalCost += (report.labor?.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-
-      // Importe facturado (para proyectos de presupuesto cerrado)
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-        // Si es proyecto de presupuesto cerrado, lo facturado cuenta como ingreso
-        if (projectType === 'fixed') {
-          totalIncome += report.invoicedAmount;
-        }
-      }
-    }
-
-    // Agrupar por semana
-    const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
-    if (!reportsByWeek[weekKey]) {
-      reportsByWeek[weekKey] = {
-        weekNumber: report.weekNumber,
-        year: new Date(report.reportDate).getFullYear(),
-        weekLabel: `Sem ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
-        laborCost: 0,
-        materialsCost: 0,
-        totalCost: 0,
-        invoicedAmount: 0,
-        totalIncome: 0,
-        extraBudget: 0,
-        extraCost: 0,
-        count: 0
-      };
-    }
-    
-    // Actualizar datos por semana
-    reportsByWeek[weekKey].count += 1;
-    
-    if (isExtraWork) {
-      if (report.extraWorkType === 'hourly') {
-        if (report.labor) {
-          reportsByWeek[weekKey].extraCost += report.labor.totalLaborCost || 0;
-        }
-        reportsByWeek[weekKey].extraCost += report.totalMaterialsCost || 0;
-      } else {
-        reportsByWeek[weekKey].extraBudget += report.extraBudgetAmount || 0;
-      }
-    } else {
-      if (report.labor) {
-        reportsByWeek[weekKey].laborCost += report.labor.totalLaborCost || 0;
-      }
-      reportsByWeek[weekKey].materialsCost += report.totalMaterialsCost || 0;
-      
-      // Removed totalCost calculation from here
-      
-      if (report.invoicedAmount) {
-        reportsByWeek[weekKey].invoicedAmount += report.invoicedAmount;
-      }
-      
-      // Actualizar ingresos según tipo de proyecto
-      if (projectType === 'hourly' && report.labor) {
-        reportsByWeek[weekKey].totalIncome += report.labor.totalLaborCost || 0;
-      } else if (projectType === 'fixed' && report.invoicedAmount) {
-        reportsByWeek[weekKey].totalIncome += report.invoicedAmount;
-      }
-    }
-
-    // Agrupar por proyecto
-    if (!reportsByProject[report.projectId]) {
-      reportsByProject[report.projectId] = {
-        projectId: report.projectId,
-        client: project?.client || 'Desconocido',
-        type: projectType,
-        laborCost: 0,
-        materialsCost: 0,
-        totalCost: 0,
-        invoicedAmount: 0,
-        totalIncome: 0,
-        extraBudget: 0,
-        extraCost: 0,
-        count: 0,
-        reports: 0
-      };
-    }
-    
-    // Actualizar datos por proyecto
-    reportsByProject[report.projectId].count += 1;
-    reportsByProject[report.projectId].reports += 1;
-    
-    // Similar a la agrupación por semana, pero para proyectos
-    if (isExtraWork) {
-      if (report.extraWorkType === 'hourly') {
-        if (report.labor) {
-          reportsByProject[report.projectId].extraCost += report.labor.totalLaborCost || 0;
-        }
-        reportsByProject[report.projectId].extraCost += report.totalMaterialsCost || 0;
-      } else {
-        reportsByProject[report.projectId].extraBudget += report.extraBudgetAmount || 0;
-      }
-    } else {
-      if (report.labor) {
-        reportsByProject[report.projectId].laborCost += report.labor.totalLaborCost || 0;
-      }
-      reportsByProject[report.projectId].materialsCost += report.totalMaterialsCost || 0;
-      
-      // Removed totalCost calculation from here
-      
-      if (report.invoicedAmount) {
-        reportsByProject[report.projectId].invoicedAmount += report.invoicedAmount;
-      }
-      
-      if (projectType === 'hourly' && report.labor) {
-        reportsByProject[report.projectId].totalIncome += report.labor.totalLaborCost || 0;
-      } else if (projectType === 'fixed' && report.invoicedAmount) {
-        reportsByProject[report.projectId].totalIncome += report.invoicedAmount;
-      }
-    }
-  });
-
-  // Convertir agrupaciones a arrays
-  const byWeek = Object.values(reportsByWeek).sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return a.weekNumber - b.weekNumber;
-  });
-
-  const byProject = Object.values(reportsByProject).sort((a, b) => {
-    return b.totalIncome - a.totalIncome;
-  });
-
-  return {
-    totals: {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced,
-      totalHours,
-      totalIncome,
-      totalExtraBudget,
-      totalExtraCost,
-      grandTotal: totalInvoiced + totalExtraBudget + totalExtraCost // Correct grandTotal calculation
-    },
-    byWeek,
-    byProject
   };
 }
 </file>
@@ -4836,22 +4539,6 @@ export default PDFDownloadButton;
 ]
 </file>
 
-<file path="firebase.json">
-{
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "storage": {
-    "rules": "storage.rules"
-  },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs18"
-  }
-}
-</file>
-
 <file path="firestore.indexes.json">
 {
   "indexes": [
@@ -4958,6 +4645,29 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
   }
+}
+</file>
+
+<file path="functions/package.json">
+{
+  "name": "functions",
+  "description": "Cloud Functions para la aplicación Partes Diarios",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^13.2.0",
+    "firebase-functions": "^6.3.2"
+  },
+  "private": true
 }
 </file>
 
@@ -6499,371 +6209,6 @@ export const useReportActions = () => {
 };
 </file>
 
-<file path="src/hooks/useFormValidation.js">
-// src/hooks/useFormValidation.js
-
-import { useState, useCallback, useEffect } from 'react';
-import { validateForm } from '../utils/validationSchemas';
-
-const useFormValidation = (initialValues, validationSchema, contextData = {}) => {
-  const [values, setValues] = useState(initialValues);
-  const [errors, setErrors] = useState({});
-  const [touchedFields, setTouchedFields] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValid, setIsValid] = useState(false);
-
-  // Validar el formulario completo
-  const validateFormData = useCallback(() => {
-  // Ensure we handle potential undefined returns
-  const result = validateForm(values, validationSchema, contextData) || { errors: {}, isValid: false };
-  setErrors(result.errors || {});
-  setIsValid(result.isValid || false);
-  return result;
-}, [values, validationSchema, contextData]);
-
-  // Efecto para validar cuando cambian los valores
-  useEffect(() => {
-    validateFormData();
-  }, [validateFormData]);
-
-  // Manejar cambios en campos
-  const handleChange = useCallback((e) => {
-    const { name, value, type, checked } = e.target;
-    
-    // Manejar diferentes tipos de input
-    const inputValue = type === 'checkbox' ? checked : value;
-    
-    setValues(prevValues => {
-      // Manejar campos anidados (e.g., 'labor.officialEntry')
-      if (name.includes('.')) {
-        const parts = name.split('.');
-        const newValues = { ...prevValues };
-        let current = newValues;
-        
-        // Navegar hasta el penúltimo nivel
-        for (let i = 0; i < parts.length - 1; i++) {
-          // Crear objeto si no existe
-          if (!current[parts[i]]) {
-            current[parts[i]] = {};
-          }
-          current = current[parts[i]];
-        }
-        
-        // Asignar valor al último nivel
-        current[parts[parts.length - 1]] = inputValue;
-        return newValues;
-      }
-      
-      // Caso simple: campo no anidado
-      return { ...prevValues, [name]: inputValue };
-    });
-    
-    // Marcar el campo como tocado
-    setTouchedFields(prev => ({ ...prev, [name]: true }));
-  }, []);
-
-  // Manejar eventos blur para validación
-  const handleBlur = useCallback((e) => {
-    const { name } = e.target;
-    setTouchedFields(prev => ({ ...prev, [name]: true }));
-  }, []);
-
-  // Verificar si un campo tiene error y ha sido tocado
-  const hasError = useCallback((fieldName) => {
-  return Boolean(touchedFields[fieldName] && errors[fieldName]);
-}, [touchedFields, errors]);
-
-  // Obtener el mensaje de error para un campo
-  const getError = useCallback((fieldName) => {
-    return hasError(fieldName) ? errors[fieldName] : null;
-  }, [hasError, errors]);
-
-  // Manejar envío del formulario
-  const handleSubmit = useCallback((onSubmit) => async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Marcar todos los campos como tocados para mostrar todos los errores
-    const allFields = Object.keys(validationSchema).reduce((acc, key) => {
-      acc[key] = true;
-      return acc;
-    }, {});
-    setTouchedFields(allFields);
-    
-    // Validar antes de enviar
-    const validationResult = validateFormData();
-    
-    if (validationResult.isValid) {
-      try {
-        await onSubmit(values);
-      } catch (error) {
-        console.error('Error en envío del formulario:', error);
-      }
-    }
-    
-    setIsSubmitting(false);
-  }, [values, validateFormData, validationSchema]);
-
-  // Resetear el formulario
-  const resetForm = useCallback((newValues = initialValues) => {
-    setValues(newValues);
-    setErrors({});
-    setTouchedFields({});
-    setIsSubmitting(false);
-  }, [initialValues]);
-
-  // Actualizar un valor específico programáticamente
-  const setValue = useCallback((name, value) => {
-    setValues(prevValues => {
-      // Manejar campos anidados
-      if (name.includes('.')) {
-        const parts = name.split('.');
-        const newValues = { ...prevValues };
-        let current = newValues;
-        
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (!current[parts[i]]) {
-            current[parts[i]] = {};
-          }
-          current = current[parts[i]];
-        }
-        
-        current[parts[parts.length - 1]] = value;
-        return newValues;
-      }
-      
-      return { ...prevValues, [name]: value };
-    });
-  }, []);
-
-  return {
-    values,
-    errors,
-    touchedFields,
-    isSubmitting,
-    isValid,
-    handleChange,
-    handleBlur,
-    handleSubmit,
-    resetForm,
-    setValue,
-    hasError,
-    getError,
-  };
-};
-
-export default useFormValidation;
-</file>
-
-<file path="src/hooks/useQueryProjects.js">
-// src/hooks/useQueryProjects.js
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where 
-} from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '../firebase';
-
-// Clave de caché para proyectos
-const PROJECTS_CACHE_KEY = 'projects';
-
-// Obtener todos los proyectos
-const fetchProjects = async (userId = null) => {
-  let q = collection(db, 'projects');
-  
-  if (userId) {
-    q = query(q, where('userId', '==', userId));
-  }
-  
-  const querySnapshot = await getDocs(q);
-  
-  // MODIFICADO: No sobrescribir el campo 'id' personalizado
-  // En lugar de usar { id: doc.id, ...doc.data() }
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    // Aseguramos que el ID personalizado esté disponible tal cual viene de la BD
-    return {
-      firestoreId: doc.id, // Guardar el ID de Firestore en una propiedad separada
-      ...data // Incluir todos los datos, manteniendo el campo 'id' original
-    };
-  });
-};
-
-// Obtener un proyecto por ID
-const fetchProjectById = async (projectId) => {
-  if (!projectId) return null;
-  
-  // MODIFICADO: Intentar buscar primero por ID de Firestore
-  try {
-    const docRef = doc(db, 'projects', projectId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return { 
-        firestoreId: docSnap.id,
-        ...data 
-      };
-    }
-  } catch (error) {
-    console.error("Error buscando por ID de Firestore:", error);
-  }
-  
-  // Si no se encuentra, intentar buscar por ID personalizado
-  try {
-    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectId));
-    const querySnapshot = await getDocs(projectsQuery);
-    
-    if (!querySnapshot.empty) {
-      const docSnap = querySnapshot.docs[0];
-      const data = docSnap.data();
-      return { 
-        firestoreId: docSnap.id,
-        ...data 
-      };
-    }
-  } catch (error) {
-    console.error("Error buscando por ID personalizado:", error);
-  }
-  
-  return null;
-};
-
-// Hook para obtener proyectos
-export const useQueryProjects = (userId = null) => {
-  return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, { userId }],
-    queryFn: () => fetchProjects(userId),
-  });
-};
-
-// Hook para obtener un proyecto específico
-export const useQueryProject = (projectId) => {
-  return useQuery({
-    queryKey: [PROJECTS_CACHE_KEY, projectId],
-    queryFn: () => fetchProjectById(projectId),
-    enabled: !!projectId, // Solo ejecutar si hay un projectId
-  });
-};
-
-// Hook para agregar un proyecto
-export const useAddProject = () => {
-  const queryClient = useQueryClient();
-  const functions = getFunctions();
-  const createProjectFunction = httpsCallable(functions, 'createProject');
-  
-  return useMutation({
-    mutationFn: async (projectData) => {
-      // Usar Cloud Function para validación y creación
-      const result = await createProjectFunction(projectData);
-      return result.data;
-    },
-    // Invalidar cache al finalizar
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
-};
-
-// Hook para actualizar un proyecto
-export const useUpdateProject = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ projectId, data }) => {
-      // MODIFICADO: Asegurarse de usar el ID correcto de Firestore
-      const projectRef = doc(db, 'projects', projectId); // Usar firestoreId si está disponible
-      await updateDoc(projectRef, data);
-      return { id: projectId, ...data };
-    },
-    // Actualizar la caché optimistamente
-    onMutate: async ({ projectId, data }) => {
-      // Cancelar consultas pendientes
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      
-      // Guardar el estado previo
-      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, projectId]);
-      
-      // Actualizar la caché optimistamente
-      queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], old => ({
-        ...old,
-        ...data,
-      }));
-      
-      // También actualizar la lista de proyectos
-      queryClient.setQueryData([PROJECTS_CACHE_KEY], old => {
-        if (!old) return old;
-        return old.map(project => 
-          project.firestoreId === projectId ? { ...project, ...data } : project
-        );
-      });
-      
-      return { previousProject };
-    },
-    // En caso de error, restaurar el estado previo
-    onError: (err, { projectId }, context) => {
-      if (context?.previousProject) {
-        queryClient.setQueryData([PROJECTS_CACHE_KEY, projectId], context.previousProject);
-      }
-    },
-    // Invalidar cache al finalizar
-    onSettled: (data, error, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, projectId] });
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
-};
-
-// Hook para eliminar un proyecto
-export const useDeleteProject = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (projectId) => {
-      // Buscar el proyecto por ID dentro de los datos
-      const projects = await fetchProjects();
-      const project = projects.find(p => p.firestoreId === projectId);
-      
-      if (!project) {
-        throw new Error(`Proyecto con ID ${projectId} no encontrado`);
-      }
-      
-      // Eliminar el documento de Firestore
-      await deleteDoc(doc(db, 'projects', project.firestoreId));
-      
-      return projectId;
-    },
-
-    onMutate: async (projectId) => {
-      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-      const previousCacheData = queryClient.getQueryState([PROJECTS_CACHE_KEY]);
-
-      queryClient.setQueriesData(
-        { queryKey: [PROJECTS_CACHE_KEY] },
-        (oldData) => {
-          if (!oldData) return oldData;
-          return oldData.filter(project => project.firestoreId !== projectId);
-        }
-      );
-
-      return { previousCacheData };
-    },
-
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
-    },
-  });
-};
-</file>
-
 <file path="src/hooks/useQueryReports.js">
 // src/hooks/useQueryReports.js (Completo)
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7308,162 +6653,205 @@ global.console = {
 };
 </file>
 
-<file path="src/utils/validationSchemas.js">
-// src/utils/validationSchemas.js - Actualizado para incluir validación de campos de trabajo extra
+<file path="src/utils/calculations/budgetUtils.js">
+// src/utils/calculations/budgetUtils.js
 
-// Funciones de validación básicas
-const isRequired = (value) => !!value || value === 0;
-const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
-const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
-const isValidTime = (value) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
-const isValidDate = (value) => !isNaN(Date.parse(value));
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-const isBoolean = (value) => typeof value === 'boolean';
+export function calculateBudget(project = {}, reports = []) {
+  if (!project || typeof project !== 'object') {
+    project = {};
+  }
+  if (!Array.isArray(reports)) {
+    reports = [];
+  }
 
-// Esquema para proyectos (actualizado)
-export const projectSchema = {
-  id: {
-    validator: (value) => isRequired(value) && /^[a-zA-Z0-9-_]+$/.test(value),
-    message: "El ID es obligatorio y solo puede contener letras, números, guiones y guiones bajos.",
-  },
-  client: {
-    validator: isRequired,
-    message: "El cliente es obligatorio.",
-  },
-  address: {
-    validator: isRequired,
-    message: "La dirección es obligatoria.",
-  },
-  nifNie: {
-    validator: (value) => isRequired(value) && /^[0-9XYZ][0-9]{7}[A-Z]$/.test(value),
-    message: "El NIF/NIE debe tener un formato válido.",
-  },
-  type: {
-    validator: (value) => ["hourly", "fixed"].includes(value),
-    message: "El tipo debe ser 'hourly' o 'fixed'.",
-  },
-  officialPrice: {
-    validator: (value, formData) => 
-      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
-    message: "El precio por hora del oficial debe ser un número positivo.",
-  },
-  workerPrice: {
-    validator: (value, formData) => 
-      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
-    message: "El precio por hora del peón debe ser un número positivo.",
-  },
-  budgetAmount: {
-    validator: (value, formData) => 
-      formData.type !== "fixed" || isPositiveNumber(value),
-    message: "El importe del presupuesto debe ser un número positivo.",
-  },
-  allowExtraWork: {
-    validator: (value, formData) => 
-      formData.type !== "fixed" || typeof value === 'boolean',
-    message: "El campo debe ser verdadero o falso.",
-  },
-};
+  const budgetAmount = parseFloat(project.budgetAmount) || 0;
+  let invoicedTotal = 0;
 
-// Esquema para partes diarios (actualizado para trabajo extra)
-export const dailyReportSchema = {
-  reportDate: {
-    validator: isValidDate,
-    message: "La fecha debe ser válida.",
-  },
-  projectId: {
-    validator: isRequired,
-    message: "El ID del proyecto es obligatorio.",
-  },
-  // Campos para trabajo extra
-  isExtraWork: {
-    validator: (value, formData) => 
-      formData.projectType !== "fixed" || typeof value === 'boolean',
-    message: "El campo debe ser verdadero o falso.",
-  },
-  extraWorkType: {
-    validator: (value, formData) => 
-      !formData.isExtraWork || ["additional_budget", "hourly"].includes(value),
-    message: "El tipo de trabajo extra debe ser 'additional_budget' o 'hourly'.",
-  },
-  extraBudgetAmount: {
-    validator: (value, formData) => 
-      !formData.isExtraWork || formData.extraWorkType !== "additional_budget" || isPositiveNumber(value),
-    message: "El importe adicional debe ser un número positivo.",
-  },
-  // Para proyectos por horas o extras facturados por horas
-  "labor.officialEntry": {
-    validator: (value, formData) => 
-      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
-      !value || isValidTime(value),
-    message: "La hora de entrada del oficial debe tener un formato válido (HH:MM).",
-  },
-  "labor.officialExit": {
-    validator: (value, formData) => 
-      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
-      !value || isValidTime(value),
-    message: "La hora de salida del oficial debe tener un formato válido (HH:MM).",
-  },
-  "labor.workerEntry": {
-    validator: (value, formData) => 
-      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
-      !value || isValidTime(value),
-    message: "La hora de entrada del peón debe tener un formato válido (HH:MM).",
-  },
-  "labor.workerExit": {
-    validator: (value, formData) => 
-      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
-      !value || isValidTime(value),
-    message: "La hora de salida del peón debe tener un formato válido (HH:MM).",
-  },
-  // Para todos los tipos
-  "workPerformed.description": {
-    validator: isRequired,
-    message: "La descripción de los trabajos realizados es obligatoria.",
-  },
-  // Para proyectos de presupuesto cerrado (dentro del presupuesto)
-  "workPerformed.invoicedAmount": {
-    validator: (value, formData) => 
-      (formData.projectType !== "fixed" || formData.isExtraWork) || isPositiveNumber(value),
-    message: "El importe facturado debe ser un número positivo.",
-  },
-};
-
-// Esquema para materiales
-export const materialSchema = {
-  description: {
-    validator: isRequired,
-    message: "La descripción del material es obligatoria.",
-  },
-  cost: {
-    validator: isPositiveNumber,
-    message: "El coste debe ser un número positivo.",
-  },
-};
-
-// Utilidad para validar formularios
-export const validateForm = (data, schema, context = {}) => {
-  const errors = {};
-  
-  Object.entries(schema).forEach(([field, { validator, message }]) => {
-    // Manejar campos anidados (e.g., 'labor.officialEntry')
-    const fieldParts = field.split('.');
-    let value = data;
-    
-    for (const part of fieldParts) {
-      value = value && typeof value === 'object' ? value[part] : undefined;
+  if (project.type === 'fixed') {
+    if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
+        invoicedTotal = parseFloat(project.totalInvoicedAmount) || 0;
+    } else {
+        console.warn(`calculateBudget: Fallback for project ${project.id}.`);
+        invoicedTotal = reports
+            .filter(report => report.projectId === project.id && !report.isExtraWork)
+            .reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
     }
-    
-    // Validar el campo
-    if (!validator(value, { ...data, ...context })) {
-      errors[field] = message;
+  }
+
+  const remainingBudget = budgetAmount - invoicedTotal;
+
+  const progressPercentage = budgetAmount > 0
+    ? Math.min(Math.max((invoicedTotal / budgetAmount) * 100, 0), 100)
+    : 0;
+
+  return {
+    budgetAmount,
+    invoicedTotal,
+    remainingBudget,
+    progressPercentage: parseFloat(progressPercentage.toFixed(2)),
+    isOverBudget: remainingBudget < 0
+  };
+}
+</file>
+
+<file path="src/utils/calculations/reportSummaryUtils.js">
+// src/utils/calculations/reportSummaryUtils.js
+
+export function calculateReportSummary(reports = [], projects = [], selectedProjectId = "") {
+  if (!Array.isArray(reports)) reports = [];
+  if (!Array.isArray(projects)) projects = [];
+
+  const filteredReports = selectedProjectId
+    ? reports.filter(report => report.projectId === selectedProjectId)
+    : reports;
+
+  let totalLabor = 0;
+  let totalMaterials = 0;
+  let totalCost = 0;
+  let totalHours = 0;
+  let totalIncome = 0;
+  let totalExtraBudget = 0;
+  let totalExtraCost = 0;
+
+  const reportsByWeek = {};
+  const reportsByProject = {};
+  const processedProjectIds = new Set();
+
+  filteredReports.forEach(report => {
+    const project = projects.find(p => p.id === report.projectId);
+    const projectType = project?.type || 'hourly';
+    const isExtraWork = report.isExtraWork ?? false;
+
+    if (isExtraWork && projectType === 'fixed') {
+      if (report.extraWorkType === 'hourly') {
+        const extraLabor = parseFloat(report.labor?.totalLaborCost) || 0;
+        const extraMats = parseFloat(report.totalMaterialsCost) || 0;
+        const extraRepCost = parseFloat(report.totalCost) || (extraLabor + extraMats);
+        totalExtraCost += extraRepCost;
+        totalIncome += extraLabor;
+      } else if (report.extraWorkType === 'additional_budget') {
+        const extraBudget = parseFloat(report.extraBudgetAmount) || 0;
+        totalExtraBudget += extraBudget;
+        totalIncome += extraBudget;
+      }
+    } else if (!isExtraWork) {
+      const laborCost = parseFloat(report.labor?.totalLaborCost) || 0;
+      const materialsCost = parseFloat(report.totalMaterialsCost) || 0;
+      const reportCost = parseFloat(report.totalCost) || (laborCost + materialsCost);
+
+      totalLabor += laborCost;
+      totalMaterials += materialsCost;
+      totalCost += reportCost;
+      totalHours += (parseFloat(report.labor?.officialHours) || 0) + (parseFloat(report.labor?.workerHours) || 0);
+
+      if (projectType === 'hourly') {
+        totalIncome += laborCost;
+      }
+    }
+
+    const reportDateObj = report.reportDate ? new Date(report.reportDate) : null;
+    if (reportDateObj && report.weekNumber) {
+      const year = reportDateObj.getFullYear();
+      const weekKey = `${report.weekNumber}-${year}`;
+      if (!reportsByWeek[weekKey]) {
+        reportsByWeek[weekKey] = {
+          weekNumber: report.weekNumber, year: year, weekLabel: `Sem ${report.weekNumber}/${year}`,
+          laborCost: 0, materialsCost: 0, totalCost: 0, invoicedAmount: 0, totalIncome: 0,
+          extraBudget: 0, extraCost: 0, count: 0
+        };
+      }
+      reportsByWeek[weekKey].count += 1;
+      if (isExtraWork && projectType === 'fixed') {
+        if (report.extraWorkType === 'hourly') {
+          const extraRepCostW = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
+          reportsByWeek[weekKey].extraCost += extraRepCostW;
+          reportsByWeek[weekKey].totalIncome += parseFloat(report.labor?.totalLaborCost) || 0;
+        } else if (report.extraWorkType === 'additional_budget') {
+          const extraBudgetW = parseFloat(report.extraBudgetAmount) || 0;
+          reportsByWeek[weekKey].extraBudget += extraBudgetW;
+          reportsByWeek[weekKey].totalIncome += extraBudgetW;
+        }
+      } else if (!isExtraWork) {
+        const laborCostW = parseFloat(report.labor?.totalLaborCost) || 0;
+        const materialsCostW = parseFloat(report.totalMaterialsCost) || 0;
+        const reportCostW = parseFloat(report.totalCost) || (laborCostW + materialsCostW);
+        reportsByWeek[weekKey].laborCost += laborCostW;
+        reportsByWeek[weekKey].materialsCost += materialsCostW;
+        reportsByWeek[weekKey].totalCost += reportCostW;
+        if (projectType === 'hourly') {
+          reportsByWeek[weekKey].totalIncome += laborCostW;
+        } else if (projectType === 'fixed') {
+          const invoicedW = parseFloat(report.invoicedAmount) || 0;
+          reportsByWeek[weekKey].invoicedAmount += invoicedW;
+          reportsByWeek[weekKey].totalIncome += invoicedW;
+        }
+      }
+    }
+
+    const projectId = report.projectId;
+    processedProjectIds.add(projectId);
+    if (!reportsByProject[projectId]) {
+      reportsByProject[projectId] = {
+        projectId: projectId, client: project?.client || 'Desconocido', type: projectType, projectData: project,
+        laborCost: 0, materialsCost: 0, totalCost: 0, invoicedAmount: 0, totalIncome: 0,
+        extraBudget: 0, extraCost: 0, count: 0, reports: 0
+      };
+    }
+    reportsByProject[projectId].count += 1;
+    reportsByProject[projectId].reports += 1;
+    if (isExtraWork && projectType === 'fixed') {
+      if (report.extraWorkType === 'hourly') {
+        const extraRepCostP = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
+        reportsByProject[projectId].extraCost += extraRepCostP;
+      } else if (report.extraWorkType === 'additional_budget') {
+        reportsByProject[projectId].extraBudget += parseFloat(report.extraBudgetAmount) || 0;
+      }
+    } else if (!isExtraWork) {
+      reportsByProject[projectId].laborCost += parseFloat(report.labor?.totalLaborCost) || 0;
+      reportsByProject[projectId].materialsCost += parseFloat(report.totalMaterialsCost) || 0;
+      const reportCostP = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
+      reportsByProject[projectId].totalCost += reportCostP;
     }
   });
-  
+
+  let grandTotalInvoiced = 0;
+  Object.keys(reportsByProject).forEach(pid => {
+    const projSummary = reportsByProject[pid];
+    const projData = projSummary.projectData;
+    if (projSummary.type === 'fixed') {
+      const projectTotalInvoiced = parseFloat(projData?.totalInvoicedAmount) || 0;
+      projSummary.invoicedAmount = projectTotalInvoiced;
+      projSummary.totalIncome = projectTotalInvoiced;
+      grandTotalInvoiced += projectTotalInvoiced;
+    } else if (projSummary.type === 'hourly') {
+      projSummary.totalIncome = projSummary.laborCost;
+      projSummary.invoicedAmount = 0;
+    }
+     projSummary.totalIncome += projSummary.extraBudget + (projSummary.type === 'fixed' ? projSummary.extraCost : 0);
+    delete projSummary.projectData;
+  });
+
+   totalIncome = Object.values(reportsByProject).reduce((sum, proj) => sum + proj.totalIncome, 0);
+
+  const byWeek = Object.values(reportsByWeek).sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.weekNumber - b.weekNumber;
+  });
+
+  const byProject = Object.values(reportsByProject).sort((a, b) => {
+    return (b.totalIncome + b.extraBudget + b.extraCost) - (a.totalIncome + a.extraBudget + a.extraCost);
+  });
+
   return {
-    isValid: Object.keys(errors).length === 0,
-    errors
+    totals: {
+      totalLabor, totalMaterials, totalCost, totalInvoiced: grandTotalInvoiced, totalHours, totalIncome,
+      totalExtraBudget, totalExtraCost,
+      grandTotal: grandTotalInvoiced + totalExtraBudget + totalExtraCost
+    },
+    byWeek,
+    byProject
   };
-};
+}
 </file>
 
 <file path="storage.rules">
@@ -7549,445 +6937,20 @@ yarn-error.log*
 /00
 </file>
 
-<file path="functions/index.js">
-const { onCall } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-
-// Inicializar la aplicación
-initializeApp();
-const db = getFirestore();
-
-// Configuración común para todas las funciones
-const functionConfig = {
-  region: "us-central1", // Definir región explícitamente
-  minInstances: 0,
-  maxInstances: 10
-};
-
-// Funciones de validación básicas
-const isRequired = (value) => value !== undefined && value !== null && value !== '';
-const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
-const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
-const isValidTime = (value) => !value || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
-const isValidDate = (value) => isRequired(value) && !isNaN(Date.parse(value));
-const isBoolean = (value) => typeof value === 'boolean';
-
-// Validadores específicos del servidor
-const isAuthenticated = (context) => !!context.auth;
-const isOwner = async (userId, resourcePath) => {
-  try {
-    const docSnap = await db.doc(resourcePath).get();
-    return docSnap.exists && docSnap.data().userId === userId;
-  } catch (error) {
-    return false;
-  }
-};
-
-// Función mejorada para buscar proyecto por ID personalizado
-const findProjectById = async (projectId) => {
-  console.log(`Buscando proyecto con ID personalizado: '${projectId}'`);
-  
-  if (!projectId) {
-    console.log("ID de proyecto no proporcionado");
-    return null;
-  }
-  
-  try {
-    // Normalizar el ID para la búsqueda (trim y to string)
-    const normalizedId = String(projectId).trim();
-    console.log(`ID de proyecto normalizado: '${normalizedId}'`);
-    
-    // Buscar con consulta case-sensitive
-    const projectQuery = await db.collection('projects')
-      .where('id', '==', normalizedId)
-      .get();
-    
-    if (projectQuery.empty) {
-      console.log(`No se encontró ningún proyecto con ID '${normalizedId}' (búsqueda case-sensitive)`);
-      
-      // Intentar listar todos los proyectos para diagnóstico
-      const allProjects = await db.collection('projects').get();
-      console.log(`Total de proyectos en la BD: ${allProjects.size}`);
-      console.log("Lista de IDs de proyectos disponibles:");
-      allProjects.forEach(doc => {
-        const data = doc.data();
-        console.log(`- Doc ID: ${doc.id}, Campo id: '${data.id || "NO TIENE CAMPO ID"}'`);
-      });
-      
-      return null;
-    }
-    
-    const projectDoc = projectQuery.docs[0];
-    console.log(`Proyecto encontrado con ID: ${projectDoc.id}`);
-    return { id: projectDoc.id, ...projectDoc.data() };
-  } catch (error) {
-    console.error(`Error al buscar proyecto: ${error.message}`);
-    return null;
-  }
-};
-
-// Validadores específicos para trabajos extra
-const validateExtraWork = async (data, projectId) => {
-  const errors = {};
-  
-  // Verificar que el proyecto existe y permite trabajos extra
-  const project = await findProjectById(projectId);
-  
-  if (!project) {
-    errors.projectId = 'El proyecto no existe';
-    return { isValid: false, errors };
-  }
-  
-  if (project.type !== 'fixed' || !project.allowExtraWork) {
-    errors.isExtraWork = 'Este proyecto no permite trabajos extra';
-    return { isValid: false, errors };
-  }
-  
-  // Validar tipo de trabajo extra
-  if (!['additional_budget', 'hourly'].includes(data.extraWorkType)) {
-    errors.extraWorkType = 'El tipo de trabajo extra debe ser "additional_budget" o "hourly"';
-  }
-  
-  // Si es presupuesto adicional, validar importe
-  if (data.extraWorkType === 'additional_budget') {
-    if (!isPositiveNumber(data.extraBudgetAmount)) {
-      errors.extraBudgetAmount = 'El importe adicional debe ser un número positivo';
-    }
-  }
-  
-  // Si es por horas, validar datos de mano de obra
-  if (data.extraWorkType === 'hourly') {
-    if (!data.labor) {
-      errors.labor = 'Los datos de mano de obra son obligatorios para trabajos extra por horas';
-    } else {
-      if (!isValidTime(data.labor.officialEntry)) {
-        errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.officialExit)) {
-        errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.workerEntry)) {
-        errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
-      }
-      
-      if (!isValidTime(data.labor.workerExit)) {
-        errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
-      }
-    }
-  }
-  
-  // Validar descripción de trabajo realizado
-  if (!data.workPerformed) {
-    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
-  } else if (!isRequired(data.workPerformed.description)) {
-    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
-  }
-  
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-};
-
-// Funciones de validación
-const validateProject = (data) => {
-  const errors = {};
-  
-  if (!isRequired(data.id)) {
-    errors.id = 'El ID es obligatorio';
-  } else if (!/^[a-zA-Z0-9-_]+$/.test(data.id)) {
-    errors.id = 'El ID solo puede contener letras, números, guiones y guiones bajos';
-  }
-  
-  if (!isRequired(data.client)) errors.client = 'El cliente es obligatorio';
-  if (!isRequired(data.address)) errors.address = 'La dirección es obligatoria';
-  
-  if (!isRequired(data.nifNie)) {
-    errors.nifNie = 'El NIF/NIE es obligatorio';
-  } else if (!/^[0-9XYZ][0-9]{7}[A-Z]$/.test(data.nifNie)) {
-    errors.nifNie = 'El NIF/NIE debe tener un formato válido';
-  }
-  
-  if (!isRequired(data.type)) {
-    errors.type = 'El tipo es obligatorio';
-  } else if (!['hourly', 'fixed'].includes(data.type)) {
-    errors.type = 'El tipo debe ser "hourly" o "fixed"';
-  }
-  
-  if (data.type === 'hourly') {
-    if (!isPositiveNumber(data.officialPrice)) {
-      errors.officialPrice = 'El precio por hora del oficial debe ser un número positivo';
-    }
-    
-    if (!isPositiveNumber(data.workerPrice)) {
-      errors.workerPrice = 'El precio por hora del peón debe ser un número positivo';
-    }
-  } else if (data.type === 'fixed') {
-    if (!isPositiveNumber(data.budgetAmount)) {
-      errors.budgetAmount = 'El importe del presupuesto debe ser un número positivo';
-    }
-    
-    // Validar campos para trabajos extra si están habilitados
-    if (data.allowExtraWork) {
-      // Solo validar precios por hora si se permiten trabajos extra
-      if (!isPositiveNumber(data.officialPrice)) {
-        errors.officialPrice = 'El precio por hora del oficial para trabajos extra debe ser un número positivo';
-      }
-      
-      if (!isPositiveNumber(data.workerPrice)) {
-        errors.workerPrice = 'El precio por hora del peón para trabajos extra debe ser un número positivo';
-      }
-    }
-  }
-  
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-};
-
-const validateDailyReport = async (data) => {
-  const errors = {};
-  
-  console.log(`Validando parte diario:`, JSON.stringify(data, null, 2));
-  
-  if (!isValidDate(data.reportDate)) {
-    errors.reportDate = 'La fecha debe ser válida';
-  }
-  
-  if (!isRequired(data.projectId)) {
-    errors.projectId = 'El ID del proyecto es obligatorio';
-  } else {
-    // Usar la función mejorada para buscar el proyecto
-    const project = await findProjectById(data.projectId);
-    
-    if (!project) {
-      errors.projectId = 'El proyecto no existe';
-    } else {
-      const projectType = project.type;
-      
-      // Verificar si es un trabajo extra
-      if (data.isExtraWork) {
-        // Validar trabajo extra
-        const extraWorkValidation = await validateExtraWork(data, data.projectId);
-        
-        if (!extraWorkValidation.isValid) {
-          // Combinar errores
-          Object.assign(errors, extraWorkValidation.errors);
-        }
-      } else {
-        // Validaciones específicas según el tipo de proyecto
-        if (projectType === 'hourly') {
-          // Validar datos de mano de obra si es proyecto por horas
-          if (!data.labor) {
-            errors.labor = 'Los datos de mano de obra son obligatorios para proyectos por horas';
-          } else {
-            if (!isValidTime(data.labor.officialEntry)) {
-              errors['labor.officialEntry'] = 'La hora de entrada del oficial debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.officialExit)) {
-              errors['labor.officialExit'] = 'La hora de salida del oficial debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.workerEntry)) {
-              errors['labor.workerEntry'] = 'La hora de entrada del peón debe tener un formato válido';
-            }
-            
-            if (!isValidTime(data.labor.workerExit)) {
-              errors['labor.workerExit'] = 'La hora de salida del peón debe tener un formato válido';
-            }
-          }
-        } else if (projectType === 'fixed') {
-          // Validar importe facturado si es proyecto de presupuesto cerrado
-          if (!isPositiveNumber(data.invoicedAmount)) {
-            errors.invoicedAmount = 'El importe facturado debe ser un número positivo';
-          }
-        }
-      }
-    }
-  }
-  
-  // Validar trabajo realizado
-  if (!data.workPerformed) {
-    errors.workPerformed = 'Los datos de trabajo realizado son obligatorios';
-  } else if (!isRequired(data.workPerformed.description)) {
-    errors['workPerformed.description'] = 'La descripción del trabajo realizado es obligatoria';
-  }
-  
-  const result = {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-  
-  console.log(`Resultado de validación: ${result.isValid ? 'Válido' : 'Inválido'}`);
-  if (!result.isValid) {
-    console.log(`Errores:`, JSON.stringify(result.errors, null, 2));
-  }
-  
-  return result;
-};
-
-// Funciones Cloud con región explícita
-exports.createProject = onCall(
-  functionConfig, 
-  async (request) => {
-    const data = request.data;
-    const context = request.auth;
-
-    console.log("Datos recibidos:", JSON.stringify(data, null, 2));
-    console.log("Contexto de auth:", context ? JSON.stringify(context) : "No autenticado");
-    // Verificar autenticación
-    if (!context) {
-      throw new Error('El usuario debe estar autenticado para crear proyectos');
-    }
-    
-    // Validar datos
-    const validationResult = validateProject(data);
-    if (!validationResult.isValid) {
-      throw new Error(JSON.stringify({
-        message: 'Datos de proyecto inválidos',
-        details: validationResult.errors
-      }));
-    }
-    
-    try {
-      // IMPORTANTE: Normalizar el campo id (trim)
-      const normalizedId = String(data.id).trim();
-      console.log(`ID normalizado: ${normalizedId}`);
-      
-      // Verificar que no existe un proyecto con el mismo ID personalizado
-      const existingProjects = await db.collection('projects')
-        .where('id', '==', normalizedId)
-        .get();
-      
-      if (!existingProjects.empty) {
-        throw new Error(JSON.stringify({
-          message: `Ya existe un proyecto con el ID ${normalizedId}`
-        }));
-      }
-      
-      // Agregar ID de usuario y normalizar el ID personalizado
-      const projectData = {
-        ...data,
-        id: normalizedId, // Guardar ID normalizado
-        userId: context.uid,
-        createdAt: new Date()
-      };
-      
-      // Crear proyecto
-      const docRef = await db.collection('projects').add(projectData);
-      console.log(`Proyecto creado con ID: ${docRef.id}, ID personalizado: ${normalizedId}`);
-      
-      return { 
-        id: docRef.id,
-        success: true,
-        message: 'Proyecto creado correctamente'
-      };
-    } catch (error) {
-      // Parsear el mensaje de error si es un JSON
-      try {
-        const errorData = JSON.parse(error.message);
-        throw new Error(errorData.message);
-      } catch (parseError) {
-        throw new Error(error.message);
-      }
-    }
-  }
-);
-
-exports.createDailyReport = onCall(
-  functionConfig,
-  async (request) => {
-    const data = request.data;
-    const context = request.auth;
-    
-    console.log("Recibida solicitud para crear parte diario:", JSON.stringify(data, null, 2));
-    
-    // Verificar autenticación
-    if (!context) {
-      throw new Error('El usuario debe estar autenticado para crear partes diarios');
-    }
-    
-    try {
-      // Validar datos
-      const validationResult = await validateDailyReport(data);
-      if (!validationResult.isValid) {
-        throw new Error(JSON.stringify({
-          message: 'Datos de parte diario inválidos',
-          details: validationResult.errors
-        }));
-      }
-      
-      // Agregar ID de usuario y timestamp
-      const reportData = {
-        ...data,
-        userId: context.uid,
-        createdAt: new Date()
-      };
-      
-      // Crear parte diario
-      const docRef = await db.collection('dailyReports').add(reportData);
-      console.log(`Parte diario creado correctamente con ID: ${docRef.id}`);
-      
-      return { 
-        id: docRef.id,
-        success: true,
-        message: 'Parte diario creado correctamente'
-      };
-    } catch (error) {
-      console.error(`Error al crear parte diario:`, error);
-      // Parsear el mensaje de error si es un JSON
-      try {
-        const errorData = JSON.parse(error.message);
-        throw new Error(errorData.message);
-      } catch (parseError) {
-        throw new Error(error.message);
-      }
-    }
-  }
-);
-
-// Trigger para validación en tiempo real - también con región específica
-exports.validateOnCreate = onDocumentCreated(
-  {
-    document: '{collection}/{docId}',
-    region: 'us-central1' // Especificamos la misma región aquí
+<file path="firebase.json">
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
-  async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) return;
-
-    const collection = event.params.collection;
-    const data = snapshot.data();
-    
-    // Solo procesar colecciones específicas
-    if (['projects', 'dailyReports'].includes(collection)) {
-      let validationResult;
-      
-      if (collection === 'projects') {
-        validationResult = validateProject(data);
-      } else if (collection === 'dailyReports') {
-        validationResult = await validateDailyReport(data);
-      }
-      
-      // Si hay errores, registrarlos y potencialmente revertir la operación
-      if (validationResult && !validationResult.isValid) {
-        console.error(`Validation failed for ${collection}/${snapshot.id}:`, validationResult.errors);
-        
-        // Opcionalmente: Marcar el documento como inválido en lugar de eliminarlo
-        await snapshot.ref.update({
-          _validationErrors: validationResult.errors,
-          _validationStatus: 'invalid'
-        });
-      }
-    }
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20"
   }
-);
+}
 </file>
 
 <file path="src/App.css">
@@ -9973,6 +8936,867 @@ export const useReportFilters = (initialFilters = {}) => {
 export default useReportFilters;
 </file>
 
+<file path="src/hooks/useFormValidation.js">
+// src/hooks/useFormValidation.js
+
+import { useState, useCallback, useEffect } from 'react';
+import { validateForm } from '../utils/validationSchemas';
+
+const useFormValidation = (initialValues, validationSchema, contextData = {}) => {
+  const [values, setValues] = useState(initialValues);
+  const [errors, setErrors] = useState({});
+  const [touchedFields, setTouchedFields] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isValid, setIsValid] = useState(false);
+
+  // La definición de validateFormData con useCallback sigue siendo útil
+  // si necesitas llamar a esta función desde otros lugares (ej. manualmente).
+  const validateFormData = useCallback(() => {
+    // console.log("Running validateFormData with values:", values); // Log para depurar
+    const result = validateForm(values, validationSchema, contextData) || { errors: {}, isValid: false };
+    // Solo actualiza el estado si los errores o la validez realmente cambian
+    // Esto puede ayudar a prevenir re-renderizados innecesarios, aunque el problema principal suele ser el trigger del useEffect
+    setErrors(prevErrors => {
+        // Comparación superficial, podría necesitarse una comparación profunda si los errores son complejos
+        if (JSON.stringify(prevErrors) !== JSON.stringify(result.errors || {})) {
+            return result.errors || {};
+        }
+        return prevErrors;
+    });
+    setIsValid(prevIsValid => {
+        if (prevIsValid !== (result.isValid || false)) {
+            return result.isValid || false;
+        }
+        return prevIsValid;
+    });
+    return result;
+  }, [values, validationSchema, contextData]);
+
+  // *** CAMBIO PRINCIPAL AQUÍ ***
+  // Hacer que el efecto dependa directamente de los datos y las reglas,
+  // no de la función `validateFormData` memoizada.
+  useEffect(() => {
+    // console.log("Running validation useEffect due to change in values/schema/context"); // Log para depurar
+    validateFormData();
+  }, [values, validationSchema, contextData]); // <--- Dependencias directas
+
+  // --- El resto de los hooks useCallback (handleChange, handleBlur, etc.) sin cambios ---
+  const handleChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+
+    setValues(prevValues => {
+      if (name.includes('.')) {
+        const parts = name.split('.');
+        const newValues = { ...prevValues };
+        let current = newValues;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!current[parts[i]]) {
+            current[parts[i]] = {};
+          }
+          current = current[parts[i]];
+        }
+        current[parts[parts.length - 1]] = inputValue;
+        return newValues;
+      }
+      return { ...prevValues, [name]: inputValue };
+    });
+    setTouchedFields(prev => ({ ...prev, [name]: true }));
+  }, []);
+
+  const handleBlur = useCallback((e) => {
+    const { name } = e.target;
+    setTouchedFields(prev => ({ ...prev, [name]: true }));
+  }, []);
+
+  const hasError = useCallback((fieldName) => {
+    // Considerar campos anidados si es necesario
+    const fieldParts = fieldName.split('.');
+    let errorValue = errors;
+    for (const part of fieldParts) {
+        errorValue = errorValue?.[part];
+        if (errorValue === undefined) break;
+    }
+    return Boolean(touchedFields[fieldName.split('.')[0]] && errorValue); // Comprobar touched en el campo base
+  }, [touchedFields, errors]);
+
+
+  const getError = useCallback((fieldName) => {
+    // Considerar campos anidados
+     const fieldParts = fieldName.split('.');
+     let errorValue = errors;
+     for (const part of fieldParts) {
+         errorValue = errorValue?.[part];
+         if (errorValue === undefined) break;
+     }
+    return hasError(fieldName) ? errorValue : null;
+  }, [hasError, errors]); // Dependencia correcta
+
+  const handleSubmit = useCallback((onSubmit) => async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const allFieldsTouched = Object.keys(validationSchema).reduce((acc, key) => {
+        acc[key.split('.')[0]] = true;
+        return acc;
+    }, {});
+    setTouchedFields(allFieldsTouched);
+
+    // Re-validar explícitamente justo antes de enviar
+    const validationResult = validateForm(values, validationSchema, contextData);
+     setErrors(validationResult.errors || {});
+     setIsValid(validationResult.isValid || false);
+
+
+    if (validationResult.isValid) {
+      try {
+        await onSubmit(values);
+      } catch (error) {
+        console.error('Error on form submission:', error);
+      }
+    }
+
+    setIsSubmitting(false);
+  }, [values, validationSchema, contextData]); // Asegúrate que las deps están bien aquí también
+
+
+  const resetForm = useCallback((newValues = initialValues) => {
+    setValues(newValues);
+    setErrors({});
+    setTouchedFields({});
+    setIsSubmitting(false);
+  }, [initialValues]);
+
+
+  const setValue = useCallback((name, value) => {
+    setValues(prevValues => {
+      if (name.includes('.')) {
+        const parts = name.split('.');
+        const newValues = { ...prevValues };
+        let current = newValues;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!current[parts[i]]) {
+            current[parts[i]] = {};
+          }
+          current = current[parts[i]];
+        }
+        current[parts[parts.length - 1]] = value;
+        return newValues;
+      }
+      return { ...prevValues, [name]: value };
+    });
+  }, []);
+
+  return {
+    values,
+    errors,
+    touchedFields,
+    isSubmitting,
+    isValid,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    resetForm,
+    setValue,
+    hasError,
+    getError,
+  };
+};
+
+export default useFormValidation;
+</file>
+
+<file path="src/hooks/useQueryProjects.js">
+// src/hooks/useQueryProjects.js
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where
+} from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db } from '../firebase';
+
+const PROJECTS_CACHE_KEY = 'projects';
+
+const fetchProjects = async (userId = null) => {
+  let q = collection(db, 'projects');
+  if (userId) {
+    q = query(q, where('userId', '==', userId));
+  }
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    firestoreId: doc.id,
+    ...doc.data()
+  }));
+};
+
+const fetchProjectById = async (projectIdOrFirestoreId) => {
+  if (!projectIdOrFirestoreId) return null;
+
+  try {
+    const docRef = doc(db, 'projects', projectIdOrFirestoreId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return {
+        firestoreId: docSnap.id,
+        ...docSnap.data()
+      };
+    }
+  } catch (error) {
+     // Ignore error if it's just not found by Firestore ID, we'll try custom ID next
+     if (error.code !== 'invalid-argument') { // Don't log if it's just an invalid path format
+        console.warn("Attempt to fetch by Firestore ID failed (may try custom ID next):", error);
+     }
+  }
+
+  try {
+    const projectsQuery = query(collection(db, 'projects'), where('id', '==', projectIdOrFirestoreId));
+    const querySnapshot = await getDocs(projectsQuery);
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      return {
+        firestoreId: docSnap.id,
+        ...docSnap.data()
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching project by custom ID:", error);
+  }
+
+  return null; // Return null if not found by either ID
+};
+
+
+export const useQueryProjects = (userId = null) => {
+  return useQuery({
+    queryKey: [PROJECTS_CACHE_KEY, { userId: userId || 'all' }], // Ensure key changes if userId changes
+    queryFn: () => fetchProjects(userId),
+  });
+};
+
+
+export const useQueryProject = (projectIdOrFirestoreId) => {
+    return useQuery({
+      // Use a more specific key that includes the ID being queried
+      queryKey: [PROJECTS_CACHE_KEY, 'detail', projectIdOrFirestoreId],
+      queryFn: () => fetchProjectById(projectIdOrFirestoreId),
+      enabled: !!projectIdOrFirestoreId, // Only run if ID is provided
+    });
+  };
+
+
+export const useAddProject = () => {
+  const queryClient = useQueryClient();
+  const functions = getFunctions();
+  const createProjectFunction = httpsCallable(functions, 'createProject');
+
+  return useMutation({
+    mutationFn: async (projectData) => {
+      const result = await createProjectFunction(projectData);
+      return result.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    },
+  });
+};
+
+export const useUpdateProject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ firestoreId, data }) => {
+      if (!firestoreId) {
+        throw new Error("firestoreId es requerido para actualizar.");
+      }
+      const projectRef = doc(db, 'projects', firestoreId);
+      const { firestoreId: _, ...updateData } = data;
+      await updateDoc(projectRef, updateData);
+      return { ...data, firestoreId: firestoreId };
+    },
+    onMutate: async ({ firestoreId, data }) => {
+      if (!firestoreId) return;
+      await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Use detailed key
+      const previousProject = queryClient.getQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId]); // Use detailed key
+
+      // Optimistically update the specific project cache
+      queryClient.setQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId], old => ({
+          ...(old || {}),
+          ...data,
+          firestoreId: firestoreId
+      }));
+
+      // Optimistically update the list cache
+      queryClient.setQueryData([PROJECTS_CACHE_KEY], (oldListData) => {
+          if (!oldListData) return [];
+          // Ensure we're working with the correct key structure if nested under userId
+          // This part might need adjustment based on how useQueryProjects structures its cache
+          if (Array.isArray(oldListData)) { // Simple array cache
+              return oldListData.map(project =>
+                  project.firestoreId === firestoreId ? { ...project, ...data, firestoreId: firestoreId } : project
+              );
+          } else if (oldListData && typeof oldListData === 'object' && oldListData.pages) { // Infinite query cache
+               return {
+                   ...oldListData,
+                   pages: oldListData.pages.map(page => ({
+                       ...page,
+                       items: page.items.map(project =>
+                           project.firestoreId === firestoreId ? { ...project, ...data, firestoreId: firestoreId } : project
+                       )
+                   }))
+               };
+          }
+          // Add handling for other cache structures if necessary
+          console.warn("Unrecognized cache structure for project list in onMutate");
+          return oldListData; // Return unchanged if structure is unknown
+      });
+
+
+      return { previousProject };
+    },
+    onError: (err, { firestoreId }, context) => {
+      if (firestoreId && context?.previousProject) {
+        queryClient.setQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId], context.previousProject); // Use detailed key
+      }
+      // Consider rolling back the list update as well
+       queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate list on error for safety
+    },
+    onSettled: (data, error, { firestoreId }) => {
+        if (firestoreId) {
+            queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Use detailed key
+        }
+        // Always invalidate the main list query (or relevant list queries)
+        queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate potentially multiple list caches
+    },
+
+  });
+};
+
+export const useDeleteProject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (firestoreId) => { // Expect firestoreId directly
+      if (!firestoreId) {
+        throw new Error("firestoreId es requerido para eliminar.");
+      }
+      await deleteDoc(doc(db, 'projects', firestoreId));
+      return firestoreId;
+    },
+    onMutate: async (firestoreId) => {
+        if (!firestoreId) return;
+        await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Cancel list queries
+        await queryClient.cancelQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Cancel detail query
+
+        const previousDetail = queryClient.getQueryData([PROJECTS_CACHE_KEY, 'detail', firestoreId]);
+        queryClient.removeQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] }); // Remove detail cache
+
+        const previousListCache = queryClient.getQueryState([PROJECTS_CACHE_KEY]); // Get state to know structure
+
+        // Optimistically remove from the list cache
+        queryClient.setQueriesData(
+          { queryKey: [PROJECTS_CACHE_KEY] }, // Target list queries
+          (oldData) => {
+            if (!oldData) return [];
+            if (Array.isArray(oldData)) { // Simple array cache
+                return oldData.filter(project => project.firestoreId !== firestoreId);
+            } else if (oldData && typeof oldData === 'object' && oldData.pages) { // Infinite query cache
+                 return {
+                     ...oldData,
+                     pages: oldData.pages.map(page => ({
+                         ...page,
+                         items: page.items.filter(project => project.firestoreId !== firestoreId)
+                     }))
+                 };
+            }
+            console.warn("Unrecognized cache structure for project list in onMutate (delete)");
+            return oldData; // Return unchanged if structure is unknown
+          }
+        );
+
+
+        return { previousListCache, previousDetail }; // Return previous states if needed for rollback
+    },
+
+    onError: (err, firestoreId, context) => {
+        // Rollback logic if needed, using context.previousListCache, context.previousDetail
+         console.error("Error deleting project:", err);
+         // Invalidate caches to refetch correct state
+         if (firestoreId) {
+             queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] });
+         }
+         queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] });
+    },
+
+    onSettled: (data, error, firestoreId) => { // data here is the returned firestoreId
+      // Invalidate relevant queries to ensure fresh data
+      if (firestoreId) {
+          queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY, 'detail', firestoreId] });
+      }
+      queryClient.invalidateQueries({ queryKey: [PROJECTS_CACHE_KEY] }); // Invalidate list(s)
+    },
+  });
+};
+</file>
+
+<file path="src/utils/validationSchemas.js">
+// src/utils/validationSchemas.js - Actualizado para incluir validación de campos de trabajo extra
+
+// Funciones de validación básicas
+const isRequired = (value) => !!value || value === 0;
+const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
+const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
+const isValidTime = (value) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
+const isValidDate = (value) => !isNaN(Date.parse(value));
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isBoolean = (value) => typeof value === 'boolean';
+
+// Esquema para proyectos (actualizado)
+export const projectSchema = {
+  id: {
+    validator: (value) => isRequired(value) && /^[a-zA-Z0-9 .-]+$/.test(value), 
+    message: "El ID es obligatorio y solo puede contener letras, números, espacios, puntos y guiones.", 
+  },
+  client: {
+    validator: isRequired,
+    message: "El cliente es obligatorio.",
+  },
+  address: {
+    validator: isRequired,
+    message: "La dirección es obligatoria.",
+  },
+  nifNie: {
+    validator: (value) => isRequired(value) && /^[0-9XYZ][0-9]{7}[A-Z]$/.test(value),
+    message: "El NIF/NIE debe tener un formato válido.",
+  },
+  type: {
+    validator: (value) => ["hourly", "fixed"].includes(value),
+    message: "El tipo debe ser 'hourly' o 'fixed'.",
+  },
+  officialPrice: {
+    validator: (value, formData) => 
+      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
+    message: "El precio por hora del oficial debe ser un número positivo.",
+  },
+  workerPrice: {
+    validator: (value, formData) => 
+      (formData.type !== "hourly" && !formData.allowExtraWork) || isPositiveNumber(value),
+    message: "El precio por hora del peón debe ser un número positivo.",
+  },
+  budgetAmount: {
+    validator: (value, formData) => 
+      formData.type !== "fixed" || isPositiveNumber(value),
+    message: "El importe del presupuesto debe ser un número positivo.",
+  },
+  allowExtraWork: {
+    validator: (value, formData) => 
+      formData.type !== "fixed" || typeof value === 'boolean',
+    message: "El campo debe ser verdadero o falso.",
+  },
+};
+
+// Esquema para partes diarios (actualizado para trabajo extra)
+export const dailyReportSchema = {
+  reportDate: {
+    validator: isValidDate,
+    message: "La fecha debe ser válida.",
+  },
+  projectId: {
+    validator: isRequired,
+    message: "El ID del proyecto es obligatorio.",
+  },
+  // Campos para trabajo extra
+  isExtraWork: {
+    validator: (value, formData) => 
+      formData.projectType !== "fixed" || typeof value === 'boolean',
+    message: "El campo debe ser verdadero o falso.",
+  },
+  extraWorkType: {
+    validator: (value, formData) => 
+      !formData.isExtraWork || ["additional_budget", "hourly"].includes(value),
+    message: "El tipo de trabajo extra debe ser 'additional_budget' o 'hourly'.",
+  },
+  extraBudgetAmount: {
+    validator: (value, formData) => 
+      !formData.isExtraWork || formData.extraWorkType !== "additional_budget" || isPositiveNumber(value),
+    message: "El importe adicional debe ser un número positivo.",
+  },
+  // Para proyectos por horas o extras facturados por horas
+  "labor.officialEntry": {
+    validator: (value, formData) => 
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
+    message: "La hora de entrada del oficial debe tener un formato válido (HH:MM).",
+  },
+  "labor.officialExit": {
+    validator: (value, formData) => 
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
+    message: "La hora de salida del oficial debe tener un formato válido (HH:MM).",
+  },
+  "labor.workerEntry": {
+    validator: (value, formData) => 
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
+    message: "La hora de entrada del peón debe tener un formato válido (HH:MM).",
+  },
+  "labor.workerExit": {
+    validator: (value, formData) => 
+      (formData.projectType !== "hourly" && !(formData.isExtraWork && formData.extraWorkType === "hourly")) || 
+      !value || isValidTime(value),
+    message: "La hora de salida del peón debe tener un formato válido (HH:MM).",
+  },
+  // Para todos los tipos
+  "workPerformed.description": {
+    validator: isRequired,
+    message: "La descripción de los trabajos realizados es obligatoria.",
+  },
+  // Para proyectos de presupuesto cerrado (dentro del presupuesto)
+  "workPerformed.invoicedAmount": {
+    validator: (value, formData) => 
+      (formData.projectType !== "fixed" || formData.isExtraWork) || isPositiveNumber(value),
+    message: "El importe facturado debe ser un número positivo.",
+  },
+};
+
+// Esquema para materiales
+export const materialSchema = {
+  description: {
+    validator: isRequired,
+    message: "La descripción del material es obligatoria.",
+  },
+  cost: {
+    validator: isPositiveNumber,
+    message: "El coste debe ser un número positivo.",
+  },
+};
+
+// Utilidad para validar formularios
+export const validateForm = (data, schema, context = {}) => {
+  const errors = {};
+  
+  Object.entries(schema).forEach(([field, { validator, message }]) => {
+    // Manejar campos anidados (e.g., 'labor.officialEntry')
+    const fieldParts = field.split('.');
+    let value = data;
+    
+    for (const part of fieldParts) {
+      value = value && typeof value === 'object' ? value[part] : undefined;
+    }
+    
+    // Validar el campo
+    if (!validator(value, { ...data, ...context })) {
+      errors[field] = message;
+    }
+  });
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+};
+</file>
+
+<file path="functions/index.js">
+// functions/index.js
+
+const { onCall } = require("firebase-functions/v2/https");
+const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+const admin = require("firebase-admin");
+
+initializeApp(); // Assuming already initialized elsewhere or handled by Firebase env
+const db = getFirestore();
+
+const functionConfig = {
+  region: "us-central1",
+  minInstances: 0,
+  maxInstances: 10
+};
+
+const isRequired = (value) => value !== undefined && value !== null && value !== '';
+const isNumber = (value) => !isNaN(parseFloat(value)) && isFinite(value);
+const isPositiveNumber = (value) => isNumber(value) && parseFloat(value) >= 0;
+const isValidTime = (value) => !value || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value);
+const isValidDate = (value) => isRequired(value) && !isNaN(Date.parse(value));
+const isBoolean = (value) => typeof value === 'boolean';
+
+const isAuthenticated = (context) => !!context.auth;
+const isOwner = async (userId, resourcePath) => {
+  try {
+    const docSnap = await db.doc(resourcePath).get();
+    return docSnap.exists && docSnap.data().userId === userId;
+  } catch (error) {
+    return false;
+  }
+};
+
+const findProjectById = async (projectId) => {
+  console.log(`Finding project by custom ID: '${projectId}'`);
+  if (!projectId) {
+    console.log("Project ID not provided.");
+    return null;
+  }
+  try {
+    const normalizedId = String(projectId).trim();
+    console.log(`Normalized project ID: '${normalizedId}'`);
+    const projectQuery = await db.collection('projects')
+      .where('id', '==', normalizedId)
+      .limit(1)
+      .get();
+
+    if (projectQuery.empty) {
+      console.log(`Project with custom ID '${normalizedId}' not found.`);
+      return null;
+    }
+
+    const projectDoc = projectQuery.docs[0];
+    console.log(`Project found. Firestore Doc ID: ${projectDoc.id}`);
+    return { firestoreDocId: projectDoc.id, ...projectDoc.data() };
+  } catch (error) {
+    console.error(`Error finding project '${projectId}': ${error.message}`);
+    return null;
+  }
+};
+
+const validateExtraWork = async (data, projectId) => {
+  const errors = {};
+  const project = await findProjectById(projectId);
+  if (!project) {
+    errors.projectId = 'El proyecto no existe';
+    return { isValid: false, errors };
+  }
+  if (project.type !== 'fixed' || !project.allowExtraWork) {
+    errors.isExtraWork = 'Este proyecto no permite trabajos extra';
+    return { isValid: false, errors };
+  }
+  if (!['additional_budget', 'hourly'].includes(data.extraWorkType)) {
+    errors.extraWorkType = 'Tipo de trabajo extra inválido.';
+  }
+  if (data.extraWorkType === 'additional_budget') {
+    if (!isPositiveNumber(data.extraBudgetAmount)) {
+      errors.extraBudgetAmount = 'Importe adicional inválido.';
+    }
+  }
+  if (data.extraWorkType === 'hourly') {
+    if (!data.labor) {
+      errors.labor = 'Datos de mano de obra obligatorios.';
+    } else {
+      if (!isValidTime(data.labor.officialEntry)) errors['labor.officialEntry'] = 'Formato HH:MM inválido.';
+      if (!isValidTime(data.labor.officialExit)) errors['labor.officialExit'] = 'Formato HH:MM inválido.';
+      if (!isValidTime(data.labor.workerEntry)) errors['labor.workerEntry'] = 'Formato HH:MM inválido.';
+      if (!isValidTime(data.labor.workerExit)) errors['labor.workerExit'] = 'Formato HH:MM inválido.';
+    }
+  }
+  if (!data.workPerformed || !isRequired(data.workPerformed.description)) {
+    errors['workPerformed.description'] = 'Descripción obligatoria.';
+  }
+  return { isValid: Object.keys(errors).length === 0, errors };
+};
+
+const validateProject = (data) => {
+  const errors = {};
+  if (!isRequired(data.id)) errors.id = 'El ID es obligatorio';
+  else if (!/^[a-zA-Z0-9 .-]+$/.test(data.id)) errors.id = 'El ID solo puede contener letras, números, espacios, puntos y guiones.';
+  if (!isRequired(data.client)) errors.client = 'Cliente obligatorio.';
+  if (!isRequired(data.address)) errors.address = 'Dirección obligatoria.';
+  if (!isRequired(data.nifNie)) errors.nifNie = 'NIF/NIE obligatorio.';
+  else if (!/^[0-9XYZ][0-9]{7}[A-Z]$/.test(data.nifNie)) errors.nifNie = 'NIF/NIE inválido.';
+  if (!isRequired(data.type)) errors.type = 'Tipo obligatorio.';
+  else if (!['hourly', 'fixed'].includes(data.type)) errors.type = 'Tipo inválido.';
+  if (data.type === 'hourly') {
+    if (!isPositiveNumber(data.officialPrice)) errors.officialPrice = 'Precio oficial inválido.';
+    if (!isPositiveNumber(data.workerPrice)) errors.workerPrice = 'Precio peón inválido.';
+  } else if (data.type === 'fixed') {
+    if (!isPositiveNumber(data.budgetAmount)) errors.budgetAmount = 'Presupuesto inválido.';
+    if (data.allowExtraWork) {
+      if (!isPositiveNumber(data.officialPrice)) errors.officialPrice = 'Precio extra oficial inválido.';
+      if (!isPositiveNumber(data.workerPrice)) errors.workerPrice = 'Precio extra peón inválido.';
+    }
+  }
+  return { isValid: Object.keys(errors).length === 0, errors };
+};
+
+const validateDailyReport = async (data) => {
+  const errors = {};
+  console.log(`Validating daily report:`, JSON.stringify(data, null, 2));
+  if (!isValidDate(data.reportDate)) errors.reportDate = 'Fecha inválida.';
+  if (!isRequired(data.projectId)) errors.projectId = 'ID de proyecto obligatorio.';
+  else {
+    const project = await findProjectById(data.projectId);
+    if (!project) errors.projectId = 'El proyecto no existe.';
+    else {
+      const projectType = project.type;
+      if (data.isExtraWork) {
+        const extraWorkValidation = await validateExtraWork(data, data.projectId);
+        if (!extraWorkValidation.isValid) Object.assign(errors, extraWorkValidation.errors);
+      } else {
+        if (projectType === 'hourly') {
+          if (!data.labor) errors.labor = 'Mano de obra obligatoria.';
+          else {
+            if (!isValidTime(data.labor.officialEntry)) errors['labor.officialEntry'] = 'Formato HH:MM inválido.';
+            if (!isValidTime(data.labor.officialExit)) errors['labor.officialExit'] = 'Formato HH:MM inválido.';
+            if (!isValidTime(data.labor.workerEntry)) errors['labor.workerEntry'] = 'Formato HH:MM inválido.';
+            if (!isValidTime(data.labor.workerExit)) errors['labor.workerExit'] = 'Formato HH:MM inválido.';
+          }
+        } else if (projectType === 'fixed') {
+          if (!isPositiveNumber(data.invoicedAmount)) errors.invoicedAmount = 'Importe facturado inválido.';
+        }
+      }
+    }
+  }
+  if (!data.workPerformed || !isRequired(data.workPerformed.description)) {
+    errors['workPerformed.description'] = 'Descripción obligatoria.';
+  }
+  const result = { isValid: Object.keys(errors).length === 0, errors };
+  console.log(`Validation result: ${result.isValid ? 'Valid' : 'Invalid'}`, result.errors);
+  return result;
+};
+
+exports.createProject = onCall(
+  functionConfig,
+  async (request) => {
+    const data = request.data;
+    const context = request.auth;
+    console.log("Data createProject:", JSON.stringify(data, null, 2));
+    if (!context) throw new Error('Authentication required.');
+    const validationResult = validateProject(data);
+    if (!validationResult.isValid) throw new Error(JSON.stringify({ message: 'Invalid data', details: validationResult.errors }));
+    try {
+      const normalizedId = String(data.id).trim();
+      const existingProjects = await db.collection('projects').where('id', '==', normalizedId).get();
+      if (!existingProjects.empty) throw new Error(JSON.stringify({ message: `ID ${normalizedId} already exists` }));
+      const projectData = { ...data, id: normalizedId, userId: context.uid, createdAt: new Date() };
+      const docRef = await db.collection('projects').add(projectData);
+      console.log(`Project created: Doc ID ${docRef.id}, Custom ID ${normalizedId}`);
+      return { id: docRef.id, success: true, message: 'Project created.' };
+    } catch (error) {
+      console.error("Error in createProject:", error);
+      try { const errorData = JSON.parse(error.message); throw new Error(errorData.message); }
+      catch (parseError) { throw new Error(error.message); }
+    }
+  }
+);
+
+exports.createDailyReport = onCall(
+  functionConfig,
+  async (request) => {
+    const data = request.data;
+    const context = request.auth;
+    console.log("Data createDailyReport:", JSON.stringify(data, null, 2));
+    if (!context) throw new Error('Authentication required.');
+    try {
+      const validationResult = await validateDailyReport(data);
+      if (!validationResult.isValid) throw new Error(JSON.stringify({ message: 'Invalid data', details: validationResult.errors }));
+      const reportData = { ...data, userId: context.uid, createdAt: new Date() };
+      const docRef = await db.collection('dailyReports').add(reportData);
+      console.log(`Daily report created: ${docRef.id}`);
+      return { id: docRef.id, success: true, message: 'Daily report created.' };
+    } catch (error) {
+      console.error("Error in createDailyReport:", error);
+      try { const errorData = JSON.parse(error.message); throw new Error(errorData.message); }
+      catch (parseError) { throw new Error(error.message); }
+    }
+  }
+);
+
+exports.validateOnCreate = onDocumentCreated(
+  { document: '{collection}/{docId}', region: 'us-central1' },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+    const collection = event.params.collection;
+    const data = snapshot.data();
+    if (['projects', 'dailyReports'].includes(collection)) {
+      let validationResult;
+      if (collection === 'projects') validationResult = validateProject(data);
+      else if (collection === 'dailyReports') validationResult = await validateDailyReport(data);
+      if (validationResult && !validationResult.isValid) {
+        console.error(`Validation failed for ${collection}/${snapshot.id}:`, validationResult.errors);
+        await snapshot.ref.update({ _validationErrors: validationResult.errors, _validationStatus: 'invalid' });
+      }
+    }
+  }
+);
+
+exports.updateProjectInvoicedTotal = onDocumentWritten(
+  { document: "dailyReports/{reportId}", region: "us-central1" },
+  async (event) => {
+    const reportId = event.params.reportId;
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+
+    const projectIdBefore = beforeData?.projectId;
+    const projectIdAfter = afterData?.projectId;
+    const affectedProjectIds = new Set();
+    if (projectIdBefore) affectedProjectIds.add(projectIdBefore);
+    if (projectIdAfter) affectedProjectIds.add(projectIdAfter);
+
+    if (affectedProjectIds.size === 0) {
+      console.log(`Report ${reportId}: No projectId found. Exiting.`);
+      return null;
+    }
+
+    console.log(`Report ${reportId} changed. Affecting project(s): ${[...affectedProjectIds].join(', ')}`);
+
+    const recalculateAndUpdate = async (projectIdToUpdate) => {
+      console.log(`Recalculating for project: ${projectIdToUpdate}`);
+      try {
+        const project = await findProjectById(projectIdToUpdate);
+        if (!project) {
+          console.log(`Project ${projectIdToUpdate} not found during recalculation.`);
+          return;
+        }
+        if (project.type !== 'fixed') {
+          console.log(`Project ${projectIdToUpdate} is type '${project.type}', skipping update.`);
+          return;
+        }
+
+        const projectDocumentId = project.firestoreDocId;
+        if (!projectDocumentId) {
+           console.error(`Firestore document ID missing for project custom ID ${projectIdToUpdate}`);
+           return;
+        }
+
+        const reportsQuery = db.collection('dailyReports')
+          .where('projectId', '==', projectIdToUpdate)
+          .where('isExtraWork', '==', false);
+
+        const snapshot = await reportsQuery.get();
+        let newTotalInvoiced = 0;
+        snapshot.forEach(doc => {
+          newTotalInvoiced += parseFloat(doc.data().invoicedAmount) || 0;
+        });
+
+        console.log(`Recalculated total for ${projectIdToUpdate} (Doc: ${projectDocumentId}): ${newTotalInvoiced}`);
+
+        const projectRef = db.collection('projects').doc(projectDocumentId);
+        await projectRef.update({ totalInvoicedAmount: newTotalInvoiced });
+
+        console.log(`Updated totalInvoicedAmount for project ${projectIdToUpdate} (Doc: ${projectDocumentId}).`);
+
+      } catch (error) {
+        console.error(`Error updating totalInvoicedAmount for ${projectIdToUpdate}:`, error);
+      }
+    };
+
+    for (const pid of affectedProjectIds) {
+      await recalculateAndUpdate(pid);
+    }
+
+    return null;
+  }
+);
+</file>
+
 <file path="package.json">
 {
   "name": "partes-diarios",
@@ -11900,6 +11724,183 @@ export default React.memo(ReportItem);
 }
 </file>
 
+<file path="src/components/Dashboard.js">
+// src/components/Dashboard.js - Refactorizado para usar useCalculationsService
+import React, { useState } from "react";
+import { useQueryProjects } from "../hooks/useQueryProjects";
+import { useQueryReportsInfinite } from "../hooks/useQueryReports";
+import useReportFilters from "../hooks/reports/useReportFilters";
+
+// Componentes
+import KPICards from "./dashboard/KPICards";
+import DashboardFilters from "./dashboard/DashboardFilters";
+import DashboardCharts from "./dashboard/DashboardCharts";
+import DashboardSummary from "./dashboard/DashboardSummary";
+import DashboardSkeleton from "./dashboard/DashboardSkeleton";
+import ErrorDisplay from "./common/ErrorDisplay";
+import EmptyState from "./common/EmptyState";
+
+// Estilos
+import "./Dashboard.css";
+
+/**
+ * Dashboard principal que muestra KPIs, gráficos y resúmenes de proyectos/reportes
+ */
+const Dashboard = () => {
+  // Estados de UI
+  const [selectedProject, setSelectedProject] = useState("all");
+  const [dateRange, setDateRange] = useState({ 
+    startDate: "", 
+    endDate: new Date().toISOString().split("T")[0]
+  });
+  const [activeView, setActiveView] = useState("costes");
+  
+  // Obtener proyectos usando React Query
+  const { 
+    data: projects = [], 
+    isLoading: projectsLoading, 
+    error: projectsError 
+  } = useQueryProjects();
+  
+  // Hook de filtros
+  const { updateFilters, filters, filterReports } = useReportFilters({
+    projectId: selectedProject !== "all" ? selectedProject : "",
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate
+  });
+
+  // Obtener reportes usando React Query con paginación infinita
+  const { 
+    data, 
+    isLoading: reportsLoading, 
+    fetchNextPage,
+    hasNextPage,
+    error: reportsError,
+    refetch
+  } = useQueryReportsInfinite({
+    pageSize: 100, // Obtener bastantes reportes por página
+    startDate: dateRange.startDate || undefined,
+    endDate: dateRange.endDate || undefined,
+    projectId: selectedProject !== "all" ? selectedProject : undefined
+  });
+  
+  // Transformar los datos paginados a un arreglo plano
+  const reports = React.useMemo(() => {
+    if (!data) return [];
+    return data.pages.flatMap(page => page.items || []);
+  }, [data]);
+
+  // Filtrar reportes basados en filtros actuales (si hay alguno adicional que no maneje ya la consulta)
+  const filteredReports = filterReports(reports);
+
+  // Manejar cambios en los filtros
+  const handleFiltersChange = (newFilters) => {
+    if (newFilters.projectId !== undefined) {
+      setSelectedProject(newFilters.projectId === "" ? "all" : newFilters.projectId);
+    }
+    
+    if (newFilters.startDate !== undefined || newFilters.endDate !== undefined) {
+      setDateRange(prev => ({
+        ...prev,
+        ...(newFilters.startDate !== undefined && { startDate: newFilters.startDate }),
+        ...(newFilters.endDate !== undefined && { endDate: newFilters.endDate })
+      }));
+    }
+    
+    updateFilters(newFilters);
+  };
+
+  // Manejar cambio de vista
+  const handleViewChange = (view) => {
+    setActiveView(view);
+  };
+
+  // Estado de carga combinado
+  const isLoading = projectsLoading || (reportsLoading && reports.length === 0);
+  
+  // Condiciones de renderizado
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+  
+  if (projectsError || reportsError) {
+    return (
+      <ErrorDisplay 
+        error={projectsError || reportsError} 
+        message="No se pudieron cargar los datos para el dashboard" 
+        onRetry={() => refetch()} // React Query proporciona refetch
+      />
+    );
+  }
+
+  if (projects.length === 0 || reports.length === 0) {
+    return (
+      <EmptyState
+        title="No hay datos disponibles"
+        message="Añade proyectos y reportes para comenzar a visualizar métricas en el dashboard."
+        icon="📊"
+        action={() => refetch()}
+        actionLabel="Actualizar datos"
+      />
+    );
+  }
+
+  return (
+    <div className="dashboard" role="region" aria-label="Panel de control">
+      <h2 className="section-title">Dashboard</h2>
+      
+      {/* Tarjetas de KPIs */}
+      <KPICards 
+        reports={filteredReports}
+        projects={projects}
+        selectedProjectId={selectedProject !== "all" ? selectedProject : ""}
+      />
+      
+      {/* Filtros */}
+      <DashboardFilters 
+        projects={projects}
+        selectedProject={selectedProject}
+        dateRange={dateRange}
+        onFiltersChange={handleFiltersChange}
+      />
+      
+      {/* Gráficos */}
+      <DashboardCharts 
+        reports={filteredReports}
+        projects={projects}
+        selectedProject={selectedProject}
+        dateRange={dateRange}
+        activeView={activeView}
+        onViewChange={handleViewChange}
+      />
+      
+      {/* Resumen de datos */}
+      <DashboardSummary 
+        reports={filteredReports}
+        projects={projects}
+        selectedProject={selectedProject}
+        isLoading={false}
+      />
+      
+      {/* Cargar más datos si es necesario */}
+      {hasNextPage && (
+        <div className="load-more-container">
+          <button 
+            onClick={() => fetchNextPage()} 
+            disabled={!hasNextPage}
+            className="load-more-button"
+          >
+            {reportsLoading ? "Cargando más datos..." : "Cargar más datos"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default React.memo(Dashboard);
+</file>
+
 <file path="src/components/reports/ReportsViewer.js">
 // src/components/reports/ReportsViewer.js - Actualizado con filtros avanzados
 import React, { useState, useCallback, useMemo, useEffect } from "react";
@@ -11961,6 +11962,7 @@ const ReportsViewer = () => {
 
   // Consultar proyectos y usuarios
   const { data: projects = [] } = useQueryProjects();
+  
   const { data: users = [], isLoading: usersLoading } = useQueryUser();
 
   // Consulta de reportes con React Query - usando los filtros nuevos
@@ -12289,240 +12291,51 @@ const ReportsViewer = () => {
 export default React.memo(ReportsViewer);
 </file>
 
-<file path="src/components/Dashboard.js">
-// src/components/Dashboard.js - Refactorizado para usar useCalculationsService
-import React, { useState } from "react";
-import { useQueryProjects } from "../hooks/useQueryProjects";
-import { useQueryReportsInfinite } from "../hooks/useQueryReports";
-import useReportFilters from "../hooks/reports/useReportFilters";
-
-// Componentes
-import KPICards from "./dashboard/KPICards";
-import DashboardFilters from "./dashboard/DashboardFilters";
-import DashboardCharts from "./dashboard/DashboardCharts";
-import DashboardSummary from "./dashboard/DashboardSummary";
-import DashboardSkeleton from "./dashboard/DashboardSkeleton";
-import ErrorDisplay from "./common/ErrorDisplay";
-import EmptyState from "./common/EmptyState";
-
-// Estilos
-import "./Dashboard.css";
-
-/**
- * Dashboard principal que muestra KPIs, gráficos y resúmenes de proyectos/reportes
- */
-const Dashboard = () => {
-  // Estados de UI
-  const [selectedProject, setSelectedProject] = useState("all");
-  const [dateRange, setDateRange] = useState({ 
-    startDate: "", 
-    endDate: new Date().toISOString().split("T")[0]
-  });
-  const [activeView, setActiveView] = useState("costes");
-  
-  // Obtener proyectos usando React Query
-  const { 
-    data: projects = [], 
-    isLoading: projectsLoading, 
-    error: projectsError 
-  } = useQueryProjects();
-  
-  // Hook de filtros
-  const { updateFilters, filters, filterReports } = useReportFilters({
-    projectId: selectedProject !== "all" ? selectedProject : "",
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate
-  });
-
-  // Obtener reportes usando React Query con paginación infinita
-  const { 
-    data, 
-    isLoading: reportsLoading, 
-    fetchNextPage,
-    hasNextPage,
-    error: reportsError,
-    refetch
-  } = useQueryReportsInfinite({
-    pageSize: 100, // Obtener bastantes reportes por página
-    startDate: dateRange.startDate || undefined,
-    endDate: dateRange.endDate || undefined,
-    projectId: selectedProject !== "all" ? selectedProject : undefined
-  });
-  
-  // Transformar los datos paginados a un arreglo plano
-  const reports = React.useMemo(() => {
-    if (!data) return [];
-    return data.pages.flatMap(page => page.items || []);
-  }, [data]);
-
-  // Filtrar reportes basados en filtros actuales (si hay alguno adicional que no maneje ya la consulta)
-  const filteredReports = filterReports(reports);
-
-  // Manejar cambios en los filtros
-  const handleFiltersChange = (newFilters) => {
-    if (newFilters.projectId !== undefined) {
-      setSelectedProject(newFilters.projectId === "" ? "all" : newFilters.projectId);
-    }
-    
-    if (newFilters.startDate !== undefined || newFilters.endDate !== undefined) {
-      setDateRange(prev => ({
-        ...prev,
-        ...(newFilters.startDate !== undefined && { startDate: newFilters.startDate }),
-        ...(newFilters.endDate !== undefined && { endDate: newFilters.endDate })
-      }));
-    }
-    
-    updateFilters(newFilters);
-  };
-
-  // Manejar cambio de vista
-  const handleViewChange = (view) => {
-    setActiveView(view);
-  };
-
-  // Estado de carga combinado
-  const isLoading = projectsLoading || (reportsLoading && reports.length === 0);
-  
-  // Condiciones de renderizado
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
-  
-  if (projectsError || reportsError) {
-    return (
-      <ErrorDisplay 
-        error={projectsError || reportsError} 
-        message="No se pudieron cargar los datos para el dashboard" 
-        onRetry={() => refetch()} // React Query proporciona refetch
-      />
-    );
-  }
-
-  if (projects.length === 0 || reports.length === 0) {
-    return (
-      <EmptyState
-        title="No hay datos disponibles"
-        message="Añade proyectos y reportes para comenzar a visualizar métricas en el dashboard."
-        icon="📊"
-        action={() => refetch()}
-        actionLabel="Actualizar datos"
-      />
-    );
-  }
-
-  return (
-    <div className="dashboard" role="region" aria-label="Panel de control">
-      <h2 className="section-title">Dashboard</h2>
-      
-      {/* Tarjetas de KPIs */}
-      <KPICards 
-        reports={filteredReports}
-        projects={projects}
-        selectedProjectId={selectedProject !== "all" ? selectedProject : ""}
-      />
-      
-      {/* Filtros */}
-      <DashboardFilters 
-        projects={projects}
-        selectedProject={selectedProject}
-        dateRange={dateRange}
-        onFiltersChange={handleFiltersChange}
-      />
-      
-      {/* Gráficos */}
-      <DashboardCharts 
-        reports={filteredReports}
-        projects={projects}
-        selectedProject={selectedProject}
-        dateRange={dateRange}
-        activeView={activeView}
-        onViewChange={handleViewChange}
-      />
-      
-      {/* Resumen de datos */}
-      <DashboardSummary 
-        reports={filteredReports}
-        projects={projects}
-        selectedProject={selectedProject}
-        isLoading={false}
-      />
-      
-      {/* Cargar más datos si es necesario */}
-      {hasNextPage && (
-        <div className="load-more-container">
-          <button 
-            onClick={() => fetchNextPage()} 
-            disabled={!hasNextPage}
-            className="load-more-button"
-          >
-            {reportsLoading ? "Cargando más datos..." : "Cargar más datos"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default React.memo(Dashboard);
-</file>
-
 <file path="src/components/ProjectsViewer.js">
+// src/components/ProjectsViewer.js
 import React, { useState, useCallback, useEffect } from "react";
 import { formatCurrency } from "../utils/formatters";
 import ProjectForm from "./ProjectForm";
-import { 
-  useQueryProjects, 
-  useAddProject, 
-  useUpdateProject, 
-  useDeleteProject 
+import {
+  useQueryProjects,
+  useAddProject,
+  useUpdateProject,
+  useDeleteProject
 } from "../hooks/useQueryProjects";
 import { useQueryReportsInfinite } from "../hooks/useQueryReports";
+import { projectSchema } from "../utils/validationSchemas";
+import useFormValidation from "../hooks/useFormValidation";
 
 const ProjectsViewer = () => {
-  // Estados locales para edición y formularios
-  const [newProject, setNewProject] = useState({ 
-    id: "", 
-    client: "", 
-    address: "", 
-    nifNie: "", 
-    officialPrice: 0, 
-    workerPrice: 0, 
-    type: "hourly", 
-    budgetAmount: 0,
-    allowExtraWork: false
-  });
-  const [editingProjectId, setEditingProjectId] = useState(null);
-  const [editedProject, setEditedProject] = useState(null);
+  const [editingProjectId, setEditingProjectId] = useState(null); // Stores firestoreId
+  const [editedProject, setEditedProject] = useState(null); // Stores the full project object being edited
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // React Query: obtener proyectos
-  const { 
-    data: projects = [], 
-    isLoading: projectsLoading, 
-    error: projectsError 
-  } = useQueryProjects();
+  const {
+    values: editedValues,
+    handleChange: handleEditChange,
+    handleBlur: handleEditBlur,
+    handleSubmit: handleEditSubmitInternal,
+    resetForm: resetEditForm,
+    isValid: isEditFormValid, // Get validity state
+    errors: editErrors,       // Get errors
+    hasError: editHasError,   // Get error checker
+    getError: editGetError    // Get error message function
+  } = useFormValidation(editedProject || {}, projectSchema);
 
-  // React Query: obtener reportes
-  const { 
-    data: reportsData,
-    isLoading: reportsLoading
-  } = useQueryReportsInfinite({
-    pageSize: 1000 // Obtener muchos reportes para cálculos
-  });
-
-  // React Query: mutaciones para proyectos
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQueryProjects();
+  const { data: reportsData } = useQueryReportsInfinite({ pageSize: 1000 }); // Fetch reports for calculations
   const addProjectMutation = useAddProject();
   const updateProjectMutation = useUpdateProject();
   const deleteProjectMutation = useDeleteProject();
 
-  // Convertir reportes paginados a lista plana
-  const reports = React.useMemo(() => {
-    if (!reportsData) return [];
-    return reportsData.pages.flatMap(page => page.items || []);
-  }, [reportsData]);
+  useEffect(() => {
+    if (editedProject) {
+      resetEditForm(editedProject);
+    }
+  }, [editedProject, resetEditForm]);
 
-  // Resetear mensajes después de 5 segundos
   useEffect(() => {
     if (errorMessage || successMessage) {
       const timer = setTimeout(() => {
@@ -12533,182 +12346,119 @@ const ProjectsViewer = () => {
     }
   }, [errorMessage, successMessage]);
 
-  const handleInputChange = useCallback((e) => {
-    const { name, value, type, checked } = e.target;
-    const finalValue = type === 'checkbox' ? checked : 
-                      (name === "officialPrice" || name === "workerPrice" || name === "budgetAmount" ? 
-                      parseFloat(value) || 0 : value);
-    
-    if (editingProjectId) {
-      setEditedProject((prev) => ({ ...prev, [name]: finalValue }));
-    } else {
-      setNewProject((prev) => ({ ...prev, [name]: finalValue }));
-    }
-  }, [editingProjectId]);
+  const reports = React.useMemo(() => {
+    if (!reportsData) return [];
+    return reportsData.pages.flatMap(page => page.items || []);
+  }, [reportsData]);
 
-  const handleTypeChange = useCallback((e) => {
-    if (editingProjectId) {
-      setEditedProject((prev) => ({ 
-        ...prev, 
-        type: e.target.value, 
-        officialPrice: e.target.value === "hourly" ? prev.officialPrice : 0, 
-        workerPrice: e.target.value === "hourly" ? prev.workerPrice : 0 
-      }));
-    } else {
-      setNewProject((prev) => ({ 
-        ...prev, 
-        type: e.target.value, 
-        officialPrice: e.target.value === "hourly" ? prev.officialPrice : 0, 
-        workerPrice: e.target.value === "hourly" ? prev.workerPrice : 0 
-      }));
-    }
-  }, [editingProjectId]);
-
-  const handleAllowExtraWorkChange = useCallback((e) => {
-    const checked = e.target.checked;
-    if (editingProjectId) {
-      setEditedProject((prev) => ({ ...prev, allowExtraWork: checked }));
-    } else {
-      setNewProject((prev) => ({ ...prev, allowExtraWork: checked }));
-    }
-  }, [editingProjectId]);
-
-  const handleAddProject = async (e) => {
-    e.preventDefault();
-    if (!newProject.id || !newProject.client || !newProject.address || !newProject.nifNie || !newProject.type) {
-      setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
-      setSuccessMessage("");
+  const startEditing = useCallback((project) => {
+    if (!project || !project.firestoreId) {
+      setErrorMessage("Error al iniciar edición: Faltan datos del proyecto.");
       return;
     }
-
-    try {
-      // Crear una copia del proyecto con el ID recortado
-      const trimmedProject = {
-        ...newProject,
-        id: newProject.id.trim()
-      };
-      
-      // Usar la mutación de React Query
-      await addProjectMutation.mutateAsync(trimmedProject);
-      
-      setNewProject({ 
-        id: "", 
-        client: "", 
-        address: "", 
-        nifNie: "", 
-        officialPrice: 0, 
-        workerPrice: 0, 
-        type: "hourly", 
-        budgetAmount: 0,
-        allowExtraWork: false
-      });
-      setSuccessMessage("Proyecto añadido correctamente!");
-      setErrorMessage("");
-    } catch (err) {
-      setErrorMessage(`Error al añadir proyecto: ${err.message}`);
-    }
-  };
-
-  const startEditing = (project) => {
-    setEditingProjectId(project.id);
+    setEditingProjectId(project.firestoreId);
     setEditedProject({ ...project });
-  };
+  }, []);
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    if (!editedProject.id || !editedProject.client || !editedProject.address || !editedProject.nifNie || !editedProject.type) {
-      setErrorMessage("Por favor, completa todos los campos requeridos (ID, Cliente, Dirección, NIF/NIE, Tipo).");
+  const cancelEditing = useCallback(() => {
+    setEditingProjectId(null);
+    setEditedProject(null);
+    resetEditForm({}); // Reset form state as well
+  }, [resetEditForm]);
+
+  const handleEditSubmit = useCallback(async (formDataFromHook) => {
+    const projectToUpdate = {
+      ...formDataFromHook,
+      firestoreId: editingProjectId
+    };
+
+    if (!projectToUpdate.firestoreId) {
+      setErrorMessage("Error crítico: No se encontró el ID interno para actualizar.");
       return;
     }
 
     try {
-      // Usar la mutación de React Query
-      await updateProjectMutation.mutateAsync({ 
-        projectId: editedProject.id, 
-        data: editedProject 
+      setSuccessMessage("");
+      setErrorMessage("");
+      await updateProjectMutation.mutateAsync({
+        firestoreId: projectToUpdate.firestoreId,
+        data: projectToUpdate
       });
-      
-      setEditingProjectId(null);
-      setEditedProject(null);
+      cancelEditing();
       setSuccessMessage("Proyecto actualizado correctamente!");
-      setErrorMessage("");
     } catch (err) {
-      setErrorMessage(`Error al actualizar proyecto: ${err.message}`);
+      console.error("Error en handleEditSubmit:", err);
+      setErrorMessage(`Error al actualizar proyecto: ${err.message || 'Error desconocido'}`);
     }
-  };
+  }, [editingProjectId, updateProjectMutation, cancelEditing]);
 
-  const handleDelete = async (projectId) => {
-    if (!window.confirm("¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.")) {
+  const actualEditFormSubmitHandler = handleEditSubmitInternal(handleEditSubmit);
+
+  const handleDelete = useCallback(async (projectToDelete) => {
+    if (!projectToDelete || !projectToDelete.firestoreId) {
+      setErrorMessage("Error: No se puede eliminar, falta información del proyecto.");
       return;
     }
-
+    if (!window.confirm(`¿Seguro que quieres eliminar "${projectToDelete.id || 'proyecto sin ID'}"?`)) {
+      return;
+    }
     try {
-      // Usar la mutación de React Query
-      await deleteProjectMutation.mutateAsync(projectId);
-      setSuccessMessage("Proyecto eliminado correctamente!");
+      setSuccessMessage("");
       setErrorMessage("");
+      await deleteProjectMutation.mutateAsync(projectToDelete.firestoreId);
+      setSuccessMessage("Proyecto eliminado.");
     } catch (err) {
       console.error("Error en handleDelete:", err);
-      setErrorMessage(`Error al eliminar proyecto: ${err.message}`);
+       setErrorMessage(`Error al eliminar: ${err.message || 'Error desconocido'}`);
     }
-  };
+  }, [deleteProjectMutation]);
 
-  const calculateProjectCosts = (projectId, projectType) => {
+  const calculateProjectCosts = useCallback((projectId, projectType) => {
     if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0 };
-    const projectReports = reports.filter((report) => report.projectId === projectId);
+    const projectReports = reports.filter((report) => report.projectId === projectId && !report.isExtraWork);
     let laborCost = 0;
     let materialsCost = 0;
-
     projectReports.forEach((report) => {
       laborCost += report.labor?.totalLaborCost || 0;
       materialsCost += report.totalMaterialsCost || 0;
     });
+    return { laborCost, materialsCost, totalCost: laborCost + materialsCost };
+  }, [reports]);
 
-    return {
-      laborCost,
-      materialsCost,
-      totalCost: laborCost + materialsCost,
-    };
-  };
+  const calculateInvoicedTotal = useCallback((project) => {
+      if (project?.type !== "fixed") return 0;
+      // Prioritize the pre-calculated value
+      if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
+          return project.totalInvoicedAmount;
+      }
+      // Fallback (should be less common now)
+      const projectReports = reports.filter((report) => report.projectId === project.id && !report.isExtraWork && report.invoicedAmount);
+      return projectReports.reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
+  }, [reports]);
 
-  const calculateInvoicedTotal = (projectId) => {
-    const projectReports = reports.filter((report) => report.projectId === projectId && report.invoicedAmount);
-    return projectReports.reduce((sum, report) => sum + (report.invoicedAmount || 0), 0);
-  };
 
-  const calculateExtraWorkTotal = (projectId) => {
+  const calculateExtraWorkTotal = useCallback((projectId) => {
     const extraReports = reports.filter(
       (report) => report.projectId === projectId && report.isExtraWork
     );
-    
     let totalExtraBudget = 0;
     let totalExtraCost = 0;
-    
     extraReports.forEach(report => {
       if (report.extraWorkType === "additional_budget") {
-        totalExtraBudget += report.extraBudgetAmount || 0;
+        totalExtraBudget += parseFloat(report.extraBudgetAmount) || 0;
       } else if (report.extraWorkType === "hourly") {
-        totalExtraCost += report.totalCost || 0;
+        const labor = parseFloat(report.labor?.totalLaborCost) || 0;
+        const mats = parseFloat(report.totalMaterialsCost) || 0;
+        totalExtraCost += parseFloat(report.totalCost) || (labor + mats);
       }
     });
-    
-    return {
-      totalExtraBudget,
-      totalExtraCost,
-      totalExtra: totalExtraBudget + totalExtraCost,
-      count: extraReports.length
-    };
-  };
+    return { totalExtraBudget, totalExtraCost, totalExtra: totalExtraBudget + totalExtraCost, count: extraReports.length };
+  }, [reports]);
 
-  // Estados de carga
-  const isLoading = projectsLoading || (reportsLoading && reports.length === 0);
   const isMutating = addProjectMutation.isPending || updateProjectMutation.isPending || deleteProjectMutation.isPending;
-  
-  // Mostrar indicador de carga
-  if (isLoading) return <p>Cargando proyectos...</p>;
-  
-  // Mostrar errores
-  if (projectsError) return <p className="error-message">Error: {projectsError.message}</p>;
+
+  if (projectsLoading) return <p>Cargando proyectos...</p>;
+  if (projectsError) return <p className="error-message">Error al cargar proyectos: {projectsError.message}</p>;
 
   return (
     <div className="projects-viewer">
@@ -12716,273 +12466,132 @@ const ProjectsViewer = () => {
       {errorMessage && <p className="error-message">{errorMessage}</p>}
       {successMessage && <p className="success-message">{successMessage}</p>}
 
-      {/* Usar el componente ProjectForm si está disponible */}
-      {React.createElement(ProjectForm || 'form', {
-        onProjectAdded: (newProject) => {
-          setSuccessMessage("Proyecto añadido correctamente!");
-        },
-        onSubmit: handleAddProject
-      })}
-
-      {/* Si no se está usando ProjectForm, mostrar el formulario manual */}
-      {!ProjectForm && (
-        <form onSubmit={handleAddProject} className="project-form">
-          {/* Campos del formulario */}
-          <input
-            type="text"
-            name="id"
-            placeholder="ID del proyecto"
-            value={newProject.id}
-            onChange={handleInputChange}
-          />
-          <input
-            type="text"
-            name="client"
-            placeholder="Cliente"
-            value={newProject.client}
-            onChange={handleInputChange}
-          />
-          <input
-            type="text"
-            name="address"
-            placeholder="Dirección"
-            value={newProject.address}
-            onChange={handleInputChange}
-          />
-          <input
-            type="text"
-            name="nifNie"
-            placeholder="NIF/NIE"
-            value={newProject.nifNie}
-            onChange={handleInputChange}
-          />
-          <select name="type" value={newProject.type} onChange={handleTypeChange}>
-            <option value="hourly">Por horas</option>
-            <option value="fixed">Presupuesto cerrado</option>
-          </select>
-          {newProject.type === "hourly" ? (
-            <>
-              <input
-                type="number"
-                name="officialPrice"
-                placeholder="Precio oficial (€/h)"
-                value={newProject.officialPrice}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-              />
-              <input
-                type="number"
-                name="workerPrice"
-                placeholder="Precio peón (€/h)"
-                value={newProject.workerPrice}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-              />
-            </>
-          ) : (
-            <>
-              <input
-                type="number"
-                name="budgetAmount"
-                placeholder="Importe presupuestado (€)"
-                value={newProject.budgetAmount}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-              />
-              
-              {/* Checkbox para permitir trabajos extra */}
-              <div className="form-group checkbox-group">
-                <input
-                  id="project-allow-extra"
-                  type="checkbox"
-                  name="allowExtraWork"
-                  checked={newProject.allowExtraWork}
-                  onChange={handleAllowExtraWorkChange}
-                  className="checkbox-input"
-                />
-                <label htmlFor="project-allow-extra" className="checkbox-label">
-                  Permitir trabajos extra fuera de presupuesto
-                </label>
-              </div>
-              
-              {/* Mostrar campos adicionales si se permiten trabajos extra */}
-              {newProject.allowExtraWork && (
-                <div className="extra-work-section">
-                  <h4>Tarifas para trabajos extra por horas</h4>
-                  <p className="hint-text">Estos precios se aplicarán solo a trabajos extra facturados por horas</p>
-                  
-                  <div className="form-group">
-                    <label htmlFor="project-extra-official-price">Precio oficial para extras (€/h)</label>
-                    <input
-                      id="project-extra-official-price"
-                      type="number"
-                      name="officialPrice"
-                      value={newProject.officialPrice}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      placeholder="Precio por hora del oficial para trabajos extra"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="project-extra-worker-price">Precio peón para extras (€/h)</label>
-                    <input
-                      id="project-extra-worker-price"
-                      type="number"
-                      name="workerPrice"
-                      value={newProject.workerPrice}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="0.01"
-                      placeholder="Precio por hora del peón para trabajos extra"
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          <button type="submit" disabled={isMutating}>
-            {isMutating ? "Añadiendo..." : "Añadir proyecto"}
-          </button>
-        </form>
-      )}
+      <ProjectForm onProjectAdded={() => setSuccessMessage("Proyecto añadido correctamente!")} />
 
       <div className="projects-list">
         {projects.map((project) => {
           const costs = calculateProjectCosts(project.id, project.type);
-          const invoicedTotal = project.type === "fixed" ? calculateInvoicedTotal(project.id) : 0;
+          const invoicedTotal = calculateInvoicedTotal(project); // Pass the whole project object
           const extraWork = project.type === "fixed" ? calculateExtraWorkTotal(project.id) : { totalExtra: 0, count: 0 };
-          const isEditing = editingProjectId === project.id;
+          const isEditing = editingProjectId === project.firestoreId;
 
           return (
-            <div key={project.id} className="project-card">
+            <div key={project.firestoreId} className="project-card">
               {isEditing ? (
-                <form onSubmit={handleEditSubmit} className="edit-form">
-                  <input
-                    type="text"
-                    name="id"
-                    value={editedProject.id}
-                    onChange={handleInputChange}
-                    disabled
-                  />
-                  <input
-                    type="text"
-                    name="client"
-                    value={editedProject.client}
-                    onChange={handleInputChange}
-                  />
-                  <input
-                    type="text"
-                    name="address"
-                    value={editedProject.address}
-                    onChange={handleInputChange}
-                  />
-                  <input
-                    type="text"
-                    name="nifNie"
-                    value={editedProject.nifNie}
-                    onChange={handleInputChange}
-                  />
-                  <select name="type" value={editedProject.type} onChange={handleTypeChange}>
-                    <option value="hourly">Por horas</option>
-                    <option value="fixed">Presupuesto cerrado</option>
-                  </select>
-                  {editedProject.type === "hourly" ? (
-                    <>
-                      <input
-                        type="number"
-                        name="officialPrice"
-                        value={editedProject.officialPrice}
-                        onChange={handleInputChange}
-                        min="0"
-                        step="0.01"
-                      />
-                      <input
-                        type="number"
-                        name="workerPrice"
-                        value={editedProject.workerPrice}
-                        onChange={handleInputChange}
-                        min="0"
-                        step="0.01"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        name="budgetAmount"
-                        value={editedProject.budgetAmount}
-                        onChange={handleInputChange}
-                        min="0"
-                        step="0.01"
-                      />
-                      
-                      {/* Checkbox para permitir trabajos extra en modo edición */}
-                      <div className="form-group checkbox-group">
-                        <input
-                          id="edit-project-allow-extra"
-                          type="checkbox"
-                          name="allowExtraWork"
-                          checked={editedProject.allowExtraWork || false}
-                          onChange={handleAllowExtraWorkChange}
-                          className="checkbox-input"
-                        />
-                        <label htmlFor="edit-project-allow-extra" className="checkbox-label">
-                          Permitir trabajos extra fuera de presupuesto
-                        </label>
-                      </div>
-                      
-                      {/* Campos adicionales si se permiten trabajos extra */}
-                      {editedProject.allowExtraWork && (
-                        <div className="extra-work-section">
-                          <h4>Tarifas para trabajos extra por horas</h4>
-                          <p className="hint-text">Estos precios se aplicarán solo a trabajos extra facturados por horas</p>
-                          
-                          <div className="form-group">
-                            <label htmlFor="edit-project-extra-official-price">Precio oficial para extras (€/h)</label>
-                            <input
-                              id="edit-project-extra-official-price"
-                              type="number"
-                              name="officialPrice"
-                              value={editedProject.officialPrice || 0}
-                              onChange={handleInputChange}
-                              min="0"
-                              step="0.01"
-                              placeholder="Precio por hora del oficial para trabajos extra"
-                            />
-                          </div>
-
-                          <div className="form-group">
-                            <label htmlFor="edit-project-extra-worker-price">Precio peón para extras (€/h)</label>
-                            <input
-                              id="edit-project-extra-worker-price"
-                              type="number"
-                              name="workerPrice"
-                              value={editedProject.workerPrice || 0}
-                              onChange={handleInputChange}
-                              min="0"
-                              step="0.01"
-                              placeholder="Precio por hora del peón para trabajos extra"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <button type="submit" disabled={updateProjectMutation.isPending}>
-                    {updateProjectMutation.isPending ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setEditingProjectId(null)}
-                    disabled={updateProjectMutation.isPending}
-                  >
-                    Cancelar
-                  </button>
+                <form onSubmit={actualEditFormSubmitHandler} className="edit-form">
+                   <div className="form-group">
+                     <label>ID Proyecto (No editable)</label>
+                     <input type="text" value={editedValues.id || ''} disabled />
+                   </div>
+                   <div className="form-group">
+                     <label>Cliente</label>
+                     <input
+                       type="text"
+                       name="client"
+                       value={editedValues.client || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('client') ? 'input-error' : ''}
+                     />
+                     {editHasError('client') && <p className="error-message">{editGetError('client')}</p>}
+                   </div>
+                    <div className="form-group">
+                     <label>Dirección</label>
+                     <input
+                       type="text"
+                       name="address"
+                       value={editedValues.address || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('address') ? 'input-error' : ''}
+                     />
+                     {editHasError('address') && <p className="error-message">{editGetError('address')}</p>}
+                   </div>
+                    <div className="form-group">
+                     <label>NIF/NIE</label>
+                     <input
+                       type="text"
+                       name="nifNie"
+                       value={editedValues.nifNie || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('nifNie') ? 'input-error' : ''}
+                     />
+                     {editHasError('nifNie') && <p className="error-message">{editGetError('nifNie')}</p>}
+                   </div>
+                   <div className="form-group">
+                     <label>Tipo</label>
+                     <select name="type" value={editedValues.type || 'hourly'} onChange={handleEditChange} onBlur={handleEditBlur}>
+                       <option value="hourly">Por horas</option>
+                       <option value="fixed">Presupuesto cerrado</option>
+                     </select>
+                   </div>
+                   {editedValues.type === "hourly" ? (
+                     <>
+                       <div className="form-group">
+                         <label>Precio oficial (€/h)</label>
+                         <input
+                           type="number" name="officialPrice" min="0" step="0.01"
+                           value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('officialPrice') ? 'input-error' : ''} />
+                         {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
+                       </div>
+                       <div className="form-group">
+                         <label>Precio peón (€/h)</label>
+                         <input
+                           type="number" name="workerPrice" min="0" step="0.01"
+                           value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('workerPrice') ? 'input-error' : ''} />
+                         {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
+                       </div>
+                     </>
+                   ) : (
+                     <>
+                       <div className="form-group">
+                         <label>Importe presupuestado (€)</label>
+                         <input
+                           type="number" name="budgetAmount" min="0" step="0.01"
+                           value={editedValues.budgetAmount || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('budgetAmount') ? 'input-error' : ''} />
+                         {editHasError('budgetAmount') && <p className="error-message">{editGetError('budgetAmount')}</p>}
+                       </div>
+                       <div className="form-group checkbox-group">
+                         <input type="checkbox" name="allowExtraWork" id={`edit-allowExtraWork-${project.firestoreId}`}
+                           checked={editedValues.allowExtraWork || false} onChange={handleEditChange}
+                           className="checkbox-input" />
+                         <label htmlFor={`edit-allowExtraWork-${project.firestoreId}`} className="checkbox-label">
+                           Permitir trabajos extra
+                         </label>
+                       </div>
+                       {editedValues.allowExtraWork && (
+                         <div className="extra-work-section">
+                           <h4>Tarifas para trabajos extra por horas</h4>
+                           <div className="form-group">
+                             <label>Precio oficial extras (€/h)</label>
+                             <input type="number" name="officialPrice" min="0" step="0.01"
+                               value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                               className={editHasError('officialPrice') ? 'input-error' : ''} />
+                             {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
+                           </div>
+                           <div className="form-group">
+                             <label>Precio peón extras (€/h)</label>
+                             <input type="number" name="workerPrice" min="0" step="0.01"
+                               value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                               className={editHasError('workerPrice') ? 'input-error' : ''} />
+                             {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
+                           </div>
+                         </div>
+                       )}
+                     </>
+                   )}
+                   <div className="form-actions">
+                     <button type="submit" disabled={!isEditFormValid || updateProjectMutation.isPending}>
+                       {updateProjectMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                     </button>
+                     <button type="button" onClick={cancelEditing} disabled={updateProjectMutation.isPending} className="button-secondary">
+                       Cancelar
+                     </button>
+                   </div>
                 </form>
               ) : (
                 <>
@@ -12998,50 +12607,40 @@ const ProjectsViewer = () => {
                     </>
                   ) : (
                     <>
-                      <p><strong>Importe presupuestado:</strong> {formatCurrency(project.budgetAmount)}</p>
+                      <p><strong>Presupuestado:</strong> {formatCurrency(project.budgetAmount)}</p>
+                      <p><strong>Facturado Total:</strong> {formatCurrency(invoicedTotal)}</p>
+                      {project.allowExtraWork && <p><strong>Permite Extras:</strong> Sí</p>}
                       {project.allowExtraWork && (
-                        <p><strong>Permite trabajos extra:</strong> Sí</p>
-                      )}
-                      {project.allowExtraWork && (
-                        <>
-                          <p><strong>Precio oficial (extras):</strong> {formatCurrency(project.officialPrice)}/h</p>
-                          <p><strong>Precio peón (extras):</strong> {formatCurrency(project.workerPrice)}/h</p>
-                        </>
+                          <>
+                           <p><strong>€ Oficial (Extras):</strong> {formatCurrency(project.officialPrice)}/h</p>
+                           <p><strong>€ Peón (Extras):</strong> {formatCurrency(project.workerPrice)}/h</p>
+                          </>
                       )}
                     </>
                   )}
-                  
-                  <h5>Resumen de costes</h5>
+                  <h5>Resumen Actual</h5>
                   {project.type === "hourly" ? (
                     <>
-                      <p>Mano de obra: {formatCurrency(costs.laborCost)}</p>
-                      <p>Materiales: {formatCurrency(costs.materialsCost)}</p>
-                      <p>Total: {formatCurrency(costs.totalCost)}</p>
+                      <p>M.Obra: {formatCurrency(costs.laborCost)} | Materiales: {formatCurrency(costs.materialsCost)} | <strong>Total: {formatCurrency(costs.totalCost)}</strong></p>
                     </>
                   ) : (
                     <>
-                      <p><strong>Importe facturado total:</strong> {formatCurrency(invoicedTotal)}</p>
+                      <p>Progreso: {project.budgetAmount > 0 ? ((invoicedTotal / project.budgetAmount) * 100).toFixed(1) : 0}%</p>
                       {extraWork.count > 0 && (
-                        <div className="extra-work-summary">
-                          <p><strong>Trabajos extra:</strong> {extraWork.count} partes</p>
-                          <p><strong>Importe total extra:</strong> {formatCurrency(extraWork.totalExtra)}</p>
-                        </div>
+                        <p>Trabajos Extra: {extraWork.count} partes | Total Extra: {formatCurrency(extraWork.totalExtra)}</p>
                       )}
                     </>
                   )}
-                  <button 
-                    onClick={() => startEditing(project)}
-                    disabled={isMutating}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(project.id)}
-                    style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
-                    disabled={deleteProjectMutation.isPending}
-                  >
-                    {deleteProjectMutation.isPending && project.id === deleteProjectMutation.variables ? "Eliminando..." : "Eliminar"}
-                  </button>
+                  <div className="project-actions">
+                    <button onClick={() => startEditing(project)} disabled={isMutating}>
+                      Editar
+                    </button>
+                    <button onClick={() => handleDelete(project)}
+                            style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
+                            disabled={deleteProjectMutation.isPending}>
+                      {deleteProjectMutation.isPending && deleteProjectMutation.variables === project.firestoreId ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -13721,9 +13320,10 @@ const ReportPDFGenerator = ({ reports, projects }) => {
               <Text style={styles.detailsColRight}>NIF: 75902042H</Text>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailsColLeft}>Proyecto: {project.address || "No disponible"}</Text>
+              <Text style={styles.detailsColLeft}>Proyecto: {project.id || "No disponible"}</Text>
               <Text style={styles.detailsColRight}>Arquitecto técnico y artesano</Text>
             </View>
+              <Text style={styles.detailsColLeft}>Dirección: {project.address || "No disponible"}</Text>
           </View>
           <Text style={styles.footer}>{currentDate}</Text>
         </View>

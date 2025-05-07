@@ -382,9 +382,10 @@ const ReportPDFGenerator = ({ reports, projects }) => {
               <Text style={styles.detailsColRight}>NIF: 75902042H</Text>
             </View>
             <View style={styles.detailsRow}>
-              <Text style={styles.detailsColLeft}>Proyecto: {project.address || "No disponible"}</Text>
+              <Text style={styles.detailsColLeft}>Proyecto: {project.id || "No disponible"}</Text>
               <Text style={styles.detailsColRight}>Arquitecto técnico y artesano</Text>
             </View>
+              <Text style={styles.detailsColLeft}>Dirección: {project.address || "No disponible"}</Text>
           </View>
           <Text style={styles.footer}>{currentDate}</Text>
         </View>
