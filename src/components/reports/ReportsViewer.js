@@ -19,17 +19,15 @@ import EmptyState from "../common/EmptyState";
 import './Reports.css';
 
 const ReportsViewer = () => {
-  // Estados locales para UI y modales
   const [editingReportId, setEditingReportId] = useState(null);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [pdfKey, setPdfKey] = useState(Date.now());
   
-  // Hook de filtrado avanzado
   const {
     filters,
     updateFilter,
     updateFilters,
-    processReports, // Usamos la función de procesamiento que filtra y ordena
+    processReports,
     hasActiveFilters,
     filtersDescription,
     sortOptions,
@@ -48,11 +46,9 @@ const ReportsViewer = () => {
     amountMax: "",
   });
 
-  // Consultar proyectos y usuarios
   const { data: projects = [] } = useQueryProjects();
   const { data: users = [] } = useQueryUser();
 
-  // Consulta de reportes con React Query
   const {
     data,
     isLoading,
@@ -70,10 +66,8 @@ const ReportsViewer = () => {
     pageSize: 100,
   });
 
-  // Mutación para eliminar un reporte
   const deleteReportMutation = useDeleteReport();
 
-  // Extraer y procesar reportes
   const allReports = useMemo(() => {
     if (!data) return [];
     return data.pages.flatMap(page => page.items || []);
@@ -83,15 +77,18 @@ const ReportsViewer = () => {
     return processReports(allReports);
   }, [allReports, processReports]);
   
-  // Usar el hook de resumen (ahora corregido) para calcular totales
-  // Se le pasa la lista COMPLETA de reportes para que los totales sean siempre correctos
   const { totals } = useReportSummary(
     allReports,
     projects,
     filters.projectId
   );
 
-  // Manejadores para cambios en filtros
+  // --- CAMBIO: Encontrar el proyecto de forma segura ---
+  const selectedProjectObject = useMemo(() => {
+      return projects.find(p => p.id === filters.projectId) || null;
+  }, [projects, filters.projectId]);
+
+
   const handleProjectChange = useCallback((projectId) => {
     updateFilter("projectId", projectId);
     setPdfKey(Date.now());
@@ -141,7 +138,6 @@ const ReportsViewer = () => {
     }
   }, [saveFilter, updateFilters, updateSortOptions]);
 
-  // Manejadores para edición y eliminación
   const handleEditReport = useCallback((reportId) => {
     setEditingReportId(reportId);
   }, []);
@@ -177,6 +173,9 @@ const ReportsViewer = () => {
 
   const isLoadingData = isLoading && allReports.length === 0;
 
+  // --- CAMBIO: Condición más robusta para mostrar el botón de PDF ---
+  const canGeneratePdf = selectedProjectObject && filteredAndSortedReports.length > 0;
+
   return (
     <div className="reports-viewer">
       <h2>Informes</h2>
@@ -210,23 +209,28 @@ const ReportsViewer = () => {
         </div>
       )}
 
-      {/* --- SECCIÓN DE RESUMEN CORREGIDA --- */}
-      {/* Se renderiza si hay un proyecto seleccionado, para mostrar su resumen financiero */}
-      {filters.projectId && (
+      {selectedProjectObject && (
         <ReportSummary
           totals={totals}
-          project={projects.find(p => p.id === filters.projectId)}
+          project={selectedProjectObject}
         />
       )}
 
-      <PDFButton
-        key={pdfKey}
-        reports={filteredAndSortedReports}
-        projects={projects}
-        selectedProjectId={filters.projectId}
-        dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
-        disabled={!filters.projectId || filteredAndSortedReports.length === 0}
-      />
+      {/* --- CAMBIO: Renderizado condicional del botón de PDF --- */}
+      {canGeneratePdf ? (
+        <PDFButton
+          key={pdfKey}
+          reports={filteredAndSortedReports}
+          projects={projects}
+          selectedProjectId={filters.projectId}
+          dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
+          disabled={false} // Ya estamos controlando el renderizado, así que no es necesario deshabilitarlo aquí
+        />
+      ) : (
+        <p className="pdf-disabled-message">
+          Para generar un PDF, selecciona un proyecto y asegúrate de que haya reportes que coincidan con los filtros.
+        </p>
+      )}
 
       <h3 className="section-title">Partes Diarios</h3>
 

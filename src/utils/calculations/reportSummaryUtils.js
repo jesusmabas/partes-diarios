@@ -1,7 +1,6 @@
 // src/utils/calculations/reportSummaryUtils.js
 import { calculateLabor } from './laborUtils';
 import { calculateMaterials } from './materialsUtils';
-// --- IMPORTACIÓN AÑADIDA ---
 import { calculateBudget } from './budgetUtils'; 
 
 /**
@@ -14,97 +13,103 @@ import { calculateBudget } from './budgetUtils';
  * @returns {Object} Un objeto con totales generales (`totals`), resumen por semana (`byWeek`), y resumen por proyecto (`byProject`).
  */
 export function calculateReportSummary(reports = [], projects = [], selectedProjectId = "") {
-  // Asegurar que los inputs sean arrays para evitar errores
   if (!Array.isArray(reports)) reports = [];
   if (!Array.isArray(projects)) projects = [];
 
-  // Filtrar reportes si se especifica un proyecto
   const filteredReports = selectedProjectId
     ? reports.filter(report => report.projectId === selectedProjectId)
     : reports;
 
-  // Obtener el proyecto seleccionado para los cálculos de presupuesto
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
-  // Inicializar acumuladores de totales generales
+  // Acumuladores para costes y facturación
   let totalLabor = 0;
   let totalMaterials = 0;
   let totalCost = 0;
-  let totalHours = 0;
+  let totalInvoiced = 0;
+  
+  // --- CAMBIO: SEPARACIÓN DE HORAS ---
+  // Horas de trabajo normal (control interno para 'fixed' o facturables para 'hourly')
   let totalOfficialHours = 0;
   let totalWorkerHours = 0;
-  let totalInvoiced = 0;
+  
+  // Acumuladores para trabajos extra
   let totalExtraBudget = 0;
   let totalExtraLaborCost = 0;
   let totalExtraMaterialsCost = 0;
-  let totalExtraOfficialHours = 0;
+  // Horas específicas para trabajos extra por horas
+  let totalExtraOfficialHours = 0; 
   let totalExtraWorkerHours = 0;
 
-  // Iterar sobre cada reporte filtrado para calcular y acumular
   filteredReports.forEach(report => {
     const project = projects.find(p => p.id === report.projectId);
-    if (!project) return; // Si no se encuentra el proyecto, se omite el reporte.
+    if (!project) return;
 
     const laborCalcs = calculateLabor(report.labor, project);
     const materialsCalcs = calculateMaterials(report.materials);
     const reportTotalCost = laborCalcs.totalLaborCost + materialsCalcs.totalMaterialsCost;
 
-    totalOfficialHours += laborCalcs.officialHours;
-    totalWorkerHours += laborCalcs.workerHours;
-    totalHours += laborCalcs.officialHours + laborCalcs.workerHours;
-
     if (report.isExtraWork && project.type === 'fixed') {
       if (report.extraWorkType === 'hourly') {
+        // Acumular costes y horas en los contadores de "extras"
         totalExtraLaborCost += laborCalcs.totalLaborCost;
         totalExtraMaterialsCost += materialsCalcs.totalMaterialsCost;
-        totalExtraOfficialHours += laborCalcs.officialHours;
-        totalExtraWorkerHours += laborCalcs.workerHours;
+        totalExtraOfficialHours += laborCalcs.officialHours || 0;
+        totalExtraWorkerHours += laborCalcs.workerHours || 0;
       } else if (report.extraWorkType === 'additional_budget') {
         totalExtraBudget += parseFloat(report.extraBudgetAmount) || 0;
       }
     } else {
-      totalLabor += laborCalcs.totalLaborCost;
-      totalMaterials += materialsCalcs.totalMaterialsCost;
-      totalCost += reportTotalCost;
-      if (project.type === 'fixed') {
+      // Es un trabajo normal (sea 'hourly' o 'fixed')
+      // Acumular horas en los contadores "normales"
+      totalOfficialHours += laborCalcs.officialHours || 0;
+      totalWorkerHours += laborCalcs.workerHours || 0;
+      
+      // Los costes solo se acumulan para proyectos 'hourly'
+      if (project.type === 'hourly') {
+          totalLabor += laborCalcs.totalLaborCost;
+          totalMaterials += materialsCalcs.totalMaterialsCost;
+          totalCost += reportTotalCost;
+      } else if (project.type === 'fixed') {
         totalInvoiced += parseFloat(report.invoicedAmount) || 0;
       }
     }
   });
+  
+  // El total de horas de trabajo ahora es la suma de las horas normales
+  const totalHours = totalOfficialHours + totalWorkerHours;
+  // El total de horas extra
+  const totalExtraHours = totalExtraOfficialHours + totalExtraWorkerHours;
 
   const totalIncome = totalInvoiced + totalExtraBudget + totalExtraLaborCost;
   const grandTotal = totalInvoiced + totalExtraBudget + totalExtraLaborCost;
 
-  // --- LÓGICA DE PRESUPUESTO CENTRALIZADA ---
-  // Usamos la función de `budgetUtils` para obtener los cálculos de presupuesto correctos.
-  // Solo la llamamos si hay un proyecto de tipo 'fixed' seleccionado.
   let budgetCalculations = {};
   if (selectedProject && selectedProject.type === 'fixed') {
-      // Pasamos el proyecto y los reportes filtrados para obtener el resumen del presupuesto
       budgetCalculations = calculateBudget(selectedProject, filteredReports);
   }
 
+  // Devolvemos todos los acumuladores, ahora separados
   return {
     totals: {
       totalLabor,
       totalMaterials,
       totalCost,
       totalInvoiced,
-      totalHours,
-      totalOfficialHours,
-      totalWorkerHours,
+      totalHours, // Horas de trabajo normal/presupuestado
+      totalOfficialHours, // Horas de oficial normales/presupuestadas
+      totalWorkerHours, // Horas de peón normales/presupuestadas
       totalIncome,
       totalExtraBudget,
       totalExtraCost: totalExtraLaborCost + totalExtraMaterialsCost,
       totalExtraLaborCost,
       totalExtraMaterialsCost,
-      totalExtraOfficialHours,
-      totalExtraWorkerHours,
+      totalExtraHours, // Total de horas extra
+      totalExtraOfficialHours, // Horas de oficial extra
+      totalExtraWorkerHours, // Horas de peón extra
       grandTotal,
-      // --- VALORES AÑADIDOS DESDE BUDGETUTILS ---
       ...budgetCalculations,
     },
-    // Mantengo los arrays vacíos para no romper la estructura, pero la lógica de agrupación se debería implementar aquí.
     byWeek: [],
     byProject: []
   };

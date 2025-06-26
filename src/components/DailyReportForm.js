@@ -34,20 +34,13 @@ const DailyReportForm = ({ userId }) => {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   
-  // Usar el hook de React Query para proyectos
   const { data: projects = [] } = useQueryProjects();
-  
-  // Usar el hook de React Query para añadir reportes
   const addReportMutation = useAddReport();
-  
-  // Usar el servicio centralizado de cálculos
   const { calculateLabor, calculateMaterials } = useCalculationsService();
   
-  // Obtener los cálculos actualizados
   const laborData = calculateLabor(report.labor, selectedProject);
   const materialsData = calculateMaterials(report.materials);
   
-  // Cálculos para trabajos extra
   const extraLaborData = report.isExtraWork && report.extraWorkData.extraWorkType === "hourly" 
     ? calculateLabor(report.extraWorkData.labor, selectedProject) 
     : null;
@@ -55,7 +48,6 @@ const DailyReportForm = ({ userId }) => {
     ? calculateMaterials(report.extraWorkData.materials)
     : null;
 
-  // Manejadores de cambios
   const handleDateChange = useCallback((e) => {
     setReport((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }, []);
@@ -107,42 +99,37 @@ const DailyReportForm = ({ userId }) => {
     setSuccessMessage("");
 
     try {
-      // Datos base del parte diario
+      // --- CAMBIO CLAVE: Incluir siempre la mano de obra ---
+      // Los datos de horas se guardarán para TODOS los tipos de proyecto.
       let reportData = {
-        // MODIFICADO: Usar el campo id personalizado del proyecto, no firestoreId
-        projectId: selectedProject.id, // Importante: debe coincidir con el campo 'id' en Firestore
+        projectId: selectedProject.id,
         weekNumber: getWeekNumber(report.reportDate),
         reportDate: report.reportDate,
         workPerformed: report.workPerformed,
         userId: userId,
-        isExtraWork: report.isExtraWork
+        isExtraWork: report.isExtraWork,
+        labor: { ...report.labor, ...laborData }, // Se guarda siempre
       };
 
       if (selectedProject.type === "hourly") {
-        // Proyecto por horas
-        // Usar los datos pre-calculados del servicio centralizado
         reportData = {
           ...reportData,
-          labor: { ...report.labor, ...laborData },
           materials: report.materials,
           totalMaterialsCost: materialsData.totalMaterialsCost,
           totalCost: laborData.totalLaborCost + materialsData.totalMaterialsCost,
         };
       } else if (selectedProject.type === "fixed") {
         if (!report.isExtraWork) {
-          // Proyecto normal de presupuesto cerrado
           reportData = {
             ...reportData,
             invoicedAmount: report.workPerformed.invoicedAmount || 0,
           };
         } else {
-          // Trabajo extra
           reportData.extraWorkType = report.extraWorkData.extraWorkType;
           
           if (report.extraWorkData.extraWorkType === "additional_budget") {
             reportData.extraBudgetAmount = report.extraWorkData.extraBudgetAmount || 0;
           } else {
-            // Usar los datos pre-calculados del servicio centralizado para trabajos extra
             reportData = {
               ...reportData,
               labor: { ...report.extraWorkData.labor, ...extraLaborData },
@@ -151,17 +138,14 @@ const DailyReportForm = ({ userId }) => {
               totalCost: extraLaborData.totalLaborCost + extraMaterialsData.totalMaterialsCost,
             };
           }
-          
           reportData.workPerformed = report.extraWorkData.workPerformed;
         }
       }
 
-      // Usar la mutación de React Query para crear el reporte
       await addReportMutation.mutateAsync(reportData);
       
       setSuccessMessage("Parte guardado correctamente!");
       
-      // Resetear el formulario
       setReport({
         reportDate: new Date().toISOString().split("T")[0],
         labor: { officialEntry: "", officialExit: "", workerEntry: "", workerExit: "" },
@@ -178,7 +162,6 @@ const DailyReportForm = ({ userId }) => {
           extraWorkType: "additional_budget"
         }
       });
-      
       setSelectedProject(null);
     } catch (err) {
       console.error("Error al guardar parte:", err);
@@ -186,10 +169,7 @@ const DailyReportForm = ({ userId }) => {
     }
   };
 
-  // Obtener el objeto proyecto completo
   const project = projects.find((p) => p.id === selectedProject?.id);
-  
-  // Verificar si el proyecto permite trabajos extra
   const allowsExtraWork = project?.type === "fixed" && project?.allowExtraWork;
 
   return (
@@ -213,6 +193,10 @@ const DailyReportForm = ({ userId }) => {
             />
           </div>
           
+          {/* --- CAMBIO: RENDERIZADO DE FORMULARIOS --- */}
+          {/* LaborForm ahora se muestra siempre que hay un proyecto seleccionado */}
+          <LaborForm labor={report.labor} onLaborChange={handleLaborChange} project={selectedProject} />
+
           {allowsExtraWork && (
             <div className="form-group checkbox-group">
               <input
@@ -229,10 +213,9 @@ const DailyReportForm = ({ userId }) => {
             </div>
           )}
           
-          {/* Formularios condicionales */}
+          {/* Formularios condicionales para el resto de datos */}
           {project.type === "hourly" ? (
             <>
-              <LaborForm labor={report.labor} onLaborChange={handleLaborChange} project={selectedProject} />
               <MaterialsForm
                 materials={report.materials}
                 onMaterialsChange={handleMaterialsChange}
