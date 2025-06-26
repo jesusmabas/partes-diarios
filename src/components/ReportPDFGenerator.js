@@ -1,3 +1,4 @@
+// src/components/ReportPDFGenerator.js
 import React, { useMemo } from "react";
 import { Document, Page, Text, View, StyleSheet, Image, Link, Font } from "@react-pdf/renderer";
 import CompressedImage from "./CompressedImage";
@@ -397,8 +398,9 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         const isHourly = project.type === "hourly";
         
         // Usar servicios centralizados para cálculos
+        // **CORRECCIÓN**: Usamos la función de budgetUtils corregida
         const budgetSummary = project.type === "fixed" 
-          ? calculateBudget(project, reports.filter(r => r.projectId === project.id)) 
+          ? calculateBudget(project, reports) // Pasamos todos los reportes para el cálculo correcto
           : { budgetAmount: 0, invoicedTotal: 0, remainingBudget: 0 };
           
         // Calcular datos de labor y materiales si aplica
@@ -492,12 +494,12 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                             <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.budgetAmount)}</Text>
                           </View>
                           <View style={styles.budgetRow}>
-                            <Text style={styles.budgetTableCell}>Importe facturado</Text>
-                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
+                            <Text style={styles.budgetTableCell}>Importe facturado (de este parte)</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(report.invoicedAmount || 0)}</Text>
                           </View>
                           <View style={styles.budgetRow}>
-                            <Text style={styles.budgetTableCell}>Importe restante</Text>
-                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.remainingBudget)}</Text>
+                            <Text style={styles.budgetTableCell}>Total facturado (acumulado)</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
                           </View>
                         </>
                       )}
@@ -612,89 +614,70 @@ const ReportPDFGenerator = ({ reports, projects }) => {
               <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total mano de obra</Text>
+              <Text style={styles.summaryColLabel}>Total mano de obra (Ingresos)</Text>
               <Text style={styles.summaryColValue}>{formatCurrency(totals.totalLabor)}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total materiales</Text>
+              <Text style={styles.summaryColLabel}>Total materiales (Coste)</Text>
               <Text style={styles.summaryColValue}>{formatCurrency(totals.totalMaterials)}</Text>
             </View>
             <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
+              <Text style={styles.summaryTotalLabel}>TOTAL COSTE OPERATIVO</Text>
               <Text style={styles.summaryTotalValue}>{formatCurrency(totals.totalCost)}</Text>
             </View>
           </View>
-        ) : (
-          <View style={styles.summaryTable}>
-            <View style={styles.summaryHeaderRow}>
-              <Text style={{...styles.summaryHeaderCol, width: "70%"}}>Concepto</Text>
-              <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Importe presupuestado</Text>
-              <Text style={styles.summaryColValue}>{formatCurrency(project.budgetAmount || 0)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total facturado</Text>
-              <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced)}</Text>
-            </View>
-            
-            {/* Sección de trabajos extra (si hay) */}
-            {(totals.totalExtraCost > 0 || totals.totalExtraBudget > 0) && (
-              <>
-                {/* Encabezado de sección */}
-                <View style={[styles.summaryRow, styles.extraWorkSection]}>
-                  <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
-                    Trabajos Extra (Fuera de Presupuesto)
-                  </Text>
-                  <Text style={[styles.summaryColValue, { color: '#e67e22' }]}>
-                    {formatCurrency(totals.totalExtraCost + totals.totalExtraBudget)}
-                  </Text>
+        ) : ( // Lógica para proyectos de presupuesto cerrado
+          (() => {
+            // **CORRECCIÓN**: Usamos la función de budgetUtils corregida para obtener los valores correctos
+            const finalBudget = calculateBudget(project, sortedReports);
+
+            return (
+              <View style={styles.summaryTable}>
+                <View style={styles.summaryHeaderRow}>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "70%" }}>Concepto</Text>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "30%" }}>Importe</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Presupuesto Original</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.budgetAmount)}</Text>
                 </View>
                 
-                {/* Detalles de trabajos extra */}
-                {totals.totalExtraBudget > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Presupuestos adicionales</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraBudget)}</Text>
-                  </View>
+                {/* Mostramos la sección de extras solo si existen */}
+                {finalBudget.totalExtraWorkIncome > 0 && (
+                  <>
+                    <View style={[styles.summaryRow, styles.extraWorkSection]}>
+                        <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            Ingresos por Trabajos Extra
+                        </Text>
+                        <Text style={[styles.summaryColValue, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            {formatCurrency(finalBudget.totalExtraWorkIncome)}
+                        </Text>
+                    </View>
+                  </>
                 )}
                 
-                {totals.totalExtraHours > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Coste mano de obra extra</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraHours)}</Text>
-                  </View>
-                )}
-                
-                {totals.totalExtraCost > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Coste total trabajos por horas</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraCost)}</Text>
-                  </View>
-                )}
-              </>
-            )}
-            
-            <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
-              <Text style={styles.summaryTotalValue}>
-                {formatCurrency(totals.totalInvoiced + totals.totalExtraCost + totals.totalExtraBudget)}
-              </Text>
-            </View>
-            
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Importe restante</Text>
-              <Text style={styles.summaryColValue}>
-                {formatCurrency((project.budgetAmount || 0) - totals.totalInvoiced)}
-              </Text>
-            </View>
-          </View>
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>PRESUPUESTO TOTAL (CON EXTRAS)</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.totalBudgetWithExtras)}</Text>
+                </View>
+
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Total Facturado (del presupuesto original)</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.invoicedTotal)}</Text>
+                </View>
+
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>IMPORTE RESTANTE</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.remainingBudget)}</Text>
+                </View>
+              </View>
+            );
+          })()
         )}
 
         <Text style={styles.summaryNote}>
           Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado.
-          {hasExtraWork ? " Los trabajos extra se muestran separados del presupuesto original." : ""}
+          {hasExtraWork ? " Los trabajos extra se muestran sumados al presupuesto original para calcular el total real del proyecto." : ""}
         </Text>
       </Page>
     </Document>

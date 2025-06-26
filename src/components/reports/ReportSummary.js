@@ -1,39 +1,37 @@
 // src/components/reports/ReportSummary.js
 import React from "react";
-// Importar formatNumber para las horas y formatCurrency para los euros
 import { formatCurrency, formatNumber } from "../../utils/calculationUtils";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
+import './Reports.css'; 
 
-const ReportSummary = ({ reports, projects, selectedProjectId }) => {
-  // Usamos el servicio centralizado de cálculos
-  const { calculateReportSummary } = useCalculationsService();
+/**
+ * Componente "tonto" que solo muestra los datos de resumen que recibe.
+ * No realiza cálculos ni llama a hooks.
+ * @param {Object} props
+ * @param {Object} props.totals - El objeto con todos los totales ya calculados.
+ * @param {Object} props.project - El proyecto seleccionado.
+ */
+const ReportSummary = ({ totals, project }) => {
+  if (!totals || !project) {
+    return null; // No renderizar nada si no hay datos
+  }
 
-  // Obtenemos los totales calculados del servicio
-  const { totals } = calculateReportSummary(reports, projects, selectedProjectId);
-
-  // Desestructuramos los valores que necesitamos, incluyendo las nuevas horas
+  // --- LÓGICA DE CÁLCULO ELIMINADA ---
+  // Ahora desestructuramos todos los valores directamente del prop 'totals'.
   const {
     totalLabor,
     totalMaterials,
-    totalCost, // Costo total (MO+Mat para hourly)
-    totalInvoiced, // Facturado total (solo partes normales 'fixed')
-    totalHours, // Horas totales generales
-    totalOfficialHours, // Horas Oficial totales
-    totalWorkerHours,   // Horas Peón totales
-    totalExtraBudget, // Total presupuestos extra
-    totalExtraCost, // Costo total extras por horas (MO+Mat)
-    totalExtraLaborCost, // Costo MO extras por horas
-    totalExtraOfficialHours, // Horas Oficial extras por horas
-    totalExtraWorkerHours, // Horas Peón extras por horas
-    grandTotal // Ingreso total (Facturado Normal + Presupuesto Extra + MO Extra)
+    totalCost,
+    totalInvoiced,
+    totalHours,
+    totalOfficialHours,
+    totalWorkerHours,
+    // --- NUEVOS VALORES PRE-CALCULADOS ---
+    totalExtraWorkIncome,
+    totalBudgetWithExtras,
+    remainingBudget
   } = totals;
 
-  // Encontrar el proyecto seleccionado para determinar su tipo
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || {};
-  const isHourlyProject = selectedProject.type === "hourly";
-
-  // Verificar si hay trabajos extra en los reportes filtrados
-  const hasExtraWork = reports.some(report => report.isExtraWork);
+  const isHourlyProject = project.type === "hourly";
 
   return (
     <div className="totals-summary">
@@ -42,7 +40,7 @@ const ReportSummary = ({ reports, projects, selectedProjectId }) => {
       <table className="summary-table">
         <tbody>
           {isHourlyProject ? (
-            // --- Resumen para Proyecto por Horas ---
+            // --- Resumen para Proyecto por Horas (sin cambios) ---
             <>
               <tr>
                 <td><strong>Total Horas Oficial:</strong></td>
@@ -65,68 +63,39 @@ const ReportSummary = ({ reports, projects, selectedProjectId }) => {
                 <td className="amount">{formatCurrency(totalMaterials)}</td>
               </tr>
               <tr className="total-row">
-                <td><strong>COSTE TOTAL GENERAL (€):</strong></td>
+                <td><strong>COSTE TOTAL OPERATIVO (€):</strong></td>
                 <td className="amount">{formatCurrency(totalCost)}</td>
               </tr>
             </>
           ) : (
-            // --- Resumen para Proyecto de Presupuesto Cerrado ---
+            // === ESTRUCTURA DEFINITIVA Y SIMPLIFICADA PARA PRESUPUESTO CERRADO ===
+            // Ahora solo muestra los valores recibidos, sin calcular nada.
             <>
               <tr>
-                <td><strong>Total Facturado (Presupuesto):</strong></td>
-                <td className="amount">{formatCurrency(totalInvoiced)}</td>
+                <td><strong>Presupuesto Original:</strong></td>
+                <td className="amount">{formatCurrency(project.budgetAmount || 0)}</td>
               </tr>
-
-              {/* Sección de trabajos extra (condicional) */}
-              {hasExtraWork && (
-                <>
-                  <tr className="extra-section-header">
-                    <td colSpan="2"><strong>Trabajos Extra</strong></td>
-                  </tr>
-
-                  {/* Horas de trabajos extra (si aplica) */}
-                  {(totalExtraOfficialHours > 0 || totalExtraWorkerHours > 0) && (
-                    <>
-                      <tr>
-                        <td><strong>Horas Oficial (Extras):</strong></td>
-                        <td className="amount">{formatNumber(totalExtraOfficialHours || 0)} h</td>
-                      </tr>
-                      <tr>
-                        <td><strong>Horas Peón (Extras):</strong></td>
-                        <td className="amount">{formatNumber(totalExtraWorkerHours || 0)} h</td>
-                      </tr>
-                       <tr>
-                        <td><strong>Coste Mano Obra (Extras):</strong></td>
-                        <td className="amount">{formatCurrency(totalExtraLaborCost)}</td>
-                      </tr>
-                    </>
-                  )}
-
-                  {/* Costos/Presupuestos de trabajos extra */}
-                  {totalExtraBudget > 0 && (
-                    <tr>
-                      <td><strong>Presupuestos Adicionales (€):</strong></td>
-                      <td className="amount">{formatCurrency(totalExtraBudget)}</td>
-                    </tr>
-                  )}
-                  {totalExtraCost > 0 && (
-                     <tr>
-                      <td><strong>Coste Total Trabajos por Horas (€):</strong></td>
-                      <td className="amount">{formatCurrency(totalExtraCost)}</td>
-                    </tr>
-                  )}
-                   <tr>
-                    <td><strong>Total Trabajos Extra (€):</strong></td>
-                    <td className="amount">{formatCurrency(totalExtraBudget + totalExtraLaborCost)}</td> {/* Ingreso extra */}
-                  </tr>
-                </>
+              
+              {(totalExtraWorkIncome || 0) > 0 && (
+                <tr>
+                  <td><strong>Ingresos Adicionales por Extras:</strong></td>
+                  <td className="amount">{formatCurrency(totalExtraWorkIncome)}</td>
+                </tr>
               )}
 
-              {/* Total final combinado */}
+              <tr className="total-row intermediate-total">
+                <td><strong>PRESUPUESTO TOTAL (con Extras):</strong></td>
+                <td className="amount">{formatCurrency(totalBudgetWithExtras)}</td>
+              </tr>
+              
+              <tr>
+                <td><strong>Total Facturado (del presupuesto):</strong></td>
+                <td className="amount">{formatCurrency(totalInvoiced)}</td>
+              </tr>
+              
               <tr className="total-row">
-                <td><strong>INGRESO TOTAL GENERAL (€):</strong></td>
-                {/* grandTotal = Facturado Normal + Presupuesto Extra + MO Extra */}
-                <td className="amount">{formatCurrency(grandTotal)}</td>
+                <td><strong>IMPORTE RESTANTE (del presupuesto total):</strong></td>
+                <td className="amount">{formatCurrency(remainingBudget)}</td>
               </tr>
             </>
           )}

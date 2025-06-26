@@ -430,7 +430,12 @@ const ProjectsViewer = () => {
                     </>
                   ) : ( // Tipo 'fixed'
                     <>
-                      <p>Progreso (Presup.): {project.budgetAmount > 0 ? ((invoicedTotal / project.budgetAmount) * 100).toFixed(1) : 0}%</p>
+                      <p>Progreso (Presup.): {
+    (() => {
+        const totalBudget = (project.budgetAmount || 0) + (extraWork.totalExtraIncome || 0);
+        return totalBudget > 0 ? ((invoicedTotal / totalBudget) * 100).toFixed(1) : 0;
+    })()
+}%</p>
                       {extraWork.count > 0 && (
                         <p>Trabajos Extra: {extraWork.count} partes | Ingreso Extra: {formatCurrency(extraWork.totalExtraIncome)} | Horas Extra: {formatNumber(extraWork.extraOfficialHours + extraWork.extraWorkerHours)} h</p>
                       )}

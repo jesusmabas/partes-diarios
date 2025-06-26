@@ -15,7 +15,7 @@ The content is organized as follows:
 2. Repository information
 3. Directory structure
 4. Repository files (if enabled)
-4. Repository files, each consisting of:
+5. Multiple file entries, each consisting of:
   - File path as an attribute
   - Full contents of the file
 </file_format>
@@ -36,10 +36,6 @@ The content is organized as follows:
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
 </notes>
-
-<additional_info>
-
-</additional_info>
 
 </file_summary>
 
@@ -546,93 +542,6 @@ const CompressedImage = ({ src, style, maxWidth = 600, maxHeight = 500, quality 
 };
 
 export default CompressedImage;
-</file>
-
-<file path="src/components/dashboard/DashboardFilters.js">
-// src/components/dashboard/DashboardFilters.js
-import React, { useCallback } from "react";
-
-/**
- * Componente para filtros del dashboard
- * @param {Object} props - Propiedades del componente
- * @param {Array} props.projects - Lista de proyectos
- * @param {string} props.selectedProject - ID del proyecto seleccionado
- * @param {Object} props.dateRange - Rango de fechas {startDate, endDate}
- * @param {Function} props.onFiltersChange - Función para manejar cambios en filtros
- */
-const DashboardFilters = ({ 
-  projects, 
-  selectedProject, 
-  dateRange, 
-  onFiltersChange 
-}) => {
-  // Manejar cambio de proyecto
-  const handleProjectChange = useCallback((e) => {
-    const newProjectId = e.target.value;
-    onFiltersChange({ 
-      projectId: newProjectId !== "all" ? newProjectId : "" 
-    });
-  }, [onFiltersChange]);
-  
-  // Manejar cambio en fechas
-  const handleDateChange = useCallback((e) => {
-    const { name, value } = e.target;
-    onFiltersChange({ [name]: value });
-  }, [onFiltersChange]);
-
-  return (
-    <div className="dashboard-filter" role="search">
-      <h3>Filtros</h3>
-      
-      {/* Selector de proyecto */}
-      <div className="filter-group">
-        <label htmlFor="project-select">Proyecto:</label>
-        <select 
-          id="project-select"
-          value={selectedProject} 
-          onChange={handleProjectChange}
-          className="project-selector"
-          aria-label="Seleccionar proyecto"
-        >
-          <option value="all">Todos los proyectos</option>
-          {projects.map(project => (
-            <option key={project.id} value={project.id}>
-              {project.id} - {project.client}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      {/* Filtro de fechas */}
-      <div className="date-range">
-        <div className="date-field">
-          <label htmlFor="startDate">Fecha inicial:</label>
-          <input 
-            id="startDate"
-            type="date" 
-            name="startDate" 
-            value={dateRange.startDate} 
-            onChange={handleDateChange}
-            aria-label="Fecha inicial para filtrar"
-          />
-        </div>
-        <div className="date-field">
-          <label htmlFor="endDate">Fecha final:</label>
-          <input 
-            id="endDate"
-            type="date" 
-            name="endDate" 
-            value={dateRange.endDate} 
-            onChange={handleDateChange}
-            aria-label="Fecha final para filtrar"
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default React.memo(DashboardFilters);
 </file>
 
 <file path="src/components/dashboard/DashboardSkeleton.js">
@@ -2453,149 +2362,29 @@ export default useReportSummary;
 </file>
 
 <file path="src/hooks/reports/useReportSummary.js">
+// src/hooks/reports/useReportSummary.js
 import { useMemo } from "react";
+// Importamos la ÚNICA función de cálculo que debe existir
+import { calculateReportSummary } from "../../utils/calculations/reportSummaryUtils";
 
 /**
- * Hook personalizado para calcular resúmenes y estadísticas de reportes
- * @param {Array} reports - Lista de reportes
- * @param {Array} projects - Lista de proyectos
- * @param {string} selectedProjectId - ID del proyecto seleccionado (opcional)
- * @returns {Object} - Objeto con cálculos y estadísticas
+ * Hook personalizado que actúa como un simple 'wrapper' memoizado
+ * para la función de cálculo de resumen principal.
+ * 
+ * @param {Array} reports - La lista completa de reportes a analizar.
+ * @param {Array} projects - La lista de proyectos.
+ * @param {string} selectedProjectId - El ID del proyecto para filtrar (o "" para todos).
+ * @returns {Object} - El objeto completo de resultados de calculateReportSummary, principalmente `{ totals, byWeek, byProject }`.
  */
 export const useReportSummary = (reports = [], projects = [], selectedProjectId = "") => {
-  // Filtrar por proyecto si es necesario
-  const filteredReports = useMemo(() => {
-    if (!selectedProjectId) return reports;
-    return reports.filter(report => report.projectId === selectedProjectId);
-  }, [reports, selectedProjectId]);
+  // useMemo asegura que el cálculo complejo solo se ejecuta si los datos de entrada cambian.
+  const summary = useMemo(() => {
+    // Llama a la función de cálculo maestra y robusta.
+    // Esta es la única fuente de verdad para los cálculos del resumen.
+    return calculateReportSummary(reports, projects, selectedProjectId);
+  }, [reports, projects, selectedProjectId]);
 
-  // Obtener tipo de proyecto
-  const projectType = useMemo(() => {
-    if (!selectedProjectId) return null;
-    const project = projects.find(p => p.id === selectedProjectId);
-    return project?.type || null;
-  }, [projects, selectedProjectId]);
-
-  // Calcular totales generales
-  const totals = useMemo(() => {
-    let totalLabor = 0;
-    let totalMaterials = 0;
-    let totalCost = 0;
-    let totalInvoiced = 0;
-    let totalHours = 0;
-
-    filteredReports.forEach(report => {
-      // Costos de mano de obra (proyectos por hora)
-      if (report.labor) {
-        totalLabor += report.labor.totalLaborCost || 0;
-        totalHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
-      }
-      
-      // Costos de materiales
-      totalMaterials += report.totalMaterialsCost || 0;
-      
-      // Coste total
-      if (report.totalCost) {
-        totalCost += report.totalCost;
-      } else if (report.labor) {
-        totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        totalInvoiced += report.invoicedAmount;
-      }
-    });
-
-    return {
-      totalLabor,
-      totalMaterials,
-      totalCost,
-      totalInvoiced,
-      totalHours
-    };
-  }, [filteredReports]);
-
-  // Calcular resumen por semanas
-  const weeklySummary = useMemo(() => {
-    if (filteredReports.length === 0) return [];
-
-    const weekMap = {};
-    
-    filteredReports.forEach(report => {
-      const weekKey = `${report.weekNumber}-${new Date(report.reportDate).getFullYear()}`;
-      
-      if (!weekMap[weekKey]) {
-        weekMap[weekKey] = {
-          weekNumber: report.weekNumber,
-          year: new Date(report.reportDate).getFullYear(),
-          label: `Semana ${report.weekNumber}/${new Date(report.reportDate).getFullYear()}`,
-          laborCost: 0,
-          materialsCost: 0,
-          totalCost: 0,
-          invoicedAmount: 0,
-          reports: 0
-        };
-      }
-      
-      // Incrementar contadores
-      weekMap[weekKey].reports += 1;
-      
-      // Para proyectos por hora
-      if (report.labor) {
-        weekMap[weekKey].laborCost += report.labor.totalLaborCost || 0;
-      }
-      
-      weekMap[weekKey].materialsCost += report.totalMaterialsCost || 0;
-      
-      // Coste total
-      if (report.totalCost) {
-        weekMap[weekKey].totalCost += report.totalCost;
-      } else if (report.labor) {
-        weekMap[weekKey].totalCost += (report.labor.totalLaborCost || 0) + (report.totalMaterialsCost || 0);
-      }
-      
-      // Para proyectos de presupuesto cerrado
-      if (report.invoicedAmount) {
-        weekMap[weekKey].invoicedAmount += report.invoicedAmount;
-      }
-    });
-
-    // Convertir a array y ordenar por semana/año
-    return Object.values(weekMap).sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.weekNumber - b.weekNumber;
-    });
-  }, [filteredReports]);
-
-  // Calcular presupuesto restante para proyectos de presupuesto cerrado
-  const budgetSummary = useMemo(() => {
-    if (projectType !== 'fixed' || !selectedProjectId) return null;
-    
-    const project = projects.find(p => p.id === selectedProjectId);
-    if (!project) return null;
-    
-    const budgetAmount = project.budgetAmount || 0;
-    const invoicedTotal = totals.totalInvoiced;
-    const remainingBudget = budgetAmount - invoicedTotal;
-    const progressPercentage = budgetAmount > 0 ? (invoicedTotal / budgetAmount) * 100 : 0;
-    
-    return {
-      budgetAmount,
-      invoicedTotal,
-      remainingBudget,
-      progressPercentage: Math.min(progressPercentage, 100), // Limitar a 100%
-      isOverBudget: remainingBudget < 0
-    };
-  }, [projectType, selectedProjectId, projects, totals.totalInvoiced]);
-
-  return {
-    totals,
-    weeklySummary,
-    budgetSummary,
-    projectType,
-    reportCount: filteredReports.length
-  };
+  return summary;
 };
 
 export default useReportSummary;
@@ -4671,52 +4460,6 @@ service cloud.firestore {
 }
 </file>
 
-<file path="public/index.html">
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-<title>alqatifa - Partes de trabajo</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-  </body>
-</html>
-</file>
-
 <file path="public/manifest.json">
 {
   "short_name": "alqatifa",
@@ -4907,101 +4650,102 @@ const DashboardCharts = ({
 export default React.memo(DashboardCharts);
 </file>
 
-<file path="src/components/dashboard/DashboardSummary.js">
-// src/components/dashboard/DashboardSummary.js - Refactorizado para usar useCalculationsService
-import React from "react";
-import EmptyState from "../common/EmptyState";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
-import { formatCurrency } from "../../utils/calculationUtils";
+<file path="src/components/dashboard/DashboardFilters.js">
+// src/components/dashboard/DashboardFilters.js
+import React, { useCallback, useMemo } from "react"; // Importar useMemo
 
 /**
- * Componente para la sección de resumen de datos del dashboard
+ * Componente para filtros del dashboard
  * @param {Object} props - Propiedades del componente
- * @param {Array} props.reports - Lista de reportes filtrados
  * @param {Array} props.projects - Lista de proyectos
- * @param {string} props.selectedProject - ID del proyecto seleccionado
- * @param {boolean} props.isLoading - Estado de carga
+ * @param {string} props.selectedProject - ID del proyecto seleccionado ("all" o un ID específico)
+ * @param {Object} props.dateRange - Rango de fechas {startDate, endDate}
+ * @param {Function} props.onFiltersChange - Función para manejar cambios en filtros
  */
-const DashboardSummary = ({ reports, projects = [], selectedProject, isLoading }) => {
-  // Usamos el servicio centralizado de cálculos
-  const { calculateReportSummary } = useCalculationsService();
-  
-  // Obtenemos las métricas ya calculadas
-  const { byWeek, totals } = calculateReportSummary(reports, projects, selectedProject);
-  
-  // Obtener los últimos 5 registros
-  const recentData = byWeek.slice(-5);
+const DashboardFilters = ({
+  projects,
+  selectedProject, // Puede ser "all" o un ID
+  dateRange,
+  onFiltersChange
+}) => {
 
-  // Renderizar tabla de resumen
-  const renderTable = () => {
-    if (recentData.length === 0) {
-      return (
-        <EmptyState
-          message="No hay datos suficientes para mostrar el resumen."
-          icon="📊"
-        />
-      );
-    }
-    
-    return (
-      <table className="data-summary-table" aria-label="Resumen de datos recientes">
-        <thead>
-          <tr>
-            <th scope="col">Periodo</th>
-            <th scope="col" style={{ backgroundColor: "#e8f7eb" }}>Ingresos Totales</th>
-            <th scope="col">Mano de Obra</th>
-            <th scope="col" style={{ backgroundColor: "#e0f7fa" }}>Facturado</th>
-            <th scope="col">Materiales</th>
-            <th scope="col">Coste Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {recentData.map((item, index) => (
-            <tr key={index}>
-              <td>{item.weekLabel}</td>
-              <td style={{ color: "#27AE60", fontWeight: "500", backgroundColor: "#f2f9f5" }}>
-                {formatCurrency(item.totalIncome)}
-              </td>
-              <td>{formatCurrency(item.laborCost)}</td>
-              <td style={{ backgroundColor: "#f0f9fa" }}>
-                {formatCurrency(item.invoicedAmount)}
-              </td>
-              <td>{formatCurrency(item.materialsCost)}</td>
-              <td>{formatCurrency(item.totalCost)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td><strong>TOTAL</strong></td>
-            <td style={{ color: "#27AE60", fontWeight: "bold", backgroundColor: "#f2f9f5" }}>
-              {formatCurrency(totals.totalIncome)}
-            </td>
-            <td><strong>{formatCurrency(totals.totalLabor)}</strong></td>
-            <td style={{ fontWeight: "bold", backgroundColor: "#f0f9fa" }}>
-              {formatCurrency(totals.totalInvoiced)}
-            </td>
-            <td><strong>{formatCurrency(totals.totalMaterials)}</strong></td>
-            <td><strong>{formatCurrency(totals.totalCost)}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-    );
-  };
+  // Ordenar los proyectos alfabéticamente descendente por ID
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      return (b.id || "").localeCompare(a.id || "");
+    });
+  }, [projects]); // Dependencia: reordenar solo si 'projects' cambia
+
+  // Manejar cambio de proyecto
+  const handleProjectChange = useCallback((e) => {
+    const newProjectId = e.target.value;
+    onFiltersChange({
+      // Pasar "" si es "all", o el ID si es un proyecto específico
+      projectId: newProjectId !== "all" ? newProjectId : ""
+    });
+  }, [onFiltersChange]);
+
+  // Manejar cambio en fechas
+  const handleDateChange = useCallback((e) => {
+    const { name, value } = e.target;
+    onFiltersChange({ [name]: value });
+  }, [onFiltersChange]);
 
   return (
-    <div className="dashboard-section">
-      <h3>Resumen de Datos</h3>
-      {isLoading ? (
-        <p className="loading-indicator">Cargando datos...</p>
-      ) : (
-        renderTable()
-      )}
+    <div className="dashboard-filter" role="search">
+      <h3>Filtros</h3>
+
+      {/* Selector de proyecto */}
+      <div className="filter-group">
+        <label htmlFor="project-select-dashboard">Proyecto:</label>
+        {/* Usar la lista ordenada */}
+        <select
+          id="project-select-dashboard"
+          // El valor debe ser "all" si no hay un ID específico
+          value={selectedProject || "all"}
+          onChange={handleProjectChange}
+          className="project-selector"
+          aria-label="Seleccionar proyecto"
+        >
+          <option value="all">Todos los proyectos</option>
+          {sortedProjects.map(project => (
+            <option key={project.firestoreId} value={project.id}>
+              {project.id} - {project.client}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Filtro de fechas */}
+      <div className="date-range">
+        <div className="date-field">
+          <label htmlFor="startDate-dashboard">Fecha inicial:</label>
+          <input
+            id="startDate-dashboard"
+            type="date"
+            name="startDate"
+            value={dateRange.startDate || ""} // Controlar valor undefined/null
+            onChange={handleDateChange}
+            aria-label="Fecha inicial para filtrar"
+          />
+        </div>
+        <div className="date-field">
+          <label htmlFor="endDate-dashboard">Fecha final:</label>
+          <input
+            id="endDate-dashboard"
+            type="date"
+            name="endDate"
+            value={dateRange.endDate || ""} // Controlar valor undefined/null
+            onChange={handleDateChange}
+            aria-label="Fecha final para filtrar"
+          />
+        </div>
+      </div>
     </div>
   );
 };
 
-export default React.memo(DashboardSummary);
+export default React.memo(DashboardFilters);
 </file>
 
 <file path="src/components/ImageUploader.js">
@@ -5785,116 +5529,6 @@ const ProjectForm = ({ onProjectAdded }) => {
 export default ProjectForm;
 </file>
 
-<file path="src/components/reports/ReportSummary.js">
-// src/components/reports/ReportSummary.js - Refactorizado para usar useCalculationsService
-import React from "react";
-import { formatCurrency } from "../../utils/calculationUtils";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
-
-const ReportSummary = ({ reports, projects, selectedProjectId }) => {
-  // Usamos el servicio centralizado de cálculos
-  const { calculateReportSummary } = useCalculationsService();
-  
-  // Obtenemos los totales calculados del servicio
-  const { totals } = calculateReportSummary(reports, projects, selectedProjectId);
-  
-  // Desestructuramos los valores que necesitamos
-  const { 
-    totalLabor, 
-    totalMaterials, 
-    totalCost, 
-    totalInvoiced,
-    totalExtraHours,
-    totalExtraBudget,
-    totalExtraCost
-  } = totals;
-
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || {};
-  const isHourlyProject = selectedProject.type === "hourly";
-  
-  // Verificar si hay trabajos extra
-  const hasExtraWork = reports.some(report => report.isExtraWork);
-
-  return (
-    <div className="totals-summary">
-      <h3>Resumen de totales</h3>
-      
-      {isHourlyProject ? (
-        // Proyecto por horas (vista existente)
-        <table className="summary-table">
-          <tbody>
-            <tr>
-              <td><strong>Total mano de obra:</strong></td>
-              <td className="amount">{formatCurrency(totalLabor)}</td>
-            </tr>
-            <tr>
-              <td><strong>Total materiales:</strong></td>
-              <td className="amount">{formatCurrency(totalMaterials)}</td>
-            </tr>
-            <tr className="total-row">
-              <td><strong>TOTAL GENERAL:</strong></td>
-              <td className="amount">{formatCurrency(totalCost)}</td>
-            </tr>
-          </tbody>
-        </table>
-      ) : (
-        // Proyecto de presupuesto cerrado (con posibles trabajos extra)
-        <table className="summary-table">
-          <tbody>
-            <tr>
-              <td><strong>Total facturado (presupuesto):</strong></td>
-              <td className="amount">{formatCurrency(totalInvoiced)}</td>
-            </tr>
-            
-            {/* Sección de trabajos extra (condicional) */}
-            {hasExtraWork && (
-              <>
-                <tr className="extra-section-header">
-                  <td colSpan="2"><strong>Trabajos Extra</strong></td>
-                </tr>
-                
-                {totalExtraBudget > 0 && (
-                  <tr>
-                    <td><strong>Presupuestos adicionales:</strong></td>
-                    <td className="amount">{formatCurrency(totalExtraBudget)}</td>
-                  </tr>
-                )}
-                
-                {totalExtraHours > 0 && (
-                  <>
-                    <tr>
-                      <td><strong>Mano de obra extra:</strong></td>
-                      <td className="amount">{formatCurrency(totalExtraHours)}</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Total coste trabajos por horas:</strong></td>
-                      <td className="amount">{formatCurrency(totalExtraCost)}</td>
-                    </tr>
-                  </>
-                )}
-                
-                <tr>
-                  <td><strong>Total trabajos extra:</strong></td>
-                  <td className="amount">{formatCurrency(totalExtraCost + totalExtraBudget)}</td>
-                </tr>
-              </>
-            )}
-            
-            {/* Total final combinado */}
-            <tr className="total-row">
-              <td><strong>TOTAL GENERAL:</strong></td>
-              <td className="amount">{formatCurrency(totalInvoiced + totalExtraCost + totalExtraBudget)}</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-};
-
-export default React.memo(ReportSummary);
-</file>
-
 <file path="src/hooks/reports/useReportActions.js">
 // src/hooks/reports/useReportActions.js (Completo)
 import { useCallback, useState } from "react";
@@ -6656,7 +6290,15 @@ global.console = {
 <file path="src/utils/calculations/budgetUtils.js">
 // src/utils/calculations/budgetUtils.js
 
+/**
+ * Calcula el presupuesto de un proyecto, considerando correctamente los trabajos extra.
+ *
+ * @param {Object} project - El objeto del proyecto, que contiene el presupuesto original.
+ * @param {Array} reports - La lista de todos los reportes (normales y extra) asociados al proyecto.
+ * @returns {Object} Un objeto con los detalles del presupuesto desglosado.
+ */
 export function calculateBudget(project = {}, reports = []) {
+  // Asegurar que los inputs sean válidos para evitar errores
   if (!project || typeof project !== 'object') {
     project = {};
   }
@@ -6664,192 +6306,49 @@ export function calculateBudget(project = {}, reports = []) {
     reports = [];
   }
 
-  const budgetAmount = parseFloat(project.budgetAmount) || 0;
-  let invoicedTotal = 0;
+  const originalBudgetAmount = parseFloat(project.budgetAmount) || 0;
+  let invoicedTotal = 0; // Acumula solo lo facturado contra el presupuesto original
+  let totalExtraWorkIncome = 0; // Acumula todos los ingresos de trabajos extra
 
-  if (project.type === 'fixed') {
-    if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
-        invoicedTotal = parseFloat(project.totalInvoicedAmount) || 0;
+  // Filtrar reportes para asegurarse de que solo se procesan los del proyecto actual
+  const projectReports = reports.filter(report => report.projectId === project.id);
+
+  projectReports.forEach(report => {
+    if (report.isExtraWork) {
+      // Si es un trabajo extra, su valor se suma a los ingresos por extras
+      if (report.extraWorkType === 'additional_budget') {
+        totalExtraWorkIncome += parseFloat(report.extraBudgetAmount) || 0;
+      } else if (report.extraWorkType === 'hourly') {
+        // Para extras por horas, el ingreso es el coste de la mano de obra
+        totalExtraWorkIncome += parseFloat(report.labor?.totalLaborCost) || 0;
+      }
     } else {
-        console.warn(`calculateBudget: Fallback for project ${project.id}.`);
-        invoicedTotal = reports
-            .filter(report => report.projectId === project.id && !report.isExtraWork)
-            .reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
+      // Si es un parte normal, su importe se suma a lo facturado del presupuesto
+      invoicedTotal += parseFloat(report.invoicedAmount) || 0;
     }
-  }
+  });
 
-  const remainingBudget = budgetAmount - invoicedTotal;
+  // **LÓGICA CORREGIDA**: El presupuesto total es el original más los ingresos de los extras.
+  const totalBudgetWithExtras = originalBudgetAmount + totalExtraWorkIncome;
 
-  const progressPercentage = budgetAmount > 0
-    ? Math.min(Math.max((invoicedTotal / budgetAmount) * 100, 0), 100)
+  // **LÓGICA CORREGIDA**: El restante se calcula sobre este nuevo presupuesto total.
+  // Se resta lo que se ha facturado del presupuesto principal.
+  const remainingBudget = totalBudgetWithExtras - invoicedTotal;
+
+  // El progreso se calcula sobre el presupuesto total (con extras), reflejando el avance real.
+  const progressPercentage = totalBudgetWithExtras > 0
+    ? Math.min(Math.max((invoicedTotal / totalBudgetWithExtras) * 100, 0), 100)
     : 0;
 
+  // Devolver un objeto completo y claro con todos los valores calculados
   return {
-    budgetAmount,
-    invoicedTotal,
-    remainingBudget,
+    budgetAmount: originalBudgetAmount, // El presupuesto original sin extras
+    totalBudgetWithExtras,             // El "bote" total del proyecto
+    totalExtraWorkIncome,              // El valor total de todos los trabajos extra
+    invoicedTotal,                     // Lo que se ha facturado del presupuesto principal
+    remainingBudget,                   // Lo que queda en el "bote" total
     progressPercentage: parseFloat(progressPercentage.toFixed(2)),
     isOverBudget: remainingBudget < 0
-  };
-}
-</file>
-
-<file path="src/utils/calculations/reportSummaryUtils.js">
-// src/utils/calculations/reportSummaryUtils.js
-
-export function calculateReportSummary(reports = [], projects = [], selectedProjectId = "") {
-  if (!Array.isArray(reports)) reports = [];
-  if (!Array.isArray(projects)) projects = [];
-
-  const filteredReports = selectedProjectId
-    ? reports.filter(report => report.projectId === selectedProjectId)
-    : reports;
-
-  let totalLabor = 0;
-  let totalMaterials = 0;
-  let totalCost = 0;
-  let totalHours = 0;
-  let totalIncome = 0;
-  let totalExtraBudget = 0;
-  let totalExtraCost = 0;
-
-  const reportsByWeek = {};
-  const reportsByProject = {};
-  const processedProjectIds = new Set();
-
-  filteredReports.forEach(report => {
-    const project = projects.find(p => p.id === report.projectId);
-    const projectType = project?.type || 'hourly';
-    const isExtraWork = report.isExtraWork ?? false;
-
-    if (isExtraWork && projectType === 'fixed') {
-      if (report.extraWorkType === 'hourly') {
-        const extraLabor = parseFloat(report.labor?.totalLaborCost) || 0;
-        const extraMats = parseFloat(report.totalMaterialsCost) || 0;
-        const extraRepCost = parseFloat(report.totalCost) || (extraLabor + extraMats);
-        totalExtraCost += extraRepCost;
-        totalIncome += extraLabor;
-      } else if (report.extraWorkType === 'additional_budget') {
-        const extraBudget = parseFloat(report.extraBudgetAmount) || 0;
-        totalExtraBudget += extraBudget;
-        totalIncome += extraBudget;
-      }
-    } else if (!isExtraWork) {
-      const laborCost = parseFloat(report.labor?.totalLaborCost) || 0;
-      const materialsCost = parseFloat(report.totalMaterialsCost) || 0;
-      const reportCost = parseFloat(report.totalCost) || (laborCost + materialsCost);
-
-      totalLabor += laborCost;
-      totalMaterials += materialsCost;
-      totalCost += reportCost;
-      totalHours += (parseFloat(report.labor?.officialHours) || 0) + (parseFloat(report.labor?.workerHours) || 0);
-
-      if (projectType === 'hourly') {
-        totalIncome += laborCost;
-      }
-    }
-
-    const reportDateObj = report.reportDate ? new Date(report.reportDate) : null;
-    if (reportDateObj && report.weekNumber) {
-      const year = reportDateObj.getFullYear();
-      const weekKey = `${report.weekNumber}-${year}`;
-      if (!reportsByWeek[weekKey]) {
-        reportsByWeek[weekKey] = {
-          weekNumber: report.weekNumber, year: year, weekLabel: `Sem ${report.weekNumber}/${year}`,
-          laborCost: 0, materialsCost: 0, totalCost: 0, invoicedAmount: 0, totalIncome: 0,
-          extraBudget: 0, extraCost: 0, count: 0
-        };
-      }
-      reportsByWeek[weekKey].count += 1;
-      if (isExtraWork && projectType === 'fixed') {
-        if (report.extraWorkType === 'hourly') {
-          const extraRepCostW = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
-          reportsByWeek[weekKey].extraCost += extraRepCostW;
-          reportsByWeek[weekKey].totalIncome += parseFloat(report.labor?.totalLaborCost) || 0;
-        } else if (report.extraWorkType === 'additional_budget') {
-          const extraBudgetW = parseFloat(report.extraBudgetAmount) || 0;
-          reportsByWeek[weekKey].extraBudget += extraBudgetW;
-          reportsByWeek[weekKey].totalIncome += extraBudgetW;
-        }
-      } else if (!isExtraWork) {
-        const laborCostW = parseFloat(report.labor?.totalLaborCost) || 0;
-        const materialsCostW = parseFloat(report.totalMaterialsCost) || 0;
-        const reportCostW = parseFloat(report.totalCost) || (laborCostW + materialsCostW);
-        reportsByWeek[weekKey].laborCost += laborCostW;
-        reportsByWeek[weekKey].materialsCost += materialsCostW;
-        reportsByWeek[weekKey].totalCost += reportCostW;
-        if (projectType === 'hourly') {
-          reportsByWeek[weekKey].totalIncome += laborCostW;
-        } else if (projectType === 'fixed') {
-          const invoicedW = parseFloat(report.invoicedAmount) || 0;
-          reportsByWeek[weekKey].invoicedAmount += invoicedW;
-          reportsByWeek[weekKey].totalIncome += invoicedW;
-        }
-      }
-    }
-
-    const projectId = report.projectId;
-    processedProjectIds.add(projectId);
-    if (!reportsByProject[projectId]) {
-      reportsByProject[projectId] = {
-        projectId: projectId, client: project?.client || 'Desconocido', type: projectType, projectData: project,
-        laborCost: 0, materialsCost: 0, totalCost: 0, invoicedAmount: 0, totalIncome: 0,
-        extraBudget: 0, extraCost: 0, count: 0, reports: 0
-      };
-    }
-    reportsByProject[projectId].count += 1;
-    reportsByProject[projectId].reports += 1;
-    if (isExtraWork && projectType === 'fixed') {
-      if (report.extraWorkType === 'hourly') {
-        const extraRepCostP = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
-        reportsByProject[projectId].extraCost += extraRepCostP;
-      } else if (report.extraWorkType === 'additional_budget') {
-        reportsByProject[projectId].extraBudget += parseFloat(report.extraBudgetAmount) || 0;
-      }
-    } else if (!isExtraWork) {
-      reportsByProject[projectId].laborCost += parseFloat(report.labor?.totalLaborCost) || 0;
-      reportsByProject[projectId].materialsCost += parseFloat(report.totalMaterialsCost) || 0;
-      const reportCostP = parseFloat(report.totalCost) || (parseFloat(report.labor?.totalLaborCost) || 0) + (parseFloat(report.totalMaterialsCost) || 0);
-      reportsByProject[projectId].totalCost += reportCostP;
-    }
-  });
-
-  let grandTotalInvoiced = 0;
-  Object.keys(reportsByProject).forEach(pid => {
-    const projSummary = reportsByProject[pid];
-    const projData = projSummary.projectData;
-    if (projSummary.type === 'fixed') {
-      const projectTotalInvoiced = parseFloat(projData?.totalInvoicedAmount) || 0;
-      projSummary.invoicedAmount = projectTotalInvoiced;
-      projSummary.totalIncome = projectTotalInvoiced;
-      grandTotalInvoiced += projectTotalInvoiced;
-    } else if (projSummary.type === 'hourly') {
-      projSummary.totalIncome = projSummary.laborCost;
-      projSummary.invoicedAmount = 0;
-    }
-     projSummary.totalIncome += projSummary.extraBudget + (projSummary.type === 'fixed' ? projSummary.extraCost : 0);
-    delete projSummary.projectData;
-  });
-
-   totalIncome = Object.values(reportsByProject).reduce((sum, proj) => sum + proj.totalIncome, 0);
-
-  const byWeek = Object.values(reportsByWeek).sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return a.weekNumber - b.weekNumber;
-  });
-
-  const byProject = Object.values(reportsByProject).sort((a, b) => {
-    return (b.totalIncome + b.extraBudget + b.extraCost) - (a.totalIncome + a.extraBudget + a.extraCost);
-  });
-
-  return {
-    totals: {
-      totalLabor, totalMaterials, totalCost, totalInvoiced: grandTotalInvoiced, totalHours, totalIncome,
-      totalExtraBudget, totalExtraCost,
-      grandTotal: grandTotalInvoiced + totalExtraBudget + totalExtraCost
-    },
-    byWeek,
-    byProject
   };
 }
 </file>
@@ -6951,6 +6450,52 @@ yarn-error.log*
     "runtime": "nodejs20"
   }
 }
+</file>
+
+<file path="public/index.html">
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.png" type="image/png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+<title>alqatifa - Partes de trabajo</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>
 </file>
 
 <file path="src/App.css">
@@ -7983,6 +7528,135 @@ h3 {
 }
 </file>
 
+<file path="src/components/dashboard/DashboardSummary.js">
+// src/components/dashboard/DashboardSummary.js
+import React from "react";
+import EmptyState from "../common/EmptyState";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
+// Importar formatNumber para las horas y formatCurrency para los euros
+import { formatCurrency, formatNumber } from "../../utils/calculationUtils";
+
+/**
+ * Componente para la sección de resumen de datos del dashboard.
+ * Muestra una tabla con los datos agregados por semana (o el período relevante).
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.reports - Lista de reportes filtrados
+ * @param {Array} props.projects - Lista de proyectos
+ * @param {string} props.selectedProject - ID del proyecto seleccionado (puede ser "" para todos)
+ * @param {boolean} props.isLoading - Estado de carga
+ */
+const DashboardSummary = ({ reports, projects = [], selectedProject, isLoading }) => {
+  // Usamos el servicio centralizado de cálculos
+  const { calculateReportSummary } = useCalculationsService();
+
+  // Obtenemos las métricas ya calculadas (por semana y totales)
+  // Pasamos selectedProject (puede ser "" si es "all")
+  const { byWeek, totals } = calculateReportSummary(reports, projects, selectedProject);
+
+  // Obtener los últimos 5 registros semanales para mostrar en la tabla
+  // Si hay menos de 5, mostrará todos los disponibles
+  const recentData = byWeek.slice(-5);
+
+  // Renderizar tabla de resumen
+  const renderTable = () => {
+    // Si no hay datos semanales, mostrar estado vacío
+    if (recentData.length === 0) {
+      return (
+        <EmptyState
+          message="No hay datos suficientes para mostrar el resumen semanal."
+          icon="📊"
+        />
+      );
+    }
+
+    // Renderizar la tabla si hay datos
+    return (
+      <table className="data-summary-table" aria-label="Resumen de datos recientes por semana">
+        <thead>
+          <tr>
+            <th scope="col">Periodo</th>
+            <th scope="col" style={{ backgroundColor: "#e8f7eb" }}>Ingresos</th>
+            <th scope="col">H. Oficial</th> {/* Nueva columna */}
+            <th scope="col">H. Peón</th>   {/* Nueva columna */}
+            <th scope="col">M. Obra (€)</th>
+            <th scope="col" style={{ backgroundColor: "#e0f7fa" }}>Facturado (€)</th>
+            <th scope="col">Materiales (€)</th>
+            <th scope="col">Coste Total (€)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {/* Mapear los datos semanales recientes para las filas */}
+          {recentData.map((item, index) => (
+            <tr key={index}>
+              {/* Columna de Periodo (Semana/Año) */}
+              <td>{item.weekLabel}</td>
+              {/* Columna de Ingresos */}
+              <td style={{ color: "#27AE60", fontWeight: "500", backgroundColor: "#f2f9f5" }}>
+                {formatCurrency(item.totalIncome)}
+              </td>
+              {/* Columna de Horas Oficial */}
+              <td>{formatNumber(item.officialHours || 0)} h</td>
+              {/* Columna de Horas Peón */}
+              <td>{formatNumber(item.workerHours || 0)} h</td>
+              {/* Columna de Coste Mano de Obra */}
+              <td>{formatCurrency(item.laborCost)}</td>
+              {/* Columna de Facturado */}
+              <td style={{ backgroundColor: "#f0f9fa" }}>
+                {formatCurrency(item.invoicedAmount)}
+              </td>
+              {/* Columna de Coste Materiales */}
+              <td>{formatCurrency(item.materialsCost)}</td>
+              {/* Columna de Coste Total */}
+              <td>{formatCurrency(item.totalCost)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          {/* Fila de Totales Generales */}
+          <tr>
+            <td><strong>TOTAL</strong></td>
+            {/* Total Ingresos */}
+            <td style={{ color: "#27AE60", fontWeight: "bold", backgroundColor: "#f2f9f5" }}>
+              {/* Usamos grandTotal que incluye facturado y extras */}
+              {formatCurrency(totals.grandTotal || 0)}
+            </td>
+            {/* Total Horas Oficial */}
+            <td><strong>{formatNumber(totals.totalOfficialHours || 0)} h</strong></td>
+            {/* Total Horas Peón */}
+            <td><strong>{formatNumber(totals.totalWorkerHours || 0)} h</strong></td>
+            {/* Total Coste Mano de Obra */}
+            <td><strong>{formatCurrency(totals.totalLabor)}</strong></td>
+            {/* Total Facturado (Presupuesto) */}
+            <td style={{ fontWeight: "bold", backgroundColor: "#f0f9fa" }}>
+              {formatCurrency(totals.totalInvoiced)}
+            </td>
+            {/* Total Coste Materiales */}
+            <td><strong>{formatCurrency(totals.totalMaterials)}</strong></td>
+            {/* Total Coste Operativo (MO + Materiales) */}
+            <td><strong>{formatCurrency((totals.totalLabor || 0) + (totals.totalMaterials || 0))}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    );
+  };
+
+  // Renderizado principal del componente
+  return (
+    <div className="dashboard-section">
+      <h3>Resumen de Datos (Últimas Semanas)</h3>
+      {/* Mostrar indicador de carga o la tabla */}
+      {isLoading ? (
+        <p className="loading-indicator">Cargando datos del resumen...</p>
+      ) : (
+        renderTable()
+      )}
+    </div>
+  );
+};
+
+export default React.memo(DashboardSummary);
+</file>
+
 <file path="src/components/FixedReportForm.js">
 import React, { useCallback } from "react";
 import { formatCurrency } from "../utils/calculationUtils";
@@ -8158,367 +7832,115 @@ const MaterialsForm = ({ materials, onMaterialsChange, projectId, reportDate }) 
 export default React.memo(MaterialsForm);
 </file>
 
-<file path="src/components/reports/ReportFilters.js">
-// src/components/reports/ReportFilters.js - Componente mejorado con más filtros
-import React, { useCallback, useState } from "react";
-import { formatCurrency } from "../../utils/calculationUtils";
+<file path="src/components/reports/ReportSummary.js">
+// src/components/reports/ReportSummary.js
+import React from "react";
+import { formatCurrency, formatNumber } from "../../utils/calculationUtils";
+import './Reports.css'; 
 
-const ReportFilters = ({
-  projects,
-  selectedProjectId,
-  dateRange,
-  onProjectChange,
-  onDateRangeChange,
-  onBilledStatusChange,
-  billedStatus,
-  // Nuevos props para filtros adicionales
-  onWorkTypeChange,
-  workType,
-  onUserChange,
-  selectedUserId,
-  users = [], // Lista de usuarios (opcional)
-  onAmountRangeChange,
-  amountRange = { min: "", max: "" },
-  // Ordenación
-  onSortChange,
-  sortField = "reportDate",
-  sortDirection = "desc",
-  // Props para UI mejorada
-  onSaveFilter,
-  onResetFilters,
-  savedFilters = []
-}) => {
-  // Estado para controlar panel de filtros expandible
-  const [isExpanded, setIsExpanded] = useState(false);
+/**
+ * Componente "tonto" que solo muestra los datos de resumen que recibe.
+ * No realiza cálculos ni llama a hooks.
+ * @param {Object} props
+ * @param {Object} props.totals - El objeto con todos los totales ya calculados.
+ * @param {Object} props.project - El proyecto seleccionado.
+ */
+const ReportSummary = ({ totals, project }) => {
+  if (!totals || !project) {
+    return null; // No renderizar nada si no hay datos
+  }
 
-  // Manejadores existentes
-  const handleProjectSelect = useCallback((e) => {
-    onProjectChange(e.target.value);
-  }, [onProjectChange]);
+  // --- LÓGICA DE CÁLCULO ELIMINADA ---
+  // Ahora desestructuramos todos los valores directamente del prop 'totals'.
+  const {
+    totalLabor,
+    totalMaterials,
+    totalCost,
+    totalInvoiced,
+    totalHours,
+    totalOfficialHours,
+    totalWorkerHours,
+    // --- NUEVOS VALORES PRE-CALCULADOS ---
+    totalExtraWorkIncome,
+    totalBudgetWithExtras,
+    remainingBudget
+  } = totals;
 
-  const handleDateChange = useCallback((e) => {
-    const { name, value } = e.target;
-    onDateRangeChange({
-      ...dateRange,
-      [name]: value
-    });
-  }, [dateRange, onDateRangeChange]);
-
-  const handleBilledStatusSelect = useCallback((e) => {
-    onBilledStatusChange(e.target.value);
-  }, [onBilledStatusChange]);
-
-  // Nuevos manejadores
-  const handleWorkTypeSelect = useCallback((e) => {
-    if (onWorkTypeChange) {
-      onWorkTypeChange(e.target.value);
-    }
-  }, [onWorkTypeChange]);
-
-  const handleUserSelect = useCallback((e) => {
-    if (onUserChange) {
-      onUserChange(e.target.value);
-    }
-  }, [onUserChange]);
-
-  const handleAmountChange = useCallback((e) => {
-    const { name, value } = e.target;
-    if (onAmountRangeChange) {
-      onAmountRangeChange({
-        ...amountRange,
-        [name.replace("amount", "")]: value
-      });
-    }
-  }, [amountRange, onAmountRangeChange]);
-
-  const handleSortChange = useCallback((e) => {
-    if (onSortChange) {
-      onSortChange({
-        field: e.target.value,
-        direction: sortDirection
-      });
-    }
-  }, [onSortChange, sortDirection]);
-
-  const handleSortDirectionChange = useCallback((e) => {
-    if (onSortChange) {
-      onSortChange({
-        field: sortField,
-        direction: e.target.value
-      });
-    }
-  }, [onSortChange, sortField]);
-
-  const toggleExpand = () => setIsExpanded(!isExpanded);
-
-  const handleSaveCurrentFilter = () => {
-    if (onSaveFilter) {
-      const filterName = prompt("Nombre para guardar este filtro:");
-      if (filterName) {
-        onSaveFilter({
-          name: filterName,
-          filter: {
-            projectId: selectedProjectId,
-            dateRange,
-            billedStatus,
-            workType,
-            selectedUserId,
-            amountRange,
-            sort: { field: sortField, direction: sortDirection }
-          }
-        });
-      }
-    }
-  };
-
-  const handleReset = () => {
-    if (onResetFilters) {
-      onResetFilters();
-    }
-  };
-
-  // Verificar si hay filtros activos para resaltar
-  const hasActiveFilters = 
-    selectedProjectId || 
-    dateRange.startDate || 
-    dateRange.endDate || 
-    billedStatus || 
-    workType || 
-    selectedUserId || 
-    amountRange.min || 
-    amountRange.max;
+  const isHourlyProject = project.type === "hourly";
 
   return (
-    <div className={`filter-section ${hasActiveFilters ? 'has-active-filters' : ''}`}>
-      <div className="filter-header">
-        <h3>Filtros</h3>
-        <div className="filter-actions">
-          <button 
-            type="button" 
-            className="filter-action-button"
-            onClick={toggleExpand}
-          >
-            {isExpanded ? 'Contraer filtros' : 'Expandir filtros'}
-          </button>
-          <button 
-            type="button" 
-            className="filter-action-button save-button"
-            onClick={handleSaveCurrentFilter}
-            disabled={!hasActiveFilters}
-          >
-            Guardar filtro
-          </button>
-          <button 
-            type="button" 
-            className="filter-action-button reset-button"
-            onClick={handleReset}
-            disabled={!hasActiveFilters}
-          >
-            Limpiar filtros
-          </button>
-        </div>
-      </div>
+    <div className="totals-summary">
+      <h3>Resumen de totales</h3>
 
-      {/* Filtros básicos siempre visibles */}
-      <div className="basic-filters">
-        <div className="filter-group">
-          <label>Proyecto: </label>
-          <select value={selectedProjectId} onChange={handleProjectSelect}>
-            <option value="">Todos los proyectos</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.id} - {project.client}
-              </option>
-            ))}
-          </select>
-        </div>
+      <table className="summary-table">
+        <tbody>
+          {isHourlyProject ? (
+            // --- Resumen para Proyecto por Horas (sin cambios) ---
+            <>
+              <tr>
+                <td><strong>Total Horas Oficial:</strong></td>
+                <td className="amount">{formatNumber(totalOfficialHours || 0)} h</td>
+              </tr>
+              <tr>
+                <td><strong>Total Horas Peón:</strong></td>
+                <td className="amount">{formatNumber(totalWorkerHours || 0)} h</td>
+              </tr>
+               <tr>
+                <td><strong>Total Horas (General):</strong></td>
+                <td className="amount">{formatNumber(totalHours || 0)} h</td>
+              </tr>
+              <tr>
+                <td><strong>Coste Total Mano de Obra (€):</strong></td>
+                <td className="amount">{formatCurrency(totalLabor)}</td>
+              </tr>
+              <tr>
+                <td><strong>Coste Total Materiales (€):</strong></td>
+                <td className="amount">{formatCurrency(totalMaterials)}</td>
+              </tr>
+              <tr className="total-row">
+                <td><strong>COSTE TOTAL OPERATIVO (€):</strong></td>
+                <td className="amount">{formatCurrency(totalCost)}</td>
+              </tr>
+            </>
+          ) : (
+            // === ESTRUCTURA DEFINITIVA Y SIMPLIFICADA PARA PRESUPUESTO CERRADO ===
+            // Ahora solo muestra los valores recibidos, sin calcular nada.
+            <>
+              <tr>
+                <td><strong>Presupuesto Original:</strong></td>
+                <td className="amount">{formatCurrency(project.budgetAmount || 0)}</td>
+              </tr>
+              
+              {(totalExtraWorkIncome || 0) > 0 && (
+                <tr>
+                  <td><strong>Ingresos Adicionales por Extras:</strong></td>
+                  <td className="amount">{formatCurrency(totalExtraWorkIncome)}</td>
+                </tr>
+              )}
 
-        <div className="date-range">
-          <div className="date-field">
-            <label>Fecha de inicio:</label>
-            <input
-              type="date"
-              name="startDate"
-              value={dateRange.startDate}
-              onChange={handleDateChange}
-            />
-          </div>
-          <div className="date-field">
-            <label>Fecha de fin:</label>
-            <input
-              type="date"
-              name="endDate"
-              value={dateRange.endDate}
-              onChange={handleDateChange}
-            />
-          </div>
-        </div>
-
-        <div className="filter-group">
-          <label>Facturación:</label>
-          <select value={billedStatus} onChange={handleBilledStatusSelect}>
-            <option value="">Todos</option>
-            <option value="true">Facturados</option>
-            <option value="false">No facturados</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Filtros avanzados (expandibles) */}
-      {isExpanded && (
-        <div className="advanced-filters">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label>Tipo de trabajo:</label>
-              <select value={workType || ""} onChange={handleWorkTypeSelect}>
-                <option value="">Todos los tipos</option>
-                <option value="normal">Trabajo normal</option>
-                <option value="extra">Trabajo extra</option>
-                <option value="extra_hourly">Extra por horas</option>
-                <option value="extra_budget">Extra con presupuesto</option>
-              </select>
-            </div>
-            
-            {users.length > 0 && (
-              <div className="filter-group">
-                <label>Usuario:</label>
-                <select value={selectedUserId || ""} onChange={handleUserSelect}>
-                  <option value="">Todos los usuarios</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-row">
-            <div className="filter-group amount-range">
-              <label>Rango de importes:</label>
-              <div className="amount-inputs">
-                <div className="amount-field">
-                  <input
-                    type="number"
-                    name="amountmin"
-                    placeholder="Mínimo €"
-                    value={amountRange.min}
-                    onChange={handleAmountChange}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <span className="amount-separator">a</span>
-                <div className="amount-field">
-                  <input
-                    type="number"
-                    name="amountmax"
-                    placeholder="Máximo €"
-                    value={amountRange.max}
-                    onChange={handleAmountChange}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="filter-row sorting-options">
-            <div className="filter-group">
-              <label>Ordenar por:</label>
-              <select value={sortField} onChange={handleSortChange}>
-                <option value="reportDate">Fecha</option>
-                <option value="invoicedAmount">Importe facturado</option>
-                <option value="totalCost">Coste total</option>
-                <option value="projectId">Proyecto</option>
-                <option value="isBilled">Estado de facturación</option>
-              </select>
-            </div>
-            <div className="filter-group">
-              <label>Dirección:</label>
-              <select value={sortDirection} onChange={handleSortDirectionChange}>
-                <option value="asc">Ascendente</option>
-                <option value="desc">Descendente</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Sección de filtros guardados */}
-          {savedFilters.length > 0 && (
-            <div className="saved-filters">
-              <h4>Filtros guardados</h4>
-              <div className="saved-filters-list">
-                {savedFilters.map((filter, index) => (
-                  <button
-                    key={index}
-                    className="saved-filter-button"
-                    onClick={() => onSaveFilter(filter, true)} // true indica que es para aplicar, no guardar
-                  >
-                    {filter.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <tr className="total-row intermediate-total">
+                <td><strong>PRESUPUESTO TOTAL (con Extras):</strong></td>
+                <td className="amount">{formatCurrency(totalBudgetWithExtras)}</td>
+              </tr>
+              
+              <tr>
+                <td><strong>Total Facturado (del presupuesto):</strong></td>
+                <td className="amount">{formatCurrency(totalInvoiced)}</td>
+              </tr>
+              
+              <tr className="total-row">
+                <td><strong>IMPORTE RESTANTE (del presupuesto total):</strong></td>
+                <td className="amount">{formatCurrency(remainingBudget)}</td>
+              </tr>
+            </>
           )}
-        </div>
-      )}
-
-      {/* Indicador de filtros activos */}
-      {hasActiveFilters && (
-        <div className="active-filters-indicator">
-          <p>Filtros activos: </p>
-          <div className="active-filter-tags">
-            {selectedProjectId && (
-              <span className="filter-tag">
-                Proyecto: {projects.find(p => p.id === selectedProjectId)?.client || selectedProjectId}
-              </span>
-            )}
-            {dateRange.startDate && (
-              <span className="filter-tag">
-                Desde: {new Date(dateRange.startDate).toLocaleDateString()}
-              </span>
-            )}
-            {dateRange.endDate && (
-              <span className="filter-tag">
-                Hasta: {new Date(dateRange.endDate).toLocaleDateString()}
-              </span>
-            )}
-            {billedStatus && (
-              <span className="filter-tag">
-                {billedStatus === "true" ? "Facturados" : "No facturados"}
-              </span>
-            )}
-            {workType && (
-              <span className="filter-tag">
-                Tipo: {workType === "normal" ? "Normal" : "Extra"}
-              </span>
-            )}
-            {selectedUserId && (
-              <span className="filter-tag">
-                Usuario: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}
-              </span>
-            )}
-            {(amountRange.min || amountRange.max) && (
-              <span className="filter-tag">
-                Importe: {amountRange.min ? formatCurrency(amountRange.min) : "0€"} - 
-                {amountRange.max ? formatCurrency(amountRange.max) : "sin límite"}
-              </span>
-            )}
-            {(sortField !== "reportDate" || sortDirection !== "desc") && (
-              <span className="filter-tag">
-                Ordenado por: {sortField} ({sortDirection === "asc" ? "↑" : "↓"})
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+        </tbody>
+      </table>
     </div>
   );
 };
 
-export default React.memo(ReportFilters);
+export default React.memo(ReportSummary);
 </file>
 
 <file path="src/components/WorkPerformedForm.js">
@@ -9346,6 +8768,120 @@ export const useDeleteProject = () => {
 };
 </file>
 
+<file path="src/utils/calculations/reportSummaryUtils.js">
+// src/utils/calculations/reportSummaryUtils.js
+import { calculateLabor } from './laborUtils';
+import { calculateMaterials } from './materialsUtils';
+// --- IMPORTACIÓN AÑADIDA ---
+import { calculateBudget } from './budgetUtils'; 
+
+/**
+ * Calcula un resumen completo de los reportes, incluyendo costes, ingresos y horas desglosadas.
+ * Esta función es ahora autónoma y realiza todos los cálculos necesarios internamente.
+ *
+ * @param {Array} reports - Lista de objetos de reporte "crudos" de Firestore.
+ * @param {Array} projects - Lista de objetos de proyecto.
+ * @param {string} [selectedProjectId=""] - ID del proyecto para filtrar (opcional).
+ * @returns {Object} Un objeto con totales generales (`totals`), resumen por semana (`byWeek`), y resumen por proyecto (`byProject`).
+ */
+export function calculateReportSummary(reports = [], projects = [], selectedProjectId = "") {
+  // Asegurar que los inputs sean arrays para evitar errores
+  if (!Array.isArray(reports)) reports = [];
+  if (!Array.isArray(projects)) projects = [];
+
+  // Filtrar reportes si se especifica un proyecto
+  const filteredReports = selectedProjectId
+    ? reports.filter(report => report.projectId === selectedProjectId)
+    : reports;
+
+  // Obtener el proyecto seleccionado para los cálculos de presupuesto
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+
+  // Inicializar acumuladores de totales generales
+  let totalLabor = 0;
+  let totalMaterials = 0;
+  let totalCost = 0;
+  let totalHours = 0;
+  let totalOfficialHours = 0;
+  let totalWorkerHours = 0;
+  let totalInvoiced = 0;
+  let totalExtraBudget = 0;
+  let totalExtraLaborCost = 0;
+  let totalExtraMaterialsCost = 0;
+  let totalExtraOfficialHours = 0;
+  let totalExtraWorkerHours = 0;
+
+  // Iterar sobre cada reporte filtrado para calcular y acumular
+  filteredReports.forEach(report => {
+    const project = projects.find(p => p.id === report.projectId);
+    if (!project) return; // Si no se encuentra el proyecto, se omite el reporte.
+
+    const laborCalcs = calculateLabor(report.labor, project);
+    const materialsCalcs = calculateMaterials(report.materials);
+    const reportTotalCost = laborCalcs.totalLaborCost + materialsCalcs.totalMaterialsCost;
+
+    totalOfficialHours += laborCalcs.officialHours;
+    totalWorkerHours += laborCalcs.workerHours;
+    totalHours += laborCalcs.officialHours + laborCalcs.workerHours;
+
+    if (report.isExtraWork && project.type === 'fixed') {
+      if (report.extraWorkType === 'hourly') {
+        totalExtraLaborCost += laborCalcs.totalLaborCost;
+        totalExtraMaterialsCost += materialsCalcs.totalMaterialsCost;
+        totalExtraOfficialHours += laborCalcs.officialHours;
+        totalExtraWorkerHours += laborCalcs.workerHours;
+      } else if (report.extraWorkType === 'additional_budget') {
+        totalExtraBudget += parseFloat(report.extraBudgetAmount) || 0;
+      }
+    } else {
+      totalLabor += laborCalcs.totalLaborCost;
+      totalMaterials += materialsCalcs.totalMaterialsCost;
+      totalCost += reportTotalCost;
+      if (project.type === 'fixed') {
+        totalInvoiced += parseFloat(report.invoicedAmount) || 0;
+      }
+    }
+  });
+
+  const totalIncome = totalInvoiced + totalExtraBudget + totalExtraLaborCost;
+  const grandTotal = totalInvoiced + totalExtraBudget + totalExtraLaborCost;
+
+  // --- LÓGICA DE PRESUPUESTO CENTRALIZADA ---
+  // Usamos la función de `budgetUtils` para obtener los cálculos de presupuesto correctos.
+  // Solo la llamamos si hay un proyecto de tipo 'fixed' seleccionado.
+  let budgetCalculations = {};
+  if (selectedProject && selectedProject.type === 'fixed') {
+      // Pasamos el proyecto y los reportes filtrados para obtener el resumen del presupuesto
+      budgetCalculations = calculateBudget(selectedProject, filteredReports);
+  }
+
+  return {
+    totals: {
+      totalLabor,
+      totalMaterials,
+      totalCost,
+      totalInvoiced,
+      totalHours,
+      totalOfficialHours,
+      totalWorkerHours,
+      totalIncome,
+      totalExtraBudget,
+      totalExtraCost: totalExtraLaborCost + totalExtraMaterialsCost,
+      totalExtraLaborCost,
+      totalExtraMaterialsCost,
+      totalExtraOfficialHours,
+      totalExtraWorkerHours,
+      grandTotal,
+      // --- VALORES AÑADIDOS DESDE BUDGETUTILS ---
+      ...budgetCalculations,
+    },
+    // Mantengo los arrays vacíos para no romper la estructura, pero la lógica de agrupación se debería implementar aquí.
+    byWeek: [],
+    byProject: []
+  };
+}
+</file>
+
 <file path="src/utils/validationSchemas.js">
 // src/utils/validationSchemas.js - Actualizado para incluir validación de campos de trabajo extra
 
@@ -9901,108 +9437,6 @@ exports.updateProjectInvoicedTotal = onDocumentWritten(
 }
 </file>
 
-<file path="src/components/dashboard/KPICards.js">
-// src/components/dashboard/KPICards.js - Refactorizado para usar useCalculationsService
-import React from "react";
-import { useCalculationsService } from "../../hooks/useCalculationsService";
-import { formatNumber, formatCurrency } from "../../utils/calculationUtils";
-
-/**
- * Componente que muestra tarjetas de métricas clave (KPIs)
- * @param {Object} props - Propiedades del componente
- * @param {Array} props.reports - Lista de reportes filtrados
- * @param {Array} props.projects - Lista de proyectos
- * @param {string} props.selectedProjectId - ID del proyecto seleccionado
- */
-const KPICards = ({ reports, projects, selectedProjectId }) => {
-  // Usamos el servicio centralizado de cálculos para obtener las métricas
-  const { calculateReportSummary } = useCalculationsService();
-  
-  // Obtenemos todas las métricas calculadas del servicio
-  const { totals } = calculateReportSummary(reports, projects, selectedProjectId);
-  
-  // Desestructuramos las métricas que necesitamos
-  const { 
-    totalLabor, 
-    totalMaterials, 
-    totalCost, 
-    totalInvoiced, 
-    totalHours, 
-    totalIncome,
-    totalExtraBudget,
-    totalExtraCost
-  } = totals;
-
-  return (
-    <div className="metrics-container">
-      <div className="metric-card">
-        <div className="metric-icon">📊</div>
-        <div className="metric-value">{projects.length}</div>
-        <div className="metric-label">Proyectos</div>
-      </div>
-      
-      <div className="metric-card">
-        <div className="metric-icon">📝</div>
-        <div className="metric-value">{reports.length}</div>
-        <div className="metric-label">Partes</div>
-      </div>
-      
-      <div className="metric-card">
-        <div className="metric-icon">⏱️</div>
-        <div className="metric-value">{formatNumber(totalHours)}</div>
-        <div className="metric-label">Horas</div>
-      </div>
-      
-      {/* Tarjeta para ingresos totales */}
-      <div className="metric-card" style={{ backgroundColor: "#e8f7eb" }}>
-        <div className="metric-icon">💵</div>
-        <div className="metric-value">{formatCurrency(totalIncome)}</div>
-        <div className="metric-label">Ingresos Totales</div>
-      </div>
-      
-      {/* Tarjeta para mano de obra */}
-      <div className="metric-card">
-        <div className="metric-icon">👷</div>
-        <div className="metric-value">{formatCurrency(totalLabor)}</div>
-        <div className="metric-label">Mano de Obra</div>
-      </div>
-      
-      {/* Tarjeta para facturación */}
-      <div className="metric-card" style={{ backgroundColor: "#e0f7fa" }}>
-        <div className="metric-icon">📋</div>
-        <div className="metric-value">{formatCurrency(totalInvoiced)}</div>
-        <div className="metric-label">Facturado</div>
-      </div>
-      
-      {/* Costes totales */}
-      <div className="metric-card">
-        <div className="metric-icon">💰</div>
-        <div className="metric-value">{formatCurrency(totalCost)}</div>
-        <div className="metric-label">Costes</div>
-      </div>
-      
-      {/* Materiales */}
-      <div className="metric-card">
-        <div className="metric-icon">🔧</div>
-        <div className="metric-value">{formatCurrency(totalMaterials)}</div>
-        <div className="metric-label">Materiales</div>
-      </div>
-      
-      {/* Trabajos extra (si hay) */}
-      {(totalExtraBudget > 0 || totalExtraCost > 0) && (
-        <div className="metric-card" style={{ backgroundColor: "#fff8e1" }}>
-          <div className="metric-icon">⚠️</div>
-          <div className="metric-value">{formatCurrency(totalExtraBudget + totalExtraCost)}</div>
-          <div className="metric-label">Trabajos Extra</div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default React.memo(KPICards);
-</file>
-
 <file path="src/components/dashboard/ProjectCostChart.js">
 // src/components/dashboard/ProjectCostChart.js - Refactorizado para usar useCalculationsService
 import React, { useState, useCallback } from "react";
@@ -10455,80 +9889,6 @@ const TimelineChart = ({ data }) => {
 export default React.memo(TimelineChart);
 </file>
 
-<file path="src/components/ProjectSelector.js">
-import React from "react";
-import { useQueryProjects } from "../hooks/useQueryProjects";
-import { formatCurrency } from "../utils/calculationUtils";
-
-const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
-  // Usamos el hook de React Query para obtener proyectos
-  const { data: projects = [], isLoading, error } = useQueryProjects();
-
-  const handleChange = (e) => {
-    const selectedProjectId = e.target.value; 
-    // MODIFICADO: Buscamos el proyecto usando el ID personalizado, no el firestoreId
-    const project = projects.find((p) => p.id === selectedProjectId);
-    onProjectSelect(project);
-  };
-
-  if (isLoading) return <p>Cargando proyectos...</p>;
-  if (error) return <p className="error-message">Error: {error.message}</p>;
-
-  return (
-    <div>
-      <label>ID del Proyecto</label>
-      <select onChange={handleChange} value={selectedProject?.id || ""} required>
-        <option value="">Selecciona un proyecto</option>
-        {projects.map((p) => (
-          <option key={p.firestoreId} value={p.id}>{p.id}</option>
-        ))}
-      </select>
-      {selectedProject && (
-  <div className="project-details">
-    <h4 className="project-details-title">Detalles del Proyecto</h4>
-    <p>
-      <span className="detail-label">Dirección:</span>
-      <span className="detail-value">{selectedProject.address}</span>
-    </p>
-    <p>
-      <span className="detail-label">Cliente:</span>
-      <span className="detail-value">{selectedProject.client}</span>
-    </p>
-    <p>
-      <span className="detail-label">NIF/NIE:</span>
-      <span className="detail-value">{selectedProject.nifNie}</span>
-    </p>
-    {selectedProject.type === "hourly" ? (
-      <>
-        <p>
-          <span className="detail-label">Precio oficial:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.officialPrice)} /h</span>
-        </p>
-        <p>
-          <span className="detail-label">Precio peón:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.workerPrice)} /h</span>
-        </p>
-      </>
-    ) : (
-      <>
-        <p>
-          <span className="detail-label">Presupuesto:</span>
-          <span className="detail-value">{formatCurrency(selectedProject.budgetAmount)}</span>
-        </p>
-        {selectedProject.allowExtraWork && (
-          <p className="extra-work-info">Este proyecto permite trabajos extra</p>
-        )}
-      </>
-    )}
-  </div>
-)}
-    </div>
-  );
-};
-
-export default React.memo(ProjectSelector);
-</file>
-
 <file path="src/components/reports/ReportEditForm.js">
 // src/components/reports/ReportEditForm.js
 import React, { useState, useEffect, useCallback } from "react";
@@ -10834,6 +10194,400 @@ const ReportEditForm = ({ reportId, projects, onCancel, onComplete }) => {
 };
 
 export default React.memo(ReportEditForm);
+</file>
+
+<file path="src/components/reports/ReportFilters.js">
+// src/components/reports/ReportFilters.js
+import React, { useCallback, useState, useMemo } from "react"; // Importar useMemo
+import { formatCurrency } from "../../utils/calculationUtils";
+
+const ReportFilters = ({
+  projects, // Recibe la lista de proyectos como prop
+  selectedProjectId,
+  dateRange,
+  onProjectChange,
+  onDateRangeChange,
+  onBilledStatusChange,
+  billedStatus,
+  onWorkTypeChange,
+  workType,
+  onUserChange,
+  selectedUserId,
+  users = [],
+  onAmountRangeChange,
+  amountRange = { min: "", max: "" },
+  onSortChange,
+  sortField = "reportDate",
+  sortDirection = "desc",
+  onSaveFilter,
+  onResetFilters,
+  savedFilters = []
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Ordenar los proyectos alfabéticamente descendente por ID
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      return (b.id || "").localeCompare(a.id || "");
+    });
+  }, [projects]); // Dependencia: reordenar solo si 'projects' cambia
+
+  // --- Manejadores existentes (sin cambios) ---
+  const handleProjectSelect = useCallback((e) => {
+    onProjectChange(e.target.value);
+  }, [onProjectChange]);
+
+  const handleDateChange = useCallback((e) => {
+    const { name, value } = e.target;
+    onDateRangeChange({
+      ...dateRange,
+      [name]: value
+    });
+  }, [dateRange, onDateRangeChange]);
+
+  const handleBilledStatusSelect = useCallback((e) => {
+    onBilledStatusChange(e.target.value);
+  }, [onBilledStatusChange]);
+
+  const handleWorkTypeSelect = useCallback((e) => {
+    if (onWorkTypeChange) {
+      onWorkTypeChange(e.target.value);
+    }
+  }, [onWorkTypeChange]);
+
+  const handleUserSelect = useCallback((e) => {
+    if (onUserChange) {
+      onUserChange(e.target.value);
+    }
+  }, [onUserChange]);
+
+  const handleAmountChange = useCallback((e) => {
+    const { name, value } = e.target;
+    if (onAmountRangeChange) {
+      onAmountRangeChange({
+        ...amountRange,
+        [name.replace("amount", "")]: value
+      });
+    }
+  }, [amountRange, onAmountRangeChange]);
+
+  const handleSortChangeInternal = useCallback((e) => { // Renombrado para evitar conflicto
+    if (onSortChange) {
+      onSortChange({
+        field: e.target.value,
+        direction: sortDirection
+      });
+    }
+  }, [onSortChange, sortDirection]);
+
+  const handleSortDirectionChange = useCallback((e) => {
+    if (onSortChange) {
+      onSortChange({
+        field: sortField,
+        direction: e.target.value
+      });
+    }
+  }, [onSortChange, sortField]);
+
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+
+  const handleSaveCurrentFilter = () => {
+    if (onSaveFilter) {
+      const filterName = prompt("Nombre para guardar este filtro:");
+      if (filterName) {
+        onSaveFilter({
+          name: filterName,
+          filter: {
+            projectId: selectedProjectId,
+            dateRange,
+            billedStatus,
+            workType,
+            selectedUserId,
+            amountRange,
+            sort: { field: sortField, direction: sortDirection }
+          }
+        });
+      }
+    }
+  };
+
+  const handleReset = () => {
+    if (onResetFilters) {
+      onResetFilters();
+    }
+  };
+
+  const handleApplySavedFilter = useCallback((filterData) => {
+      if (onSaveFilter) {
+          onSaveFilter(filterData, true); // true indica aplicar
+      }
+  }, [onSaveFilter]);
+
+
+  const hasActiveFilters =
+    selectedProjectId ||
+    dateRange.startDate ||
+    dateRange.endDate ||
+    billedStatus !== undefined || // Comprobar undefined en lugar de falsy
+    workType ||
+    selectedUserId ||
+    amountRange.min ||
+    amountRange.max;
+
+  return (
+    <div className={`filter-section ${hasActiveFilters ? 'has-active-filters' : ''}`}>
+      <div className="filter-header">
+        <h3>Filtros</h3>
+        <div className="filter-actions">
+          <button
+            type="button"
+            className="filter-action-button"
+            onClick={toggleExpand}
+          >
+            {isExpanded ? 'Contraer filtros' : 'Expandir filtros'}
+          </button>
+          <button
+            type="button"
+            className="filter-action-button save-button"
+            onClick={handleSaveCurrentFilter}
+            disabled={!hasActiveFilters}
+          >
+            Guardar filtro
+          </button>
+          <button
+            type="button"
+            className="filter-action-button reset-button"
+            onClick={handleReset}
+            disabled={!hasActiveFilters}
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros básicos siempre visibles */}
+      <div className="basic-filters">
+        <div className="filter-group">
+          <label htmlFor="filter-project-select">Proyecto: </label>
+          {/* Usar la lista ordenada */}
+          <select id="filter-project-select" value={selectedProjectId || ""} onChange={handleProjectSelect}>
+            <option value="">Todos los proyectos</option>
+            {sortedProjects.map((project) => (
+              <option key={project.firestoreId} value={project.id}>
+                {project.id} - {project.client}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="date-range">
+          <div className="date-field">
+            <label htmlFor="filter-startDate">Fecha de inicio:</label>
+            <input
+              id="filter-startDate"
+              type="date"
+              name="startDate"
+              value={dateRange.startDate || ""}
+              onChange={handleDateChange}
+            />
+          </div>
+          <div className="date-field">
+            <label htmlFor="filter-endDate">Fecha de fin:</label>
+            <input
+              id="filter-endDate"
+              type="date"
+              name="endDate"
+              value={dateRange.endDate || ""}
+              onChange={handleDateChange}
+            />
+          </div>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="filter-billedStatus">Facturación:</label>
+          <select id="filter-billedStatus" value={billedStatus === undefined ? "" : String(billedStatus)} onChange={handleBilledStatusSelect}>
+            <option value="">Todos</option>
+            <option value="true">Facturados</option>
+            <option value="false">No facturados</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Filtros avanzados (expandibles) */}
+      {isExpanded && (
+        <div className="advanced-filters">
+          <div className="filter-row">
+            <div className="filter-group">
+              <label htmlFor="filter-workType">Tipo de trabajo:</label>
+              <select id="filter-workType" value={workType || ""} onChange={handleWorkTypeSelect}>
+                <option value="">Todos los tipos</option>
+                <option value="normal">Trabajo normal</option>
+                <option value="extra">Trabajo extra (todos)</option>
+                <option value="extra_hourly">Extra por horas</option>
+                <option value="extra_budget">Extra con presupuesto</option>
+              </select>
+            </div>
+
+            {users.length > 0 && (
+              <div className="filter-group">
+                <label htmlFor="filter-user">Usuario:</label>
+                <select id="filter-user" value={selectedUserId || ""} onChange={handleUserSelect}>
+                  <option value="">Todos los usuarios</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email} {/* Mostrar nombre si existe */}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="filter-row">
+            <div className="filter-group amount-range">
+              <label>Rango de importes:</label>
+              <div className="amount-inputs">
+                <div className="amount-field">
+                   <label htmlFor="filter-amount-min" className="sr-only">Importe mínimo</label> {/* Label oculto para accesibilidad */}
+                  <input
+                    id="filter-amount-min"
+                    type="number"
+                    name="amountmin"
+                    placeholder="Mínimo €"
+                    value={amountRange.min || ""}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <span className="amount-separator">a</span>
+                <div className="amount-field">
+                  <label htmlFor="filter-amount-max" className="sr-only">Importe máximo</label> {/* Label oculto para accesibilidad */}
+                  <input
+                    id="filter-amount-max"
+                    type="number"
+                    name="amountmax"
+                    placeholder="Máximo €"
+                    value={amountRange.max || ""}
+                    onChange={handleAmountChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="filter-row sorting-options">
+            <div className="filter-group">
+              <label htmlFor="filter-sortField">Ordenar por:</label>
+              <select id="filter-sortField" value={sortField} onChange={handleSortChangeInternal}>
+                <option value="reportDate">Fecha</option>
+                <option value="invoicedAmount">Importe facturado</option>
+                <option value="totalCost">Coste total</option>
+                <option value="projectId">Proyecto</option>
+                <option value="isBilled">Estado de facturación</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label htmlFor="filter-sortDirection">Dirección:</label>
+              <select id="filter-sortDirection" value={sortDirection} onChange={handleSortDirectionChange}>
+                <option value="asc">Ascendente</option>
+                <option value="desc">Descendente</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sección de filtros guardados */}
+          {savedFilters.length > 0 && (
+            <div className="saved-filters">
+              <h4>Filtros guardados</h4>
+              <div className="saved-filters-list">
+                {savedFilters.map((filterData, index) => (
+                  <button
+                    key={index}
+                    className="saved-filter-button"
+                    onClick={() => handleApplySavedFilter(filterData)} // Usar handler específico
+                    title={`Aplicar filtro: ${filterData.name}`}
+                  >
+                    {filterData.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Indicador de filtros activos */}
+      {hasActiveFilters && (
+        <div className="active-filters-indicator">
+          <p>Filtros activos: </p>
+          <div className="active-filter-tags">
+            {selectedProjectId && (
+              <span className="filter-tag">
+                Proyecto: {projects.find(p => p.id === selectedProjectId)?.client || selectedProjectId}
+              </span>
+            )}
+            {dateRange.startDate && (
+              <span className="filter-tag">
+                Desde: {new Date(dateRange.startDate).toLocaleDateString()}
+              </span>
+            )}
+            {dateRange.endDate && (
+              <span className="filter-tag">
+                Hasta: {new Date(dateRange.endDate).toLocaleDateString()}
+              </span>
+            )}
+            {billedStatus !== undefined && ( // Comprobar undefined
+              <span className="filter-tag">
+                {billedStatus === true ? "Facturados" : "No facturados"}
+              </span>
+            )}
+            {workType && (
+              <span className="filter-tag">
+                Tipo: {workType === "normal" ? "Normal" : `Extra (${workType.replace('extra_','')})`}
+              </span>
+            )}
+            {selectedUserId && (
+              <span className="filter-tag">
+                Usuario: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}
+              </span>
+            )}
+            {(amountRange.min || amountRange.max) && (
+              <span className="filter-tag">
+                Importe: {amountRange.min ? formatCurrency(amountRange.min) : "0€"} -
+                {amountRange.max ? formatCurrency(amountRange.max) : "sin límite"}
+              </span>
+            )}
+            {(sortField !== "reportDate" || sortDirection !== "desc") && (
+              <span className="filter-tag">
+                Ordenado por: {sortField} ({sortDirection === "asc" ? "↑" : "↓"})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Añadir clase sr-only a tu CSS si no la tienes
+/*
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+*/
+
+export default React.memo(ReportFilters);
 </file>
 
 <file path="src/components/reports/ReportItem.js">
@@ -11722,6 +11476,253 @@ export default React.memo(ReportItem);
     gap: 4px;
   }
 }
+
+.summary-table tr.intermediate-total td {
+  font-weight: bold;
+  background-color: #f5f5f5;
+  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+}
+</file>
+
+<file path="src/components/dashboard/KPICards.js">
+// src/components/dashboard/KPICards.js
+import React from "react";
+import { useCalculationsService } from "../../hooks/useCalculationsService";
+// Importar formatNumber para las horas y formatCurrency para los euros
+import { formatNumber, formatCurrency } from "../../utils/calculationUtils";
+
+/**
+ * Componente que muestra tarjetas de métricas clave (KPIs)
+ * @param {Object} props - Propiedades del componente
+ * @param {Array} props.reports - Lista de reportes filtrados
+ * @param {Array} props.projects - Lista de proyectos
+ * @param {string} props.selectedProjectId - ID del proyecto seleccionado (puede ser "" para todos)
+ */
+const KPICards = ({ reports, projects, selectedProjectId }) => {
+  // Usamos el servicio centralizado de cálculos para obtener las métricas
+  const { calculateReportSummary } = useCalculationsService();
+
+  // Obtenemos todas las métricas calculadas del servicio
+  // Pasamos selectedProjectId (puede ser "" si es "all")
+  const { totals } = calculateReportSummary(reports, projects, selectedProjectId);
+
+  // Desestructuramos las métricas que necesitamos, incluyendo las nuevas horas
+  const {
+    totalLabor,
+    totalMaterials,
+    totalCost,
+    totalInvoiced,
+    totalHours, // Horas totales generales
+    totalOfficialHours, // Horas Oficial totales
+    totalWorkerHours,   // Horas Peón totales
+    totalIncome, // Ingreso total (calculado según tipo y extras)
+    totalExtraBudget,
+    totalExtraCost,
+    totalExtraLaborCost, // <--- AÑADIDO AQUÍ
+    grandTotal // Ingreso total general (Facturado Normal + Presupuesto Extra + MO Extra)
+  } = totals;
+
+  // Determinar el número de proyectos activos (si se filtra o todos)
+  const activeProjectCount = selectedProjectId && selectedProjectId !== "all"
+    ? 1
+    : projects.length;
+
+  return (
+    <div className="metrics-container">
+      {/* Proyectos */}
+      <div className="metric-card">
+        <div className="metric-icon">📊</div>
+        <div className="metric-value">{activeProjectCount}</div>
+        <div className="metric-label">Proyectos Activos</div>
+      </div>
+
+      {/* Partes */}
+      <div className="metric-card">
+        <div className="metric-icon">📝</div>
+        <div className="metric-value">{reports.length}</div>
+        <div className="metric-label">Partes Mostrados</div>
+      </div>
+
+      {/* Horas Oficial */}
+      <div className="metric-card">
+        <div className="metric-icon">👷🏻‍♂️</div> {/* Icono para oficial */}
+        <div className="metric-value">{formatNumber(totalOfficialHours || 0)}</div>
+        <div className="metric-label">Horas Oficial</div>
+      </div>
+
+      {/* Horas Peón */}
+      <div className="metric-card">
+        <div className="metric-icon">👷🏼</div> {/* Icono para peón */}
+        <div className="metric-value">{formatNumber(totalWorkerHours || 0)}</div>
+        <div className="metric-label">Horas Peón</div>
+      </div>
+
+      {/* Horas Totales */}
+      <div className="metric-card">
+        <div className="metric-icon">⏱️</div>
+        <div className="metric-value">{formatNumber(totalHours || 0)}</div>
+        <div className="metric-label">Horas Totales</div>
+      </div>
+
+      {/* Ingresos Totales (Usando grandTotal) */}
+      <div className="metric-card" style={{ backgroundColor: "#e8f7eb" }}>
+        <div className="metric-icon">💵</div>
+        {/* Usamos grandTotal que representa el ingreso total esperado */}
+        <div className="metric-value">{formatCurrency(grandTotal || 0)}</div>
+        <div className="metric-label">Ingresos Totales</div>
+      </div>
+
+      {/* Coste Mano de Obra (Solo partes normales o hourly) */}
+      <div className="metric-card">
+        <div className="metric-icon">👷</div>
+        <div className="metric-value">{formatCurrency(totalLabor || 0)}</div>
+        <div className="metric-label">Coste M. Obra</div>
+      </div>
+
+      {/* Facturado (Solo partes normales 'fixed') */}
+      <div className="metric-card" style={{ backgroundColor: "#e0f7fa" }}>
+        <div className="metric-icon">📋</div>
+        <div className="metric-value">{formatCurrency(totalInvoiced || 0)}</div>
+        <div className="metric-label">Facturado (Presup.)</div>
+      </div>
+
+      {/* Costes Totales (MO+Mat para hourly, no aplica directo a fixed) */}
+      {/* Podríamos mostrar totalLabor + totalMaterials si queremos un coste operativo */}
+      <div className="metric-card">
+        <div className="metric-icon">💰</div>
+        <div className="metric-value">{formatCurrency((totalLabor || 0) + (totalMaterials || 0))}</div>
+        <div className="metric-label">Coste Operativo</div>
+      </div>
+
+      {/* Materiales */}
+      <div className="metric-card">
+        <div className="metric-icon">🔧</div>
+        <div className="metric-value">{formatCurrency(totalMaterials || 0)}</div>
+        <div className="metric-label">Coste Materiales</div>
+      </div>
+
+      {/* Trabajos extra (si hay) */}
+      {(totalExtraBudget > 0 || totalExtraCost > 0) && (
+        <div className="metric-card" style={{ backgroundColor: "#fff8e1" }}>
+          <div className="metric-icon">⚠️</div>
+          {/* Mostramos el ingreso total de los extras */}
+          <div className="metric-value">{formatCurrency((totalExtraBudget || 0) + (totalExtraLaborCost || 0))}</div>
+          <div className="metric-label">Ingreso Trab. Extra</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default React.memo(KPICards);
+</file>
+
+<file path="src/components/ProjectSelector.js">
+import React, { useMemo } from "react"; // Importar useMemo
+import { useQueryProjects } from "../hooks/useQueryProjects";
+import { formatCurrency } from "../utils/calculationUtils"; // Asegúrate que la ruta sea correcta
+
+const ProjectSelector = ({ onProjectSelect, selectedProject }) => {
+  // Usamos el hook de React Query para obtener proyectos
+  const { data: projects = [], isLoading, error } = useQueryProjects();
+
+  // Ordenar los proyectos alfabéticamente descendente por ID
+  // Usamos useMemo para que solo se reordene si la lista de 'projects' cambia
+  const sortedProjects = useMemo(() => {
+    // Creamos una copia antes de ordenar para no mutar el estado original de React Query
+    return [...projects].sort((a, b) => {
+      // localeCompare para comparación de strings segura
+      // b.id.localeCompare(a.id) para orden descendente
+      return (b.id || "").localeCompare(a.id || "");
+    });
+  }, [projects]); // Dependencia: reordenar solo si 'projects' cambia
+
+  const handleChange = (e) => {
+    const selectedProjectId = e.target.value;
+    // Buscamos el proyecto usando el ID personalizado
+    const project = projects.find((p) => p.id === selectedProjectId);
+    onProjectSelect(project); // Pasar el objeto proyecto completo
+  };
+
+  if (isLoading) return <p>Cargando proyectos...</p>;
+  if (error) return <p className="error-message">Error: {error.message}</p>;
+
+  return (
+    <div className="project-selector-container"> {/* Añadido un contenedor si es necesario */}
+      <label htmlFor="project-select-main">ID del Proyecto</label>
+      <select
+        id="project-select-main" // Añadido un ID para el label
+        onChange={handleChange}
+        value={selectedProject?.id || ""}
+        required
+        className="project-selector" // Clase para estilos si es necesario
+      >
+        <option value="">Selecciona un proyecto</option>
+        {/* Mapear sobre la lista ordenada */}
+        {sortedProjects.map((p) => (
+          <option key={p.firestoreId} value={p.id}>
+            {/* Mostrar ID y Cliente para mejor identificación */}
+            {p.id} - {p.client}
+          </option>
+        ))}
+      </select>
+
+      {/* Detalles del proyecto seleccionado (sin cambios en esta parte) */}
+      {selectedProject && (
+        <div className="project-details">
+          <h4 className="project-details-title">Detalles del Proyecto</h4>
+          <p>
+            <span className="detail-label">Dirección:</span>
+            <span className="detail-value">{selectedProject.address}</span>
+          </p>
+          <p>
+            <span className="detail-label">Cliente:</span>
+            <span className="detail-value">{selectedProject.client}</span>
+          </p>
+          <p>
+            <span className="detail-label">NIF/NIE:</span>
+            <span className="detail-value">{selectedProject.nifNie}</span>
+          </p>
+          {selectedProject.type === "hourly" ? (
+            <>
+              <p>
+                <span className="detail-label">Precio oficial:</span>
+                <span className="detail-value">{formatCurrency(selectedProject.officialPrice)} /h</span>
+              </p>
+              <p>
+                <span className="detail-label">Precio peón:</span>
+                <span className="detail-value">{formatCurrency(selectedProject.workerPrice)} /h</span>
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <span className="detail-label">Presupuesto:</span>
+                <span className="detail-value">{formatCurrency(selectedProject.budgetAmount)}</span>
+              </p>
+              {selectedProject.allowExtraWork && (
+                <>
+                    <p className="extra-work-info">Este proyecto permite trabajos extra</p>
+                    <p>
+                        <span className="detail-label">€ Oficial (Extras):</span>
+                        <span className="detail-value">{formatCurrency(selectedProject.officialPrice)}/h</span>
+                    </p>
+                    <p>
+                        <span className="detail-label">€ Peón (Extras):</span>
+                        <span className="detail-value">{formatCurrency(selectedProject.workerPrice)}/h</span>
+                    </p>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default React.memo(ProjectSelector);
 </file>
 
 <file path="src/components/Dashboard.js">
@@ -11902,10 +11903,10 @@ export default React.memo(Dashboard);
 </file>
 
 <file path="src/components/reports/ReportsViewer.js">
-// src/components/reports/ReportsViewer.js - Actualizado con filtros avanzados
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+// src/components/reports/ReportsViewer.js
+import React, { useState, useCallback, useMemo } from "react";
 import { useQueryProjects } from "../../hooks/useQueryProjects";
-import { useQueryUser } from "../../hooks/useQueryUser"; // Nuevo hook para usuarios
+import { useQueryUser } from "../../hooks/useQueryUser";
 import {
   useQueryReportsInfinite,
   useDeleteReport,
@@ -11927,20 +11928,13 @@ const ReportsViewer = () => {
   const [editingReportId, setEditingReportId] = useState(null);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [pdfKey, setPdfKey] = useState(Date.now());
-  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   
-  // Estado para filtrado avanzado
-  const [sortConfig, setSortConfig] = useState({
-    field: "reportDate",
-    direction: "desc" 
-  });
-
   // Hook de filtrado avanzado
   const {
     filters,
     updateFilter,
     updateFilters,
-    filterReports,
+    processReports, // Usamos la función de procesamiento que filtra y ordena
     hasActiveFilters,
     filtersDescription,
     sortOptions,
@@ -11948,7 +11942,6 @@ const ReportsViewer = () => {
     resetFilters,
     saveFilter,
     savedFilters,
-    processReports
   } = useReportFilters({
     projectId: "",
     startDate: "",
@@ -11962,18 +11955,15 @@ const ReportsViewer = () => {
 
   // Consultar proyectos y usuarios
   const { data: projects = [] } = useQueryProjects();
-  
-  const { data: users = [], isLoading: usersLoading } = useQueryUser();
+  const { data: users = [] } = useQueryUser();
 
-  // Consulta de reportes con React Query - usando los filtros nuevos
+  // Consulta de reportes con React Query
   const {
     data,
     isLoading,
-    isError,
-    error,
     fetchNextPage,
     hasNextPage,
-    refetch
+    refetch,
   } = useQueryReportsInfinite({
     projectId: filters.projectId || undefined,
     startDate: filters.startDate || undefined,
@@ -11988,59 +11978,20 @@ const ReportsViewer = () => {
   // Mutación para eliminar un reporte
   const deleteReportMutation = useDeleteReport();
 
-  // Extraer reportes de los datos paginados
-  const reports = useMemo(() => {
+  // Extraer y procesar reportes
+  const allReports = useMemo(() => {
     if (!data) return [];
-    return data.pages.flatMap(page => page.items);
+    return data.pages.flatMap(page => page.items || []);
   }, [data]);
 
-  // Aplicar filtros adicionales en el cliente (para los que no soporta Firestore)
-  const filteredReports = useMemo(() => {
-    // Usar processReports que aplica filtrado y ordenación
-    const processed = processReports(reports);
-    
-    // Aplicar filtrado adicional si es necesario
-    return processed.filter(report => {
-      // Filtro por rango de importes
-      if (filters.amountMin || filters.amountMax) {
-        const amount = getReportAmount(report);
-        
-        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
-          return false;
-        }
-        
-        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
-          return false;
-        }
-      }
-      
-      // Filtro por tipo de trabajo específico
-      if (filters.workType === 'extra_hourly' && 
-          (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
-        return false;
-      }
-      
-      if (filters.workType === 'extra_budget' && 
-          (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
-        return false;
-      }
-      
-      return true;
-    });
-  }, [reports, filters, processReports]);
-
-  // Función auxiliar para obtener el monto relevante de un reporte
-  const getReportAmount = (report) => {
-    return report.invoicedAmount || 
-           report.extraBudgetAmount || 
-           report.totalCost || 
-           ((report.labor?.totalLaborCost || 0) + (report.totalMaterialsCost || 0)) || 
-           0;
-  };
-
-  // Usar hook de resumen para calcular totales
+  const filteredAndSortedReports = useMemo(() => {
+    return processReports(allReports);
+  }, [allReports, processReports]);
+  
+  // Usar el hook de resumen (ahora corregido) para calcular totales
+  // Se le pasa la lista COMPLETA de reportes para que los totales sean siempre correctos
   const { totals } = useReportSummary(
-    filteredReports,
+    allReports,
     projects,
     filters.projectId
   );
@@ -12058,7 +12009,7 @@ const ReportsViewer = () => {
     });
     setPdfKey(Date.now());
   }, [updateFilters]);
-
+  
   const handleBilledStatusChange = useCallback((status) => {
     updateFilter("isBilled", status === "" ? undefined : status === "true");
   }, [updateFilter]);
@@ -12074,35 +12025,24 @@ const ReportsViewer = () => {
   const handleAmountRangeChange = useCallback((range) => {
     updateFilters({
       amountMin: range.min || "",
-      amountMax: range.max || ""
+      max: range.max || ""
     });
   }, [updateFilters]);
 
   const handleSortChange = useCallback((sortData) => {
     updateSortOptions(sortData);
-    setSortConfig(sortData);
   }, [updateSortOptions]);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
-    setSortConfig({
-      field: "reportDate",
-      direction: "desc"
-    });
   }, [resetFilters]);
 
   const handleSaveFilter = useCallback((filterData, apply = false) => {
-    saveFilter({
-      ...filterData,
-      apply
-    });
-    
+    saveFilter({ ...filterData, apply });
     if (apply) {
-      // Si estamos aplicando un filtro guardado
       const { filter } = filterData;
       updateFilters(filter);
       updateSortOptions(filter.sort || { field: "reportDate", direction: "desc" });
-      setSortConfig(filter.sort || { field: "reportDate", direction: "desc" });
     }
   }, [saveFilter, updateFilters, updateSortOptions]);
 
@@ -12115,7 +12055,18 @@ const ReportsViewer = () => {
     setEditingReportId(null);
   }, []);
 
-  const handleDeleteConfirm = useCallback((reportId) => {
+  const handleModalOverlayClick = useCallback((e) => {
+    if (e.target.className === 'modal-overlay') {
+      handleCancelEdit();
+    }
+  }, [handleCancelEdit]);
+
+  const handleEditComplete = useCallback(() => {
+    setEditingReportId(null);
+    refetch();
+  }, [refetch]);
+
+  const handleDeleteRequest = useCallback((reportId) => {
     setReportToDelete(reportId);
   }, []);
 
@@ -12123,122 +12074,88 @@ const ReportsViewer = () => {
     setReportToDelete(null);
   }, []);
 
-  const handleModalOverlayClick = useCallback((e) => {
-    if(e.target.className === 'modal-overlay'){
-      handleCancelEdit();
-    }
-  }, [handleCancelEdit]);
-
-  const handleDeleteReport = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!reportToDelete) return;
-
-    try {
-      await deleteReportMutation.mutateAsync(reportToDelete);
-      setReportToDelete(null);
-    } catch (error) {
-      console.error("Error al eliminar reporte:", error);
-    }
+    await deleteReportMutation.mutateAsync(reportToDelete);
+    setReportToDelete(null);
   }, [reportToDelete, deleteReportMutation]);
 
-  const handleEditComplete = useCallback(() => {
-    setEditingReportId(null);
-    refetch();
-  }, [refetch]);
-
-  // Estado de carga
-  const isLoadingData = isLoading && reports.length === 0;
+  const isLoadingData = isLoading && allReports.length === 0;
 
   return (
     <div className="reports-viewer">
       <h2>Informes</h2>
 
-      {/* Filtros mejorados */}
       <ReportFilters
         projects={projects}
         selectedProjectId={filters.projectId}
-        dateRange={{
-          startDate: filters.startDate,
-          endDate: filters.endDate
-        }}
+        dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
         onProjectChange={handleProjectChange}
         onDateRangeChange={handleDateRangeChange}
         onBilledStatusChange={handleBilledStatusChange}
         billedStatus={filters.isBilled === undefined ? "" : String(filters.isBilled)}
-        // Nuevos props para filtros adicionales
         onWorkTypeChange={handleWorkTypeChange}
         workType={filters.workType}
         onUserChange={handleUserChange}
         selectedUserId={filters.userId}
         users={users}
         onAmountRangeChange={handleAmountRangeChange}
-        amountRange={{
-          min: filters.amountMin,
-          max: filters.amountMax
-        }}
-        // Props para ordenación
+        amountRange={{ min: filters.amountMin, max: filters.amountMax }}
         onSortChange={handleSortChange}
-        sortField={sortConfig.field}
-        sortDirection={sortConfig.direction}
-        // Props para UI mejorada
+        sortField={sortOptions.field}
+        sortDirection={sortOptions.direction}
         onSaveFilter={handleSaveFilter}
         onResetFilters={handleResetFilters}
         savedFilters={savedFilters}
       />
 
-      {/* Descripción de filtros activos */}
       {hasActiveFilters && (
         <div className="filters-summary">
-          <p>Filtros aplicados: {filtersDescription}</p>
+          <p>Mostrando resultados para: {filtersDescription}</p>
         </div>
       )}
 
-      {/* Resumen de Totales (si hay reportes y se ha seleccionado un proyecto) */}
-      {filteredReports.length > 0 && filters.projectId && (
+      {/* --- SECCIÓN DE RESUMEN CORREGIDA --- */}
+      {/* Se renderiza si hay un proyecto seleccionado, para mostrar su resumen financiero */}
+      {filters.projectId && (
         <ReportSummary
-          reports={filteredReports}
-          projects={projects}
-          selectedProjectId={filters.projectId}
+          totals={totals}
+          project={projects.find(p => p.id === filters.projectId)}
         />
       )}
 
-      {/* Botón para generar PDF (si hay reportes) */}
       <PDFButton
         key={pdfKey}
-        reports={filteredReports}
+        reports={filteredAndSortedReports}
         projects={projects}
         selectedProjectId={filters.projectId}
-        dateRange={{
-          startDate: filters.startDate,
-          endDate: filters.endDate
-        }}
-        disabled={!filters.projectId || filteredReports.length === 0}
+        dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
+        disabled={!filters.projectId || filteredAndSortedReports.length === 0}
       />
 
-      <h3 className="section-title">Partes en el rango seleccionado:</h3>
+      <h3 className="section-title">Partes Diarios</h3>
 
-      {/* Mostrar estado vacío si no hay reportes */}
-      {filteredReports.length === 0 && !isLoadingData ? (
+      {isLoadingData ? (
+        <p>Cargando informes...</p>
+      ) : filteredAndSortedReports.length === 0 ? (
         <EmptyState 
           title="No se encontraron partes"
           message={hasActiveFilters ? 
-            "No hay partes que coincidan con los filtros aplicados. Prueba con otros filtros." : 
-            "No hay partes creados aún. Crea tu primer parte diario en la sección 'Partes'."
+            "No hay partes que coincidan con los filtros aplicados. Prueba a cambiarlos o limpiarlos." : 
+            "No hay partes creados aún en este proyecto o rango de fechas."
           }
           icon="📊"
-          action={hasActiveFilters ? handleResetFilters : null}
+          action={hasActiveFilters ? resetFilters : null}
           actionLabel={hasActiveFilters ? "Limpiar filtros" : null}
         />
       ) : (
         <>
-          {/* Lista de Reportes */}
           <ReportsList
-            reports={filteredReports}
+            reports={filteredAndSortedReports}
             projects={projects}
             onEdit={handleEditReport}
-            onDelete={handleDeleteConfirm}
+            onDelete={handleDeleteRequest}
           />
-
-          {/* Cargar más datos si es necesario */}
           {hasNextPage && (
             <div className="load-more-container">
               <button 
@@ -12246,26 +12163,18 @@ const ReportsViewer = () => {
                 disabled={isLoading}
                 className="load-more-button"
               >
-                {isLoading ? "Cargando más partes..." : "Cargar más partes"}
+                {isLoading ? "Cargando más..." : "Cargar más partes"}
               </button>
             </div>
           )}
         </>
       )}
 
-      {/* Modal de edición de reportes */}
       {editingReportId && (
         <div className="modal-overlay" onClick={handleModalOverlayClick}>
           <div className="custom-modal edit-modal">
             <h3>Editar Parte</h3>
-            <button
-              type="button"
-              className="close-button"
-              onClick={handleCancelEdit}
-              aria-label="Cerrar formulario"
-            >
-              ×
-            </button>
+            <button type="button" className="close-button" onClick={handleCancelEdit} aria-label="Cerrar">×</button>
             <ReportEditForm
               reportId={editingReportId}
               projects={projects}
@@ -12276,12 +12185,10 @@ const ReportsViewer = () => {
         </div>
       )}
 
-      {/* Modal de confirmación de eliminación */}
       {reportToDelete && (
         <ReportDeleteModal
-          onConfirm={handleDeleteReport}
+          onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
-          isLoading={deleteReportMutation.isPending}
         />
       )}
     </div>
@@ -12289,369 +12196,6 @@ const ReportsViewer = () => {
 };
 
 export default React.memo(ReportsViewer);
-</file>
-
-<file path="src/components/ProjectsViewer.js">
-// src/components/ProjectsViewer.js
-import React, { useState, useCallback, useEffect } from "react";
-import { formatCurrency } from "../utils/formatters";
-import ProjectForm from "./ProjectForm";
-import {
-  useQueryProjects,
-  useAddProject,
-  useUpdateProject,
-  useDeleteProject
-} from "../hooks/useQueryProjects";
-import { useQueryReportsInfinite } from "../hooks/useQueryReports";
-import { projectSchema } from "../utils/validationSchemas";
-import useFormValidation from "../hooks/useFormValidation";
-
-const ProjectsViewer = () => {
-  const [editingProjectId, setEditingProjectId] = useState(null); // Stores firestoreId
-  const [editedProject, setEditedProject] = useState(null); // Stores the full project object being edited
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const {
-    values: editedValues,
-    handleChange: handleEditChange,
-    handleBlur: handleEditBlur,
-    handleSubmit: handleEditSubmitInternal,
-    resetForm: resetEditForm,
-    isValid: isEditFormValid, // Get validity state
-    errors: editErrors,       // Get errors
-    hasError: editHasError,   // Get error checker
-    getError: editGetError    // Get error message function
-  } = useFormValidation(editedProject || {}, projectSchema);
-
-  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQueryProjects();
-  const { data: reportsData } = useQueryReportsInfinite({ pageSize: 1000 }); // Fetch reports for calculations
-  const addProjectMutation = useAddProject();
-  const updateProjectMutation = useUpdateProject();
-  const deleteProjectMutation = useDeleteProject();
-
-  useEffect(() => {
-    if (editedProject) {
-      resetEditForm(editedProject);
-    }
-  }, [editedProject, resetEditForm]);
-
-  useEffect(() => {
-    if (errorMessage || successMessage) {
-      const timer = setTimeout(() => {
-        setErrorMessage("");
-        setSuccessMessage("");
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage, successMessage]);
-
-  const reports = React.useMemo(() => {
-    if (!reportsData) return [];
-    return reportsData.pages.flatMap(page => page.items || []);
-  }, [reportsData]);
-
-  const startEditing = useCallback((project) => {
-    if (!project || !project.firestoreId) {
-      setErrorMessage("Error al iniciar edición: Faltan datos del proyecto.");
-      return;
-    }
-    setEditingProjectId(project.firestoreId);
-    setEditedProject({ ...project });
-  }, []);
-
-  const cancelEditing = useCallback(() => {
-    setEditingProjectId(null);
-    setEditedProject(null);
-    resetEditForm({}); // Reset form state as well
-  }, [resetEditForm]);
-
-  const handleEditSubmit = useCallback(async (formDataFromHook) => {
-    const projectToUpdate = {
-      ...formDataFromHook,
-      firestoreId: editingProjectId
-    };
-
-    if (!projectToUpdate.firestoreId) {
-      setErrorMessage("Error crítico: No se encontró el ID interno para actualizar.");
-      return;
-    }
-
-    try {
-      setSuccessMessage("");
-      setErrorMessage("");
-      await updateProjectMutation.mutateAsync({
-        firestoreId: projectToUpdate.firestoreId,
-        data: projectToUpdate
-      });
-      cancelEditing();
-      setSuccessMessage("Proyecto actualizado correctamente!");
-    } catch (err) {
-      console.error("Error en handleEditSubmit:", err);
-      setErrorMessage(`Error al actualizar proyecto: ${err.message || 'Error desconocido'}`);
-    }
-  }, [editingProjectId, updateProjectMutation, cancelEditing]);
-
-  const actualEditFormSubmitHandler = handleEditSubmitInternal(handleEditSubmit);
-
-  const handleDelete = useCallback(async (projectToDelete) => {
-    if (!projectToDelete || !projectToDelete.firestoreId) {
-      setErrorMessage("Error: No se puede eliminar, falta información del proyecto.");
-      return;
-    }
-    if (!window.confirm(`¿Seguro que quieres eliminar "${projectToDelete.id || 'proyecto sin ID'}"?`)) {
-      return;
-    }
-    try {
-      setSuccessMessage("");
-      setErrorMessage("");
-      await deleteProjectMutation.mutateAsync(projectToDelete.firestoreId);
-      setSuccessMessage("Proyecto eliminado.");
-    } catch (err) {
-      console.error("Error en handleDelete:", err);
-       setErrorMessage(`Error al eliminar: ${err.message || 'Error desconocido'}`);
-    }
-  }, [deleteProjectMutation]);
-
-  const calculateProjectCosts = useCallback((projectId, projectType) => {
-    if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0 };
-    const projectReports = reports.filter((report) => report.projectId === projectId && !report.isExtraWork);
-    let laborCost = 0;
-    let materialsCost = 0;
-    projectReports.forEach((report) => {
-      laborCost += report.labor?.totalLaborCost || 0;
-      materialsCost += report.totalMaterialsCost || 0;
-    });
-    return { laborCost, materialsCost, totalCost: laborCost + materialsCost };
-  }, [reports]);
-
-  const calculateInvoicedTotal = useCallback((project) => {
-      if (project?.type !== "fixed") return 0;
-      // Prioritize the pre-calculated value
-      if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
-          return project.totalInvoicedAmount;
-      }
-      // Fallback (should be less common now)
-      const projectReports = reports.filter((report) => report.projectId === project.id && !report.isExtraWork && report.invoicedAmount);
-      return projectReports.reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
-  }, [reports]);
-
-
-  const calculateExtraWorkTotal = useCallback((projectId) => {
-    const extraReports = reports.filter(
-      (report) => report.projectId === projectId && report.isExtraWork
-    );
-    let totalExtraBudget = 0;
-    let totalExtraCost = 0;
-    extraReports.forEach(report => {
-      if (report.extraWorkType === "additional_budget") {
-        totalExtraBudget += parseFloat(report.extraBudgetAmount) || 0;
-      } else if (report.extraWorkType === "hourly") {
-        const labor = parseFloat(report.labor?.totalLaborCost) || 0;
-        const mats = parseFloat(report.totalMaterialsCost) || 0;
-        totalExtraCost += parseFloat(report.totalCost) || (labor + mats);
-      }
-    });
-    return { totalExtraBudget, totalExtraCost, totalExtra: totalExtraBudget + totalExtraCost, count: extraReports.length };
-  }, [reports]);
-
-  const isMutating = addProjectMutation.isPending || updateProjectMutation.isPending || deleteProjectMutation.isPending;
-
-  if (projectsLoading) return <p>Cargando proyectos...</p>;
-  if (projectsError) return <p className="error-message">Error al cargar proyectos: {projectsError.message}</p>;
-
-  return (
-    <div className="projects-viewer">
-      <h2>Proyectos</h2>
-      {errorMessage && <p className="error-message">{errorMessage}</p>}
-      {successMessage && <p className="success-message">{successMessage}</p>}
-
-      <ProjectForm onProjectAdded={() => setSuccessMessage("Proyecto añadido correctamente!")} />
-
-      <div className="projects-list">
-        {projects.map((project) => {
-          const costs = calculateProjectCosts(project.id, project.type);
-          const invoicedTotal = calculateInvoicedTotal(project); // Pass the whole project object
-          const extraWork = project.type === "fixed" ? calculateExtraWorkTotal(project.id) : { totalExtra: 0, count: 0 };
-          const isEditing = editingProjectId === project.firestoreId;
-
-          return (
-            <div key={project.firestoreId} className="project-card">
-              {isEditing ? (
-                <form onSubmit={actualEditFormSubmitHandler} className="edit-form">
-                   <div className="form-group">
-                     <label>ID Proyecto (No editable)</label>
-                     <input type="text" value={editedValues.id || ''} disabled />
-                   </div>
-                   <div className="form-group">
-                     <label>Cliente</label>
-                     <input
-                       type="text"
-                       name="client"
-                       value={editedValues.client || ''}
-                       onChange={handleEditChange}
-                       onBlur={handleEditBlur}
-                       className={editHasError('client') ? 'input-error' : ''}
-                     />
-                     {editHasError('client') && <p className="error-message">{editGetError('client')}</p>}
-                   </div>
-                    <div className="form-group">
-                     <label>Dirección</label>
-                     <input
-                       type="text"
-                       name="address"
-                       value={editedValues.address || ''}
-                       onChange={handleEditChange}
-                       onBlur={handleEditBlur}
-                       className={editHasError('address') ? 'input-error' : ''}
-                     />
-                     {editHasError('address') && <p className="error-message">{editGetError('address')}</p>}
-                   </div>
-                    <div className="form-group">
-                     <label>NIF/NIE</label>
-                     <input
-                       type="text"
-                       name="nifNie"
-                       value={editedValues.nifNie || ''}
-                       onChange={handleEditChange}
-                       onBlur={handleEditBlur}
-                       className={editHasError('nifNie') ? 'input-error' : ''}
-                     />
-                     {editHasError('nifNie') && <p className="error-message">{editGetError('nifNie')}</p>}
-                   </div>
-                   <div className="form-group">
-                     <label>Tipo</label>
-                     <select name="type" value={editedValues.type || 'hourly'} onChange={handleEditChange} onBlur={handleEditBlur}>
-                       <option value="hourly">Por horas</option>
-                       <option value="fixed">Presupuesto cerrado</option>
-                     </select>
-                   </div>
-                   {editedValues.type === "hourly" ? (
-                     <>
-                       <div className="form-group">
-                         <label>Precio oficial (€/h)</label>
-                         <input
-                           type="number" name="officialPrice" min="0" step="0.01"
-                           value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
-                           className={editHasError('officialPrice') ? 'input-error' : ''} />
-                         {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
-                       </div>
-                       <div className="form-group">
-                         <label>Precio peón (€/h)</label>
-                         <input
-                           type="number" name="workerPrice" min="0" step="0.01"
-                           value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
-                           className={editHasError('workerPrice') ? 'input-error' : ''} />
-                         {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
-                       </div>
-                     </>
-                   ) : (
-                     <>
-                       <div className="form-group">
-                         <label>Importe presupuestado (€)</label>
-                         <input
-                           type="number" name="budgetAmount" min="0" step="0.01"
-                           value={editedValues.budgetAmount || 0} onChange={handleEditChange} onBlur={handleEditBlur}
-                           className={editHasError('budgetAmount') ? 'input-error' : ''} />
-                         {editHasError('budgetAmount') && <p className="error-message">{editGetError('budgetAmount')}</p>}
-                       </div>
-                       <div className="form-group checkbox-group">
-                         <input type="checkbox" name="allowExtraWork" id={`edit-allowExtraWork-${project.firestoreId}`}
-                           checked={editedValues.allowExtraWork || false} onChange={handleEditChange}
-                           className="checkbox-input" />
-                         <label htmlFor={`edit-allowExtraWork-${project.firestoreId}`} className="checkbox-label">
-                           Permitir trabajos extra
-                         </label>
-                       </div>
-                       {editedValues.allowExtraWork && (
-                         <div className="extra-work-section">
-                           <h4>Tarifas para trabajos extra por horas</h4>
-                           <div className="form-group">
-                             <label>Precio oficial extras (€/h)</label>
-                             <input type="number" name="officialPrice" min="0" step="0.01"
-                               value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
-                               className={editHasError('officialPrice') ? 'input-error' : ''} />
-                             {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
-                           </div>
-                           <div className="form-group">
-                             <label>Precio peón extras (€/h)</label>
-                             <input type="number" name="workerPrice" min="0" step="0.01"
-                               value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
-                               className={editHasError('workerPrice') ? 'input-error' : ''} />
-                             {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
-                           </div>
-                         </div>
-                       )}
-                     </>
-                   )}
-                   <div className="form-actions">
-                     <button type="submit" disabled={!isEditFormValid || updateProjectMutation.isPending}>
-                       {updateProjectMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                     </button>
-                     <button type="button" onClick={cancelEditing} disabled={updateProjectMutation.isPending} className="button-secondary">
-                       Cancelar
-                     </button>
-                   </div>
-                </form>
-              ) : (
-                <>
-                  <p><strong>ID:</strong> {project.id}</p>
-                  <p><strong>Cliente:</strong> {project.client}</p>
-                  <p><strong>Dirección:</strong> {project.address}</p>
-                  <p><strong>NIF/NIE:</strong> {project.nifNie}</p>
-                  <p><strong>Tipo:</strong> {project.type === "hourly" ? "Por horas" : "Presupuesto cerrado"}</p>
-                  {project.type === "hourly" ? (
-                    <>
-                      <p><strong>Precio oficial:</strong> {formatCurrency(project.officialPrice)}/h</p>
-                      <p><strong>Precio peón:</strong> {formatCurrency(project.workerPrice)}/h</p>
-                    </>
-                  ) : (
-                    <>
-                      <p><strong>Presupuestado:</strong> {formatCurrency(project.budgetAmount)}</p>
-                      <p><strong>Facturado Total:</strong> {formatCurrency(invoicedTotal)}</p>
-                      {project.allowExtraWork && <p><strong>Permite Extras:</strong> Sí</p>}
-                      {project.allowExtraWork && (
-                          <>
-                           <p><strong>€ Oficial (Extras):</strong> {formatCurrency(project.officialPrice)}/h</p>
-                           <p><strong>€ Peón (Extras):</strong> {formatCurrency(project.workerPrice)}/h</p>
-                          </>
-                      )}
-                    </>
-                  )}
-                  <h5>Resumen Actual</h5>
-                  {project.type === "hourly" ? (
-                    <>
-                      <p>M.Obra: {formatCurrency(costs.laborCost)} | Materiales: {formatCurrency(costs.materialsCost)} | <strong>Total: {formatCurrency(costs.totalCost)}</strong></p>
-                    </>
-                  ) : (
-                    <>
-                      <p>Progreso: {project.budgetAmount > 0 ? ((invoicedTotal / project.budgetAmount) * 100).toFixed(1) : 0}%</p>
-                      {extraWork.count > 0 && (
-                        <p>Trabajos Extra: {extraWork.count} partes | Total Extra: {formatCurrency(extraWork.totalExtra)}</p>
-                      )}
-                    </>
-                  )}
-                  <div className="project-actions">
-                    <button onClick={() => startEditing(project)} disabled={isMutating}>
-                      Editar
-                    </button>
-                    <button onClick={() => handleDelete(project)}
-                            style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
-                            disabled={deleteProjectMutation.isPending}>
-                      {deleteProjectMutation.isPending && deleteProjectMutation.variables === project.firestoreId ? "Eliminando..." : "Eliminar"}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-export default React.memo(ProjectsViewer);
 </file>
 
 <file path="src/components/DailyReportForm.js">
@@ -12935,7 +12479,490 @@ const DailyReportForm = ({ userId }) => {
 export default DailyReportForm;
 </file>
 
+<file path="src/components/ProjectsViewer.js">
+// src/components/ProjectsViewer.js
+import React, { useState, useCallback, useEffect } from "react";
+// Importar formatNumber para las horas y formatCurrency para los euros
+import { formatCurrency, formatNumber } from "../utils/calculationUtils"; // Asegúrate que la ruta sea correcta
+import ProjectForm from "./ProjectForm";
+import {
+  useQueryProjects,
+  useAddProject,
+  useUpdateProject,
+  useDeleteProject
+} from "../hooks/useQueryProjects";
+import { useQueryReportsInfinite } from "../hooks/useQueryReports";
+import { projectSchema } from "../utils/validationSchemas";
+import useFormValidation from "../hooks/useFormValidation";
+import ConfirmModal from "./common/ConfirmModal"; // Importar el modal de confirmación
+
+const ProjectsViewer = () => {
+  const [editingProjectId, setEditingProjectId] = useState(null); // Stores firestoreId
+  const [editedProject, setEditedProject] = useState(null); // Stores the full project object being edited
+  const [projectToDelete, setProjectToDelete] = useState(null); // Stores the project object to delete
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Hook de validación para el formulario de edición
+  const {
+    values: editedValues,
+    handleChange: handleEditChange,
+    handleBlur: handleEditBlur,
+    handleSubmit: handleEditSubmitInternal,
+    resetForm: resetEditForm,
+    isValid: isEditFormValid,
+    errors: editErrors,
+    hasError: editHasError,
+    getError: editGetError,
+    setValues: setEditedValues // Para inicializar el form al editar
+  } = useFormValidation({}, projectSchema); // Inicializar vacío, se llenará al editar
+
+  // Hooks de React Query
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQueryProjects();
+  const { data: reportsData } = useQueryReportsInfinite({ pageSize: 1000 }); // Fetch reports for calculations
+  const addProjectMutation = useAddProject();
+  const updateProjectMutation = useUpdateProject();
+  const deleteProjectMutation = useDeleteProject();
+
+  // Efecto para inicializar el formulario de edición cuando se selecciona un proyecto
+  useEffect(() => {
+    if (editedProject) {
+      setEditedValues(editedProject); // Usar setValues del hook de validación
+    } else {
+      resetEditForm({}); // Resetear si no hay proyecto editándose
+    }
+  }, [editedProject, setEditedValues, resetEditForm]);
+
+  // Efecto para limpiar mensajes después de un tiempo
+  useEffect(() => {
+    if (errorMessage || successMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage("");
+        setSuccessMessage("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage, successMessage]);
+
+  // Extraer reportes de los datos paginados
+  const reports = React.useMemo(() => {
+    if (!reportsData) return [];
+    return reportsData.pages.flatMap(page => page.items || []);
+  }, [reportsData]);
+
+  // Iniciar edición
+  const startEditing = useCallback((project) => {
+    if (!project || !project.firestoreId) {
+      setErrorMessage("Error al iniciar edición: Faltan datos del proyecto.");
+      return;
+    }
+    setEditingProjectId(project.firestoreId);
+    setEditedProject({ ...project }); // Guardar el proyecto completo para el form
+  }, []);
+
+  // Cancelar edición
+  const cancelEditing = useCallback(() => {
+    setEditingProjectId(null);
+    setEditedProject(null);
+  }, []);
+
+  // Manejar envío del formulario de edición (función interna que llama a la mutación)
+  const handleEditSubmit = useCallback(async (formDataFromHook) => {
+    const projectToUpdate = {
+      ...formDataFromHook,
+      // Asegurarse de que los campos numéricos sean números
+      officialPrice: parseFloat(formDataFromHook.officialPrice) || 0,
+      workerPrice: parseFloat(formDataFromHook.workerPrice) || 0,
+      budgetAmount: parseFloat(formDataFromHook.budgetAmount) || 0,
+      firestoreId: editingProjectId // Usar el ID guardado en el estado
+    };
+
+    if (!projectToUpdate.firestoreId) {
+      setErrorMessage("Error crítico: No se encontró el ID interno para actualizar.");
+      return;
+    }
+
+    try {
+      setSuccessMessage("");
+      setErrorMessage("");
+      await updateProjectMutation.mutateAsync({
+        firestoreId: projectToUpdate.firestoreId,
+        data: projectToUpdate // Enviar los datos validados
+      });
+      cancelEditing();
+      setSuccessMessage("Proyecto actualizado correctamente!");
+    } catch (err) {
+      console.error("Error en handleEditSubmit:", err);
+      setErrorMessage(`Error al actualizar proyecto: ${err.message || 'Error desconocido'}`);
+    }
+  }, [editingProjectId, updateProjectMutation, cancelEditing]);
+
+  // Crear el handler que el formulario usará, conectando validación y envío
+  const actualEditFormSubmitHandler = handleEditSubmitInternal(handleEditSubmit);
+
+  // Iniciar proceso de eliminación (mostrar modal)
+  const handleDeleteRequest = useCallback((project) => {
+    if (!project || !project.firestoreId) {
+      setErrorMessage("Error: No se puede eliminar, falta información del proyecto.");
+      return;
+    }
+    setProjectToDelete(project); // Guardar el proyecto completo para el modal
+  }, []);
+
+  // Cancelar eliminación (cerrar modal)
+  const handleDeleteCancel = useCallback(() => {
+    setProjectToDelete(null);
+  }, []);
+
+  // Confirmar y ejecutar eliminación
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!projectToDelete || !projectToDelete.firestoreId) return;
+
+    try {
+      setSuccessMessage("");
+      setErrorMessage("");
+      await deleteProjectMutation.mutateAsync(projectToDelete.firestoreId);
+      setProjectToDelete(null); // Cerrar modal
+      setSuccessMessage("Proyecto eliminado.");
+    } catch (err) {
+      console.error("Error en handleDeleteConfirm:", err);
+      setErrorMessage(`Error al eliminar: ${err.message || 'Error desconocido'}`);
+      setProjectToDelete(null); // Cerrar modal incluso si hay error
+    }
+  }, [projectToDelete, deleteProjectMutation]);
+
+  // Calcular costos y horas para proyectos por horas
+  const calculateProjectCostsAndHours = useCallback((projectId, projectType) => {
+    if (projectType !== "hourly") return { laborCost: 0, materialsCost: 0, totalCost: 0, officialHours: 0, workerHours: 0 };
+    const projectReports = reports.filter((report) => report.projectId === projectId && !report.isExtraWork);
+    let laborCost = 0;
+    let materialsCost = 0;
+    let officialHours = 0;
+    let workerHours = 0;
+
+    projectReports.forEach((report) => {
+      laborCost += report.labor?.totalLaborCost || 0;
+      materialsCost += report.totalMaterialsCost || 0;
+      officialHours += report.labor?.officialHours || 0;
+      workerHours += report.labor?.workerHours || 0;
+    });
+    return { laborCost, materialsCost, totalCost: laborCost + materialsCost, officialHours, workerHours };
+  }, [reports]);
+
+  // Calcular total facturado para proyectos de presupuesto cerrado
+  const calculateInvoicedTotal = useCallback((project) => {
+      if (project?.type !== "fixed") return 0;
+      // Priorizar el valor precalculado si existe
+      if (project.totalInvoicedAmount !== undefined && project.totalInvoicedAmount !== null) {
+          return project.totalInvoicedAmount;
+      }
+      // Fallback: calcular sumando reportes (menos eficiente)
+      console.warn(`Fallback calculation for invoicedTotal on project ${project.id}`);
+      const projectReports = reports.filter((report) => report.projectId === project.id && !report.isExtraWork && report.invoicedAmount);
+      return projectReports.reduce((sum, report) => sum + (parseFloat(report.invoicedAmount) || 0), 0);
+  }, [reports]);
+
+  // Calcular totales de trabajos extra
+  const calculateExtraWorkTotal = useCallback((projectId) => {
+    const extraReports = reports.filter(
+      (report) => report.projectId === projectId && report.isExtraWork
+    );
+    let totalExtraBudget = 0;
+    let totalExtraCost = 0; // Costo total de extras por horas (MO+Mat)
+    let totalExtraLaborCost = 0; // Costo MO de extras por horas
+    let extraOfficialHours = 0;
+    let extraWorkerHours = 0;
+
+    extraReports.forEach(report => {
+      if (report.extraWorkType === "additional_budget") {
+        totalExtraBudget += parseFloat(report.extraBudgetAmount) || 0;
+      } else if (report.extraWorkType === "hourly") {
+        const labor = parseFloat(report.labor?.totalLaborCost) || 0;
+        const mats = parseFloat(report.totalMaterialsCost) || 0;
+        totalExtraCost += parseFloat(report.totalCost) || (labor + mats);
+        totalExtraLaborCost += labor; // Acumular coste MO extra
+        extraOfficialHours += report.labor?.officialHours || 0;
+        extraWorkerHours += report.labor?.workerHours || 0;
+      }
+    });
+    // El ingreso total extra es la suma del presupuesto adicional y el coste de MO de los extras por horas
+    const totalExtraIncome = totalExtraBudget + totalExtraLaborCost;
+    return {
+        totalExtraBudget,
+        totalExtraCost,
+        totalExtraIncome,
+        extraOfficialHours,
+        extraWorkerHours,
+        count: extraReports.length
+    };
+  }, [reports]);
+
+  // Estado de carga general o mutación en progreso
+  const isMutating = addProjectMutation.isPending || updateProjectMutation.isPending || deleteProjectMutation.isPending;
+
+  // Renderizado condicional de carga y error
+  if (projectsLoading) return <p>Cargando proyectos...</p>;
+  if (projectsError) return <p className="error-message">Error al cargar proyectos: {projectsError.message}</p>;
+
+  return (
+    <div className="projects-viewer">
+      <h2>Proyectos</h2>
+      {errorMessage && <p className="error-message">{errorMessage}</p>}
+      {successMessage && <p className="success-message">{successMessage}</p>}
+
+      {/* Formulario para añadir nuevos proyectos */}
+      <ProjectForm onProjectAdded={() => setSuccessMessage("Proyecto añadido correctamente!")} />
+
+      <h3 className="section-title">Lista de Proyectos</h3>
+      <div className="projects-list">
+        {projects.map((project) => {
+          // Calcular datos derivados para cada proyecto
+          const { laborCost, materialsCost, totalCost, officialHours, workerHours } = calculateProjectCostsAndHours(project.id, project.type);
+          const invoicedTotal = calculateInvoicedTotal(project);
+          const extraWork = project.type === "fixed" ? calculateExtraWorkTotal(project.id) : { totalExtraIncome: 0, count: 0, extraOfficialHours: 0, extraWorkerHours: 0 };
+          const isEditing = editingProjectId === project.firestoreId;
+
+          return (
+            <div key={project.firestoreId} className={`project-card ${isEditing ? 'editing' : ''}`}>
+              {isEditing ? (
+                // --- Formulario de Edición ---
+                <form onSubmit={actualEditFormSubmitHandler} className="edit-form project-form">
+                   {/* ID no editable */}
+                   <div className="form-group">
+                     <label>ID Proyecto (No editable)</label>
+                     <input type="text" value={editedValues.id || ''} disabled />
+                   </div>
+                   {/* Cliente */}
+                   <div className="form-group">
+                     <label htmlFor={`edit-client-${project.firestoreId}`}>Cliente</label>
+                     <input
+                       id={`edit-client-${project.firestoreId}`}
+                       type="text"
+                       name="client"
+                       value={editedValues.client || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('client') ? 'input-error' : ''}
+                     />
+                     {editHasError('client') && <p className="error-message">{editGetError('client')}</p>}
+                   </div>
+                   {/* Dirección */}
+                    <div className="form-group">
+                     <label htmlFor={`edit-address-${project.firestoreId}`}>Dirección</label>
+                     <input
+                       id={`edit-address-${project.firestoreId}`}
+                       type="text"
+                       name="address"
+                       value={editedValues.address || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('address') ? 'input-error' : ''}
+                     />
+                     {editHasError('address') && <p className="error-message">{editGetError('address')}</p>}
+                   </div>
+                   {/* NIF/NIE */}
+                    <div className="form-group">
+                     <label htmlFor={`edit-nifNie-${project.firestoreId}`}>NIF/NIE</label>
+                     <input
+                       id={`edit-nifNie-${project.firestoreId}`}
+                       type="text"
+                       name="nifNie"
+                       value={editedValues.nifNie || ''}
+                       onChange={handleEditChange}
+                       onBlur={handleEditBlur}
+                       className={editHasError('nifNie') ? 'input-error' : ''}
+                     />
+                     {editHasError('nifNie') && <p className="error-message">{editGetError('nifNie')}</p>}
+                   </div>
+                   {/* Tipo */}
+                   <div className="form-group">
+                     <label htmlFor={`edit-type-${project.firestoreId}`}>Tipo</label>
+                     <select
+                        id={`edit-type-${project.firestoreId}`}
+                        name="type"
+                        value={editedValues.type || 'hourly'}
+                        onChange={handleEditChange}
+                        onBlur={handleEditBlur}
+                        className={editHasError('type') ? 'input-error' : ''}
+                     >
+                       <option value="hourly">Por horas</option>
+                       <option value="fixed">Presupuesto cerrado</option>
+                     </select>
+                      {editHasError('type') && <p className="error-message">{editGetError('type')}</p>}
+                   </div>
+                   {/* Campos condicionales según tipo */}
+                   {editedValues.type === "hourly" ? (
+                     <>
+                       <div className="form-group">
+                         <label htmlFor={`edit-officialPrice-${project.firestoreId}`}>Precio oficial (€/h)</label>
+                         <input
+                           id={`edit-officialPrice-${project.firestoreId}`}
+                           type="number" name="officialPrice" min="0" step="0.01"
+                           value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('officialPrice') ? 'input-error' : ''} />
+                         {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
+                       </div>
+                       <div className="form-group">
+                         <label htmlFor={`edit-workerPrice-${project.firestoreId}`}>Precio peón (€/h)</label>
+                         <input
+                           id={`edit-workerPrice-${project.firestoreId}`}
+                           type="number" name="workerPrice" min="0" step="0.01"
+                           value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('workerPrice') ? 'input-error' : ''} />
+                         {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
+                       </div>
+                     </>
+                   ) : ( // Tipo 'fixed'
+                     <>
+                       <div className="form-group">
+                         <label htmlFor={`edit-budgetAmount-${project.firestoreId}`}>Importe presupuestado (€)</label>
+                         <input
+                           id={`edit-budgetAmount-${project.firestoreId}`}
+                           type="number" name="budgetAmount" min="0" step="0.01"
+                           value={editedValues.budgetAmount || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                           className={editHasError('budgetAmount') ? 'input-error' : ''} />
+                         {editHasError('budgetAmount') && <p className="error-message">{editGetError('budgetAmount')}</p>}
+                       </div>
+                       {/* Checkbox para permitir extras */}
+                       <div className="form-group checkbox-group">
+                         <input
+                            type="checkbox"
+                            name="allowExtraWork"
+                            id={`edit-allowExtraWork-${project.firestoreId}`}
+                            checked={editedValues.allowExtraWork || false}
+                            onChange={handleEditChange} // Usa el mismo handler, detecta tipo checkbox
+                            className="checkbox-input"
+                         />
+                         <label htmlFor={`edit-allowExtraWork-${project.firestoreId}`} className="checkbox-label">
+                           Permitir trabajos extra
+                         </label>
+                       </div>
+                       {/* Precios para extras si está permitido */}
+                       {editedValues.allowExtraWork && (
+                         <div className="extra-work-section">
+                           <h4>Tarifas para trabajos extra por horas</h4>
+                           <div className="form-group">
+                             <label htmlFor={`edit-extra-officialPrice-${project.firestoreId}`}>Precio oficial extras (€/h)</label>
+                             <input
+                                id={`edit-extra-officialPrice-${project.firestoreId}`}
+                                type="number" name="officialPrice" min="0" step="0.01"
+                                value={editedValues.officialPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                                className={editHasError('officialPrice') ? 'input-error' : ''} />
+                             {editHasError('officialPrice') && <p className="error-message">{editGetError('officialPrice')}</p>}
+                           </div>
+                           <div className="form-group">
+                             <label htmlFor={`edit-extra-workerPrice-${project.firestoreId}`}>Precio peón extras (€/h)</label>
+                             <input
+                                id={`edit-extra-workerPrice-${project.firestoreId}`}
+                                type="number" name="workerPrice" min="0" step="0.01"
+                                value={editedValues.workerPrice || 0} onChange={handleEditChange} onBlur={handleEditBlur}
+                                className={editHasError('workerPrice') ? 'input-error' : ''} />
+                             {editHasError('workerPrice') && <p className="error-message">{editGetError('workerPrice')}</p>}
+                           </div>
+                         </div>
+                       )}
+                     </>
+                   )}
+                   {/* Botones de acción del formulario de edición */}
+                   <div className="form-actions">
+                     <button type="submit" disabled={!isEditFormValid || updateProjectMutation.isPending}>
+                       {updateProjectMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                     </button>
+                     <button type="button" onClick={cancelEditing} disabled={updateProjectMutation.isPending} className="button-secondary">
+                       Cancelar
+                     </button>
+                   </div>
+                </form>
+              ) : (
+                // --- Vista de Detalles del Proyecto ---
+                <>
+                  <p><strong>ID:</strong> {project.id}</p>
+                  <p><strong>Cliente:</strong> {project.client}</p>
+                  <p><strong>Dirección:</strong> {project.address}</p>
+                  <p><strong>NIF/NIE:</strong> {project.nifNie}</p>
+                  <p><strong>Tipo:</strong> {project.type === "hourly" ? "Por horas" : "Presupuesto cerrado"}</p>
+                  {/* Detalles específicos por tipo */}
+                  {project.type === "hourly" ? (
+                    <>
+                      <p><strong>Precio oficial:</strong> {formatCurrency(project.officialPrice)}/h</p>
+                      <p><strong>Precio peón:</strong> {formatCurrency(project.workerPrice)}/h</p>
+                      <p><strong>Horas Oficial Acumuladas:</strong> {formatNumber(officialHours)} h</p>
+                      <p><strong>Horas Peón Acumuladas:</strong> {formatNumber(workerHours)} h</p>
+                    </>
+                  ) : ( // Tipo 'fixed'
+                    <>
+                      <p><strong>Presupuestado:</strong> {formatCurrency(project.budgetAmount)}</p>
+                      <p><strong>Facturado Total (Presup.):</strong> {formatCurrency(invoicedTotal)}</p>
+                      {project.allowExtraWork && <p><strong>Permite Extras:</strong> Sí</p>}
+                      {/* Mostrar precios de extras si están definidos y permitidos */}
+                      {project.allowExtraWork && (
+                          <>
+                           <p><strong>€ Oficial (Extras):</strong> {formatCurrency(project.officialPrice)}/h</p>
+                           <p><strong>€ Peón (Extras):</strong> {formatCurrency(project.workerPrice)}/h</p>
+                          </>
+                      )}
+                    </>
+                  )}
+                  {/* Resumen de costos/progreso */}
+                  <h5>Resumen Actual</h5>
+                  {project.type === "hourly" ? (
+                    <>
+                      <p>M.Obra: {formatCurrency(laborCost)} | Materiales: {formatCurrency(materialsCost)} | <strong>Total: {formatCurrency(totalCost)}</strong></p>
+                      <p>Horas Totales: {formatNumber(officialHours + workerHours)} h</p>
+                    </>
+                  ) : ( // Tipo 'fixed'
+                    <>
+                      <p>Progreso (Presup.): {
+    (() => {
+        const totalBudget = (project.budgetAmount || 0) + (extraWork.totalExtraIncome || 0);
+        return totalBudget > 0 ? ((invoicedTotal / totalBudget) * 100).toFixed(1) : 0;
+    })()
+}%</p>
+                      {extraWork.count > 0 && (
+                        <p>Trabajos Extra: {extraWork.count} partes | Ingreso Extra: {formatCurrency(extraWork.totalExtraIncome)} | Horas Extra: {formatNumber(extraWork.extraOfficialHours + extraWork.extraWorkerHours)} h</p>
+                      )}
+                    </>
+                  )}
+                  {/* Botones de acción para vista de detalles */}
+                  <div className="project-actions">
+                    <button onClick={() => startEditing(project)} disabled={isMutating}>
+                      Editar
+                    </button>
+                    <button onClick={() => handleDeleteRequest(project)} // Cambiado para mostrar modal
+                            style={{ backgroundColor: "#e74c3c", marginLeft: "10px" }}
+                            disabled={isMutating}>
+                      Eliminar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+       {/* Modal de Confirmación de Eliminación */}
+       {projectToDelete && (
+        <ConfirmModal
+          title="Confirmar Eliminación"
+          message={`¿Estás seguro de que quieres eliminar el proyecto "${projectToDelete.id || 'proyecto sin ID'}"? Esta acción no se puede deshacer.`}
+          confirmText="Sí, eliminar"
+          cancelText="Cancelar"
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          isDangerous={true} // Estilo de botón de confirmación peligroso
+          confirmButtonClass={deleteProjectMutation.isPending ? 'button-loading' : ''} // Añadir clase si está cargando
+        />
+      )}
+    </div>
+  );
+};
+
+export default React.memo(ProjectsViewer);
+</file>
+
 <file path="src/components/ReportPDFGenerator.js">
+// src/components/ReportPDFGenerator.js
 import React, { useMemo } from "react";
 import { Document, Page, Text, View, StyleSheet, Image, Link, Font } from "@react-pdf/renderer";
 import CompressedImage from "./CompressedImage";
@@ -13335,8 +13362,9 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         const isHourly = project.type === "hourly";
         
         // Usar servicios centralizados para cálculos
+        // **CORRECCIÓN**: Usamos la función de budgetUtils corregida
         const budgetSummary = project.type === "fixed" 
-          ? calculateBudget(project, reports.filter(r => r.projectId === project.id)) 
+          ? calculateBudget(project, reports) // Pasamos todos los reportes para el cálculo correcto
           : { budgetAmount: 0, invoicedTotal: 0, remainingBudget: 0 };
           
         // Calcular datos de labor y materiales si aplica
@@ -13430,12 +13458,12 @@ const ReportPDFGenerator = ({ reports, projects }) => {
                             <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.budgetAmount)}</Text>
                           </View>
                           <View style={styles.budgetRow}>
-                            <Text style={styles.budgetTableCell}>Importe facturado</Text>
-                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
+                            <Text style={styles.budgetTableCell}>Importe facturado (de este parte)</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(report.invoicedAmount || 0)}</Text>
                           </View>
                           <View style={styles.budgetRow}>
-                            <Text style={styles.budgetTableCell}>Importe restante</Text>
-                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.remainingBudget)}</Text>
+                            <Text style={styles.budgetTableCell}>Total facturado (acumulado)</Text>
+                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
                           </View>
                         </>
                       )}
@@ -13550,89 +13578,70 @@ const ReportPDFGenerator = ({ reports, projects }) => {
               <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total mano de obra</Text>
+              <Text style={styles.summaryColLabel}>Total mano de obra (Ingresos)</Text>
               <Text style={styles.summaryColValue}>{formatCurrency(totals.totalLabor)}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total materiales</Text>
+              <Text style={styles.summaryColLabel}>Total materiales (Coste)</Text>
               <Text style={styles.summaryColValue}>{formatCurrency(totals.totalMaterials)}</Text>
             </View>
             <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
+              <Text style={styles.summaryTotalLabel}>TOTAL COSTE OPERATIVO</Text>
               <Text style={styles.summaryTotalValue}>{formatCurrency(totals.totalCost)}</Text>
             </View>
           </View>
-        ) : (
-          <View style={styles.summaryTable}>
-            <View style={styles.summaryHeaderRow}>
-              <Text style={{...styles.summaryHeaderCol, width: "70%"}}>Concepto</Text>
-              <Text style={{...styles.summaryHeaderCol, width: "30%"}}>Importe</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Importe presupuestado</Text>
-              <Text style={styles.summaryColValue}>{formatCurrency(project.budgetAmount || 0)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Total facturado</Text>
-              <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced)}</Text>
-            </View>
-            
-            {/* Sección de trabajos extra (si hay) */}
-            {(totals.totalExtraCost > 0 || totals.totalExtraBudget > 0) && (
-              <>
-                {/* Encabezado de sección */}
-                <View style={[styles.summaryRow, styles.extraWorkSection]}>
-                  <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
-                    Trabajos Extra (Fuera de Presupuesto)
-                  </Text>
-                  <Text style={[styles.summaryColValue, { color: '#e67e22' }]}>
-                    {formatCurrency(totals.totalExtraCost + totals.totalExtraBudget)}
-                  </Text>
+        ) : ( // Lógica para proyectos de presupuesto cerrado
+          (() => {
+            // **CORRECCIÓN**: Usamos la función de budgetUtils corregida para obtener los valores correctos
+            const finalBudget = calculateBudget(project, sortedReports);
+
+            return (
+              <View style={styles.summaryTable}>
+                <View style={styles.summaryHeaderRow}>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "70%" }}>Concepto</Text>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "30%" }}>Importe</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Presupuesto Original</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.budgetAmount)}</Text>
                 </View>
                 
-                {/* Detalles de trabajos extra */}
-                {totals.totalExtraBudget > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Presupuestos adicionales</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraBudget)}</Text>
-                  </View>
+                {/* Mostramos la sección de extras solo si existen */}
+                {finalBudget.totalExtraWorkIncome > 0 && (
+                  <>
+                    <View style={[styles.summaryRow, styles.extraWorkSection]}>
+                        <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            Ingresos por Trabajos Extra
+                        </Text>
+                        <Text style={[styles.summaryColValue, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            {formatCurrency(finalBudget.totalExtraWorkIncome)}
+                        </Text>
+                    </View>
+                  </>
                 )}
                 
-                {totals.totalExtraHours > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Coste mano de obra extra</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraHours)}</Text>
-                  </View>
-                )}
-                
-                {totals.totalExtraCost > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Coste total trabajos por horas</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalExtraCost)}</Text>
-                  </View>
-                )}
-              </>
-            )}
-            
-            <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>TOTAL GENERAL</Text>
-              <Text style={styles.summaryTotalValue}>
-                {formatCurrency(totals.totalInvoiced + totals.totalExtraCost + totals.totalExtraBudget)}
-              </Text>
-            </View>
-            
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryColLabel}>Importe restante</Text>
-              <Text style={styles.summaryColValue}>
-                {formatCurrency((project.budgetAmount || 0) - totals.totalInvoiced)}
-              </Text>
-            </View>
-          </View>
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>PRESUPUESTO TOTAL (CON EXTRAS)</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.totalBudgetWithExtras)}</Text>
+                </View>
+
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Total Facturado (del presupuesto original)</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.invoicedTotal)}</Text>
+                </View>
+
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>IMPORTE RESTANTE</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.remainingBudget)}</Text>
+                </View>
+              </View>
+            );
+          })()
         )}
 
         <Text style={styles.summaryNote}>
           Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado.
-          {hasExtraWork ? " Los trabajos extra se muestran separados del presupuesto original." : ""}
+          {hasExtraWork ? " Los trabajos extra se muestran sumados al presupuesto original para calcular el total real del proyecto." : ""}
         </Text>
       </Page>
     </Document>

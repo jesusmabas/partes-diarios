@@ -1,7 +1,7 @@
-// src/components/reports/ReportsViewer.js - Actualizado con filtros avanzados
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+// src/components/reports/ReportsViewer.js
+import React, { useState, useCallback, useMemo } from "react";
 import { useQueryProjects } from "../../hooks/useQueryProjects";
-import { useQueryUser } from "../../hooks/useQueryUser"; // Nuevo hook para usuarios
+import { useQueryUser } from "../../hooks/useQueryUser";
 import {
   useQueryReportsInfinite,
   useDeleteReport,
@@ -23,20 +23,13 @@ const ReportsViewer = () => {
   const [editingReportId, setEditingReportId] = useState(null);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [pdfKey, setPdfKey] = useState(Date.now());
-  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   
-  // Estado para filtrado avanzado
-  const [sortConfig, setSortConfig] = useState({
-    field: "reportDate",
-    direction: "desc" 
-  });
-
   // Hook de filtrado avanzado
   const {
     filters,
     updateFilter,
     updateFilters,
-    filterReports,
+    processReports, // Usamos la función de procesamiento que filtra y ordena
     hasActiveFilters,
     filtersDescription,
     sortOptions,
@@ -44,7 +37,6 @@ const ReportsViewer = () => {
     resetFilters,
     saveFilter,
     savedFilters,
-    processReports
   } = useReportFilters({
     projectId: "",
     startDate: "",
@@ -58,18 +50,15 @@ const ReportsViewer = () => {
 
   // Consultar proyectos y usuarios
   const { data: projects = [] } = useQueryProjects();
-  
-  const { data: users = [], isLoading: usersLoading } = useQueryUser();
+  const { data: users = [] } = useQueryUser();
 
-  // Consulta de reportes con React Query - usando los filtros nuevos
+  // Consulta de reportes con React Query
   const {
     data,
     isLoading,
-    isError,
-    error,
     fetchNextPage,
     hasNextPage,
-    refetch
+    refetch,
   } = useQueryReportsInfinite({
     projectId: filters.projectId || undefined,
     startDate: filters.startDate || undefined,
@@ -84,59 +73,20 @@ const ReportsViewer = () => {
   // Mutación para eliminar un reporte
   const deleteReportMutation = useDeleteReport();
 
-  // Extraer reportes de los datos paginados
-  const reports = useMemo(() => {
+  // Extraer y procesar reportes
+  const allReports = useMemo(() => {
     if (!data) return [];
-    return data.pages.flatMap(page => page.items);
+    return data.pages.flatMap(page => page.items || []);
   }, [data]);
 
-  // Aplicar filtros adicionales en el cliente (para los que no soporta Firestore)
-  const filteredReports = useMemo(() => {
-    // Usar processReports que aplica filtrado y ordenación
-    const processed = processReports(reports);
-    
-    // Aplicar filtrado adicional si es necesario
-    return processed.filter(report => {
-      // Filtro por rango de importes
-      if (filters.amountMin || filters.amountMax) {
-        const amount = getReportAmount(report);
-        
-        if (filters.amountMin && amount < parseFloat(filters.amountMin)) {
-          return false;
-        }
-        
-        if (filters.amountMax && amount > parseFloat(filters.amountMax)) {
-          return false;
-        }
-      }
-      
-      // Filtro por tipo de trabajo específico
-      if (filters.workType === 'extra_hourly' && 
-          (!report.isExtraWork || report.extraWorkType !== 'hourly')) {
-        return false;
-      }
-      
-      if (filters.workType === 'extra_budget' && 
-          (!report.isExtraWork || report.extraWorkType !== 'additional_budget')) {
-        return false;
-      }
-      
-      return true;
-    });
-  }, [reports, filters, processReports]);
-
-  // Función auxiliar para obtener el monto relevante de un reporte
-  const getReportAmount = (report) => {
-    return report.invoicedAmount || 
-           report.extraBudgetAmount || 
-           report.totalCost || 
-           ((report.labor?.totalLaborCost || 0) + (report.totalMaterialsCost || 0)) || 
-           0;
-  };
-
-  // Usar hook de resumen para calcular totales
+  const filteredAndSortedReports = useMemo(() => {
+    return processReports(allReports);
+  }, [allReports, processReports]);
+  
+  // Usar el hook de resumen (ahora corregido) para calcular totales
+  // Se le pasa la lista COMPLETA de reportes para que los totales sean siempre correctos
   const { totals } = useReportSummary(
-    filteredReports,
+    allReports,
     projects,
     filters.projectId
   );
@@ -154,7 +104,7 @@ const ReportsViewer = () => {
     });
     setPdfKey(Date.now());
   }, [updateFilters]);
-
+  
   const handleBilledStatusChange = useCallback((status) => {
     updateFilter("isBilled", status === "" ? undefined : status === "true");
   }, [updateFilter]);
@@ -170,35 +120,24 @@ const ReportsViewer = () => {
   const handleAmountRangeChange = useCallback((range) => {
     updateFilters({
       amountMin: range.min || "",
-      amountMax: range.max || ""
+      max: range.max || ""
     });
   }, [updateFilters]);
 
   const handleSortChange = useCallback((sortData) => {
     updateSortOptions(sortData);
-    setSortConfig(sortData);
   }, [updateSortOptions]);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
-    setSortConfig({
-      field: "reportDate",
-      direction: "desc"
-    });
   }, [resetFilters]);
 
   const handleSaveFilter = useCallback((filterData, apply = false) => {
-    saveFilter({
-      ...filterData,
-      apply
-    });
-    
+    saveFilter({ ...filterData, apply });
     if (apply) {
-      // Si estamos aplicando un filtro guardado
       const { filter } = filterData;
       updateFilters(filter);
       updateSortOptions(filter.sort || { field: "reportDate", direction: "desc" });
-      setSortConfig(filter.sort || { field: "reportDate", direction: "desc" });
     }
   }, [saveFilter, updateFilters, updateSortOptions]);
 
@@ -211,7 +150,18 @@ const ReportsViewer = () => {
     setEditingReportId(null);
   }, []);
 
-  const handleDeleteConfirm = useCallback((reportId) => {
+  const handleModalOverlayClick = useCallback((e) => {
+    if (e.target.className === 'modal-overlay') {
+      handleCancelEdit();
+    }
+  }, [handleCancelEdit]);
+
+  const handleEditComplete = useCallback(() => {
+    setEditingReportId(null);
+    refetch();
+  }, [refetch]);
+
+  const handleDeleteRequest = useCallback((reportId) => {
     setReportToDelete(reportId);
   }, []);
 
@@ -219,122 +169,88 @@ const ReportsViewer = () => {
     setReportToDelete(null);
   }, []);
 
-  const handleModalOverlayClick = useCallback((e) => {
-    if(e.target.className === 'modal-overlay'){
-      handleCancelEdit();
-    }
-  }, [handleCancelEdit]);
-
-  const handleDeleteReport = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!reportToDelete) return;
-
-    try {
-      await deleteReportMutation.mutateAsync(reportToDelete);
-      setReportToDelete(null);
-    } catch (error) {
-      console.error("Error al eliminar reporte:", error);
-    }
+    await deleteReportMutation.mutateAsync(reportToDelete);
+    setReportToDelete(null);
   }, [reportToDelete, deleteReportMutation]);
 
-  const handleEditComplete = useCallback(() => {
-    setEditingReportId(null);
-    refetch();
-  }, [refetch]);
-
-  // Estado de carga
-  const isLoadingData = isLoading && reports.length === 0;
+  const isLoadingData = isLoading && allReports.length === 0;
 
   return (
     <div className="reports-viewer">
       <h2>Informes</h2>
 
-      {/* Filtros mejorados */}
       <ReportFilters
         projects={projects}
         selectedProjectId={filters.projectId}
-        dateRange={{
-          startDate: filters.startDate,
-          endDate: filters.endDate
-        }}
+        dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
         onProjectChange={handleProjectChange}
         onDateRangeChange={handleDateRangeChange}
         onBilledStatusChange={handleBilledStatusChange}
         billedStatus={filters.isBilled === undefined ? "" : String(filters.isBilled)}
-        // Nuevos props para filtros adicionales
         onWorkTypeChange={handleWorkTypeChange}
         workType={filters.workType}
         onUserChange={handleUserChange}
         selectedUserId={filters.userId}
         users={users}
         onAmountRangeChange={handleAmountRangeChange}
-        amountRange={{
-          min: filters.amountMin,
-          max: filters.amountMax
-        }}
-        // Props para ordenación
+        amountRange={{ min: filters.amountMin, max: filters.amountMax }}
         onSortChange={handleSortChange}
-        sortField={sortConfig.field}
-        sortDirection={sortConfig.direction}
-        // Props para UI mejorada
+        sortField={sortOptions.field}
+        sortDirection={sortOptions.direction}
         onSaveFilter={handleSaveFilter}
         onResetFilters={handleResetFilters}
         savedFilters={savedFilters}
       />
 
-      {/* Descripción de filtros activos */}
       {hasActiveFilters && (
         <div className="filters-summary">
-          <p>Filtros aplicados: {filtersDescription}</p>
+          <p>Mostrando resultados para: {filtersDescription}</p>
         </div>
       )}
 
-      {/* Resumen de Totales (si hay reportes y se ha seleccionado un proyecto) */}
-      {filteredReports.length > 0 && filters.projectId && (
+      {/* --- SECCIÓN DE RESUMEN CORREGIDA --- */}
+      {/* Se renderiza si hay un proyecto seleccionado, para mostrar su resumen financiero */}
+      {filters.projectId && (
         <ReportSummary
-          reports={filteredReports}
-          projects={projects}
-          selectedProjectId={filters.projectId}
+          totals={totals}
+          project={projects.find(p => p.id === filters.projectId)}
         />
       )}
 
-      {/* Botón para generar PDF (si hay reportes) */}
       <PDFButton
         key={pdfKey}
-        reports={filteredReports}
+        reports={filteredAndSortedReports}
         projects={projects}
         selectedProjectId={filters.projectId}
-        dateRange={{
-          startDate: filters.startDate,
-          endDate: filters.endDate
-        }}
-        disabled={!filters.projectId || filteredReports.length === 0}
+        dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
+        disabled={!filters.projectId || filteredAndSortedReports.length === 0}
       />
 
-      <h3 className="section-title">Partes en el rango seleccionado:</h3>
+      <h3 className="section-title">Partes Diarios</h3>
 
-      {/* Mostrar estado vacío si no hay reportes */}
-      {filteredReports.length === 0 && !isLoadingData ? (
+      {isLoadingData ? (
+        <p>Cargando informes...</p>
+      ) : filteredAndSortedReports.length === 0 ? (
         <EmptyState 
           title="No se encontraron partes"
           message={hasActiveFilters ? 
-            "No hay partes que coincidan con los filtros aplicados. Prueba con otros filtros." : 
-            "No hay partes creados aún. Crea tu primer parte diario en la sección 'Partes'."
+            "No hay partes que coincidan con los filtros aplicados. Prueba a cambiarlos o limpiarlos." : 
+            "No hay partes creados aún en este proyecto o rango de fechas."
           }
           icon="📊"
-          action={hasActiveFilters ? handleResetFilters : null}
+          action={hasActiveFilters ? resetFilters : null}
           actionLabel={hasActiveFilters ? "Limpiar filtros" : null}
         />
       ) : (
         <>
-          {/* Lista de Reportes */}
           <ReportsList
-            reports={filteredReports}
+            reports={filteredAndSortedReports}
             projects={projects}
             onEdit={handleEditReport}
-            onDelete={handleDeleteConfirm}
+            onDelete={handleDeleteRequest}
           />
-
-          {/* Cargar más datos si es necesario */}
           {hasNextPage && (
             <div className="load-more-container">
               <button 
@@ -342,26 +258,18 @@ const ReportsViewer = () => {
                 disabled={isLoading}
                 className="load-more-button"
               >
-                {isLoading ? "Cargando más partes..." : "Cargar más partes"}
+                {isLoading ? "Cargando más..." : "Cargar más partes"}
               </button>
             </div>
           )}
         </>
       )}
 
-      {/* Modal de edición de reportes */}
       {editingReportId && (
         <div className="modal-overlay" onClick={handleModalOverlayClick}>
           <div className="custom-modal edit-modal">
             <h3>Editar Parte</h3>
-            <button
-              type="button"
-              className="close-button"
-              onClick={handleCancelEdit}
-              aria-label="Cerrar formulario"
-            >
-              ×
-            </button>
+            <button type="button" className="close-button" onClick={handleCancelEdit} aria-label="Cerrar">×</button>
             <ReportEditForm
               reportId={editingReportId}
               projects={projects}
@@ -372,12 +280,10 @@ const ReportsViewer = () => {
         </div>
       )}
 
-      {/* Modal de confirmación de eliminación */}
       {reportToDelete && (
         <ReportDeleteModal
-          onConfirm={handleDeleteReport}
+          onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
-          isLoading={deleteReportMutation.isPending}
         />
       )}
     </div>
