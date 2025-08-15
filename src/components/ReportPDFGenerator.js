@@ -676,7 +676,7 @@ const ReportPDFGenerator = ({ reports, projects }) => {
         )}
 
         <Text style={styles.summaryNote}>
-          Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado.
+          Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado. Todos los importes reflejados en el presente informe NO incluyen el IVA correspondiente.
           {hasExtraWork ? " Los trabajos extra se muestran sumados al presupuesto original para calcular el total real del proyecto." : ""}
         </Text>
       </Page>
