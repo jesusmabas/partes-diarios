@@ -6,10 +6,29 @@ const PDFButton = ({
   reports,
   projects,
   selectedProjectId,
+  startDate = "", // Fecha de inicio del filtro
+  endDate = "", // Fecha de fin del filtro
   onLoadAllReports, // Nueva prop: función para cargar todos los reportes
   hasMoreReports = false, // Nueva prop: indica si hay más reportes sin cargar
   isLoadingAll = false // Nueva prop: indica si se están cargando todos
 }) => {
+  // Generar nombre de archivo con fechas
+  const generateFileName = () => {
+    const projectName = selectedProjectId || 'todos';
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Si hay fechas de filtro, incluirlas en el nombre
+    if (startDate && endDate) {
+      return `informe_${projectName}_${startDate}_a_${endDate}.pdf`;
+    } else if (startDate) {
+      return `informe_${projectName}_desde_${startDate}.pdf`;
+    } else if (endDate) {
+      return `informe_${projectName}_hasta_${endDate}.pdf`;
+    } else {
+      // Sin filtro de fechas, usar fecha actual
+      return `informe_${projectName}_${today}.pdf`;
+    }
+  };
   const [preparingPDF, setPreparingPDF] = useState(false);
   const [allReportsLoaded, setAllReportsLoaded] = useState(!hasMoreReports);
 
@@ -84,7 +103,7 @@ const PDFButton = ({
             projects={projects.map(p => ({...p}))}
           />
         }
-        fileName={`informe_${selectedProjectId || 'todos'}_${new Date().toISOString().split('T')[0]}.pdf`}
+        fileName={generateFileName()}
         className={`pdf-button ${showWarning ? 'warning' : ''}`}
         onClick={handlePDFClick}
       >

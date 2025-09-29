@@ -285,6 +285,8 @@ const ReportsViewer = () => {
             reports={filteredAndSortedReports}
             projects={projects}
             selectedProjectId={filters.projectId}
+            startDate={filters.startDate}
+            endDate={filters.endDate}
             onLoadAllReports={loadAllReports}
             hasMoreReports={hasNextPage}
             isLoadingAll={isLoadingAllReports}
