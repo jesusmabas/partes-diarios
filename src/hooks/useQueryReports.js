@@ -24,7 +24,7 @@ const REPORTS_CACHE_KEY = 'reports';
 
 // Obtener reportes con filtros y paginación  (MODIFICADO: Manejo de undefined)
 const fetchReports = async ({ pageParam = null, ...filters }) => {
-  const pageSize = filters.pageSize || 10;
+  const pageSize = filters.pageSize || 20;
 
   let q = collection(db, 'dailyReports');
   const conditions = [];
