@@ -1,169 +1,228 @@
-// src/components/Dashboard.js - Refactorizado para usar useCalculationsService
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useQueryProjects } from "../hooks/useQueryProjects";
 import { useQueryReportsInfinite } from "../hooks/useQueryReports";
-import useReportFilters from "../hooks/reports/useReportFilters";
-
-// Componentes
-import KPICards from "./dashboard/KPICards";
+import { useReportFilters } from "../hooks/reports/useReportFilters";
+import { useCalculationsService } from "../hooks/useCalculationsService";
 import DashboardFilters from "./dashboard/DashboardFilters";
+import KPICards from "./dashboard/KPICards";
 import DashboardCharts from "./dashboard/DashboardCharts";
 import DashboardSummary from "./dashboard/DashboardSummary";
 import DashboardSkeleton from "./dashboard/DashboardSkeleton";
-import ErrorDisplay from "./common/ErrorDisplay";
 import EmptyState from "./common/EmptyState";
-
-// Estilos
+import ErrorDisplay from "./common/ErrorDisplay";
 import "./Dashboard.css";
 
-/**
- * Dashboard principal que muestra KPIs, gráficos y resúmenes de proyectos/reportes
- */
 const Dashboard = () => {
-  // Estados de UI
   const [selectedProject, setSelectedProject] = useState("all");
-  const [dateRange, setDateRange] = useState({ 
-    startDate: "", 
+  const [dateRange, setDateRange] = useState({
+    startDate: "",
     endDate: new Date().toISOString().split("T")[0]
   });
   const [activeView, setActiveView] = useState("costes");
-  
-  // Obtener proyectos usando React Query
+
+  // Obtener proyectos
   const { 
     data: projects = [], 
     isLoading: projectsLoading, 
     error: projectsError 
   } = useQueryProjects();
-  
-  // Hook de filtros
+
+  // Configurar filtros para reportes
   const { updateFilters, filters, filterReports } = useReportFilters({
-    projectId: selectedProject !== "all" ? selectedProject : "",
+    projectId: selectedProject === "all" ? "" : selectedProject,
     startDate: dateRange.startDate,
     endDate: dateRange.endDate
   });
 
   // Obtener reportes usando React Query con paginación infinita
-  const { 
-    data, 
-    isLoading: reportsLoading, 
+  const {
+    data,
+    isLoading: reportsLoading,
+    error: reportsError,
     fetchNextPage,
     hasNextPage,
-    error: reportsError,
-    refetch
+    isFetchingNextPage
   } = useQueryReportsInfinite({
-    pageSize: 100, // Obtener bastantes reportes por página
-    startDate: dateRange.startDate || undefined,
-    endDate: dateRange.endDate || undefined,
-    projectId: selectedProject !== "all" ? selectedProject : undefined
+    pageSize: 100,
+    projectId: filters.projectId,
+    startDate: filters.startDate,
+    endDate: filters.endDate
   });
-  
-  // Transformar los datos paginados a un arreglo plano
-  const reports = React.useMemo(() => {
-    if (!data) return [];
+
+  // Combinar todas las páginas de reportes
+  const allReports = useMemo(() => {
+    if (!data?.pages) return [];
     return data.pages.flatMap(page => page.items || []);
   }, [data]);
 
-  // Filtrar reportes basados en filtros actuales (si hay alguno adicional que no maneje ya la consulta)
-  const filteredReports = filterReports(reports);
+  // Filtrar reportes (aplicar filtros adicionales si los hay)
+  const filteredReports = useMemo(() => {
+    return filterReports(allReports);
+  }, [allReports, filterReports]);
 
-  // Manejar cambios en los filtros
-  const handleFiltersChange = (newFilters) => {
+  // Calcular resumen usando el servicio de cálculos
+  const { calculateReportSummary } = useCalculationsService();
+  
+  const summaryData = useMemo(() => {
+    if (!filteredReports.length || !projects.length) {
+      return {
+        totals: {},
+        byProject: [],
+        byWeek: []
+      };
+    }
+    
+    try {
+      return calculateReportSummary(
+        filteredReports,
+        projects,
+        selectedProject === "all" ? "" : selectedProject
+      );
+    } catch (error) {
+      console.error("Error calculando resumen:", error);
+      return {
+        totals: {},
+        byProject: [],
+        byWeek: []
+      };
+    }
+  }, [filteredReports, projects, selectedProject, calculateReportSummary]);
+
+  // Manejar cambios en filtros
+  const handleFiltersChange = useCallback((newFilters) => {
+    // Actualizar proyecto seleccionado
     if (newFilters.projectId !== undefined) {
       setSelectedProject(newFilters.projectId === "" ? "all" : newFilters.projectId);
     }
-    
+
+    // Actualizar rango de fechas
     if (newFilters.startDate !== undefined || newFilters.endDate !== undefined) {
       setDateRange(prev => ({
-        ...prev,
-        ...(newFilters.startDate !== undefined && { startDate: newFilters.startDate }),
-        ...(newFilters.endDate !== undefined && { endDate: newFilters.endDate })
+        startDate: newFilters.startDate !== undefined ? newFilters.startDate : prev.startDate,
+        endDate: newFilters.endDate !== undefined ? newFilters.endDate : prev.endDate
       }));
     }
-    
+
+    // Actualizar filtros en el hook
     updateFilters(newFilters);
-  };
+  }, [updateFilters]);
 
   // Manejar cambio de vista
-  const handleViewChange = (view) => {
+  const handleViewChange = useCallback((view) => {
     setActiveView(view);
-  };
+  }, []);
 
-  // Estado de carga combinado
-  const isLoading = projectsLoading || (reportsLoading && reports.length === 0);
-  
-  // Condiciones de renderizado
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
-  
-  if (projectsError || reportsError) {
+  // Estados de carga y error
+  const isLoading = projectsLoading || reportsLoading;
+  const hasError = projectsError || reportsError;
+
+  // Mostrar esqueleto mientras carga
+  if (isLoading && !allReports.length) {
     return (
-      <ErrorDisplay 
-        error={projectsError || reportsError} 
-        message="No se pudieron cargar los datos para el dashboard" 
-        onRetry={() => refetch()} // React Query proporciona refetch
-      />
+      <div className="dashboard">
+        <DashboardSkeleton />
+      </div>
     );
   }
 
-  if (projects.length === 0 || reports.length === 0) {
+  // Mostrar error si hay problemas
+  if (hasError) {
     return (
-      <EmptyState
-        title="No hay datos disponibles"
-        message="Añade proyectos y reportes para comenzar a visualizar métricas en el dashboard."
-        icon="📊"
-        action={() => refetch()}
-        actionLabel="Actualizar datos"
-      />
+      <div className="dashboard">
+        <ErrorDisplay
+          error={projectsError || reportsError}
+          message="Error al cargar los datos del dashboard"
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
+
+  // Mostrar estado vacío si no hay proyectos
+  if (!projects.length) {
+    return (
+      <div className="dashboard">
+        <EmptyState
+          title="No hay proyectos"
+          message="Crea tu primer proyecto para comenzar a ver el dashboard"
+          action={() => window.location.href = "#proyectos"}
+          actionLabel="Ir a Proyectos"
+        />
+      </div>
+    );
+  }
+
+  // Mostrar estado vacío si no hay reportes (pero hay proyectos)
+  if (!filteredReports.length && !isLoading) {
+    return (
+      <div className="dashboard">
+        <DashboardFilters
+          projects={projects}
+          selectedProject={selectedProject}
+          dateRange={dateRange}
+          onFiltersChange={handleFiltersChange}
+        />
+        <EmptyState
+          title="No hay partes de trabajo"
+          message={
+            selectedProject !== "all"
+              ? "No hay partes registrados para este proyecto en el rango de fechas seleccionado"
+              : "No hay partes registrados en el rango de fechas seleccionado"
+          }
+          action={() => handleFiltersChange({ startDate: "", endDate: "" })}
+          actionLabel="Limpiar filtros"
+        />
+      </div>
     );
   }
 
   return (
-    <div className="dashboard" role="region" aria-label="Panel de control">
-      <h2 className="section-title">Dashboard</h2>
-      
-      {/* Tarjetas de KPIs */}
-      <KPICards 
-        reports={filteredReports}
-        projects={projects}
-        selectedProjectId={selectedProject !== "all" ? selectedProject : ""}
-      />
-      
+    <div className="dashboard">
+      <h2>Dashboard de Proyectos</h2>
+
       {/* Filtros */}
-      <DashboardFilters 
+      <DashboardFilters
         projects={projects}
         selectedProject={selectedProject}
         dateRange={dateRange}
         onFiltersChange={handleFiltersChange}
       />
-      
+
+      {/* KPI Cards */}
+      <KPICards
+        reports={filteredReports}
+        projects={projects}
+        selectedProjectId={selectedProject === "all" ? "" : selectedProject}
+      />
+
       {/* Gráficos */}
-      <DashboardCharts 
+      <DashboardCharts
         reports={filteredReports}
         projects={projects}
         selectedProject={selectedProject}
-        dateRange={dateRange}
         activeView={activeView}
         onViewChange={handleViewChange}
+        byProject={summaryData.byProject}
+        byWeek={summaryData.byWeek}
       />
-      
+
       {/* Resumen de datos */}
-      <DashboardSummary 
+      <DashboardSummary
         reports={filteredReports}
         projects={projects}
-        selectedProject={selectedProject}
-        isLoading={false}
+        selectedProject={selectedProject === "all" ? "" : selectedProject}
+        isLoading={isFetchingNextPage}
       />
-      
+
       {/* Cargar más datos si es necesario */}
       {hasNextPage && (
         <div className="load-more-container">
-          <button 
-            onClick={() => fetchNextPage()} 
-            disabled={!hasNextPage}
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
             className="load-more-button"
           >
-            {reportsLoading ? "Cargando más datos..." : "Cargar más datos"}
+            {isFetchingNextPage ? "Cargando..." : "Cargar más datos"}
           </button>
         </div>
       )}
