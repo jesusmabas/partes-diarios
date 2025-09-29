@@ -88,8 +88,9 @@ const Dashboard = () => {
   const metrics = useMemo(() => {
     const { totals, byWeek, byProject } = summaryData;
     
+    // CORRECCIÓN: Los costes son solo materiales
     const totalIncome = totals.totalIncome || 0;
-    const totalCost = (totals.totalLabor || 0) + (totals.totalMaterials || 0);
+    const totalCost = totals.totalMaterials || 0; // Solo materiales
     const margin = totalIncome - totalCost;
     const marginPercent = totalIncome > 0 ? (margin / totalIncome) * 100 : 0;
     
@@ -100,6 +101,9 @@ const Dashboard = () => {
     // Promedio diario
     const avgDailyIncome = workDays > 0 ? totalIncome / workDays : 0;
     const avgDailyCost = workDays > 0 ? totalCost / workDays : 0;
+    
+    // Valor de mano de obra (para eficiencia, no es coste)
+    const laborValue = totals.totalLabor || 0;
     
     // Eficiencia (€ por hora)
     const totalHours = (totals.totalOfficialHours || 0) + (totals.totalWorkerHours || 0);
@@ -127,18 +131,23 @@ const Dashboard = () => {
       avgDailyCost,
       totalHours,
       efficiency,
+      laborValue, // Valor de la mano de obra (para mostrar, no es coste)
       projectsNearBudget,
       projectsOverBudget
     };
   }, [summaryData, filteredReports]);
 
-  // Datos para gráfico de distribución de costes
+  // Datos para gráfico de distribución de costes (solo materiales realmente)
   const costDistribution = useMemo(() => {
     const { totals } = summaryData;
+    const materials = totals.totalMaterials || 0;
+    
+    // Si no hay costes de materiales, mostrar mensaje
+    if (materials === 0) return [];
+    
     return [
-      { name: 'Mano de Obra', value: totals.totalLabor || 0, color: '#2196F3' },
-      { name: 'Materiales', value: totals.totalMaterials || 0, color: '#FF9800' }
-    ].filter(item => item.value > 0);
+      { name: 'Materiales', value: materials, color: '#FF9800' }
+    ];
   }, [summaryData]);
 
   // Datos para gráfico de evolución temporal
@@ -147,8 +156,8 @@ const Dashboard = () => {
     return byWeek.map(week => ({
       name: week.label,
       ingresos: week.totalIncome || 0,
-      costes: (week.laborCost || 0) + (week.materialsCost || 0),
-      margen: (week.totalIncome || 0) - ((week.laborCost || 0) + (week.materialsCost || 0))
+      materiales: week.materialsCost || 0, // Solo materiales como coste
+      margen: (week.totalIncome || 0) - (week.materialsCost || 0)
     }));
   }, [summaryData]);
 
@@ -158,8 +167,8 @@ const Dashboard = () => {
     return byProject.slice(0, 5).map(p => ({
       name: p.projectClient || p.projectId,
       ingresos: p.totalIncome || 0,
-      costes: (p.laborCost || 0) + (p.materialsCost || 0),
-      margen: (p.totalIncome || 0) - ((p.laborCost || 0) + (p.materialsCost || 0))
+      materiales: p.materialsCost || 0, // Solo materiales como coste
+      margen: (p.totalIncome || 0) - (p.materialsCost || 0)
     }));
   }, [summaryData]);
 
@@ -274,10 +283,21 @@ const Dashboard = () => {
           </div>
         </div>
 
+        <div className="metric-card metric-info">
+          <div className="metric-header">
+            <span className="metric-icon">🔧</span>
+            <span className="metric-label">Valor Mano Obra</span>
+          </div>
+          <div className="metric-value">{formatCurrency(metrics.laborValue)}</div>
+          <div className="metric-detail">
+            {formatNumber(metrics.totalHours)} horas trabajadas
+          </div>
+        </div>
+
         <div className="metric-card metric-secondary">
           <div className="metric-header">
-            <span className="metric-icon">💸</span>
-            <span className="metric-label">Costes Totales</span>
+            <span className="metric-icon">📦</span>
+            <span className="metric-label">Costes Materiales</span>
           </div>
           <div className="metric-value">{formatCurrency(metrics.totalCost)}</div>
           <div className="metric-detail">
@@ -288,22 +308,11 @@ const Dashboard = () => {
         <div className={`metric-card ${metrics.margin >= 0 ? 'metric-success' : 'metric-danger'}`}>
           <div className="metric-header">
             <span className="metric-icon">{metrics.margin >= 0 ? '✅' : '❌'}</span>
-            <span className="metric-label">Margen</span>
+            <span className="metric-label">Margen Neto</span>
           </div>
           <div className="metric-value">{formatCurrency(metrics.margin)}</div>
           <div className="metric-detail">
             {metrics.marginPercent.toFixed(1)}% de beneficio
-          </div>
-        </div>
-
-        <div className="metric-card metric-info">
-          <div className="metric-header">
-            <span className="metric-icon">⏱️</span>
-            <span className="metric-label">Eficiencia</span>
-          </div>
-          <div className="metric-value">{formatCurrency(metrics.efficiency)}/h</div>
-          <div className="metric-detail">
-            {formatNumber(metrics.totalHours)} horas trabajadas
           </div>
         </div>
       </div>
@@ -321,9 +330,9 @@ const Dashboard = () => {
                     <stop offset="5%" stopColor="#4CAF50" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#4CAF50" stopOpacity={0}/>
                   </linearGradient>
-                  <linearGradient id="colorCostes" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f44336" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#f44336" stopOpacity={0}/>
+                  <linearGradient id="colorMateriales" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#FF9800" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#FF9800" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -344,11 +353,11 @@ const Dashboard = () => {
                 />
                 <Area 
                   type="monotone" 
-                  dataKey="costes" 
-                  stroke="#f44336" 
+                  dataKey="materiales" 
+                  stroke="#FF9800" 
                   fillOpacity={1} 
-                  fill="url(#colorCostes)"
-                  name="Costes"
+                  fill="url(#colorMateriales)"
+                  name="Materiales"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -359,7 +368,7 @@ const Dashboard = () => {
 
         {/* Distribución de Costes */}
         <div className="chart-card">
-          <h3>Distribución de Costes</h3>
+          <h3>Costes (Materiales)</h3>
           {costDistribution.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -381,7 +390,7 @@ const Dashboard = () => {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="chart-empty">No hay costes registrados</div>
+            <div className="chart-empty">No hay costes de materiales</div>
           )}
         </div>
 
@@ -400,7 +409,7 @@ const Dashboard = () => {
                 />
                 <Legend />
                 <Bar dataKey="ingresos" fill="#4CAF50" name="Ingresos" />
-                <Bar dataKey="costes" fill="#f44336" name="Costes" />
+                <Bar dataKey="materiales" fill="#FF9800" name="Materiales" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
