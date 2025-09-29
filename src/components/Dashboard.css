@@ -112,6 +112,11 @@
   background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%);
 }
 
+.metric-accent {
+  border-color: #9C27B0;
+  background: linear-gradient(135deg, #ffffff 0%, #f9f0ff 100%);
+}
+
 .metric-header {
   display: flex;
   align-items: center;

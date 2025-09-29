@@ -88,9 +88,15 @@ const Dashboard = () => {
   const metrics = useMemo(() => {
     const { totals, byWeek, byProject } = summaryData;
     
-    // CORRECCIÓN: Los costes son solo materiales
+    // Los ingresos ya vienen calculados correctamente por tipo de proyecto:
+    // - Proyectos por hora: suma de horas × precio
+    // - Proyectos con presupuesto: suma de facturado
     const totalIncome = totals.totalIncome || 0;
-    const totalCost = totals.totalMaterials || 0; // Solo materiales
+    
+    // Costes = solo materiales
+    const totalCost = totals.totalMaterials || 0;
+    
+    // Margen neto
     const margin = totalIncome - totalCost;
     const marginPercent = totalIncome > 0 ? (margin / totalIncome) * 100 : 0;
     
@@ -102,12 +108,35 @@ const Dashboard = () => {
     const avgDailyIncome = workDays > 0 ? totalIncome / workDays : 0;
     const avgDailyCost = workDays > 0 ? totalCost / workDays : 0;
     
-    // Valor de mano de obra (para eficiencia, no es coste)
-    const laborValue = totals.totalLabor || 0;
-    
-    // Eficiencia (€ por hora)
+    // Horas totales trabajadas (para todos los proyectos)
     const totalHours = (totals.totalOfficialHours || 0) + (totals.totalWorkerHours || 0);
+    
+    // Eficiencia global (€ facturado/cobrado por hora trabajada)
+    // Incluye tanto proyectos por hora como presupuesto
     const efficiency = totalHours > 0 ? totalIncome / totalHours : 0;
+    
+    // Para proyectos de presupuesto cerrado específicamente
+    const fixedProjects = projects.filter(p => p.type === 'fixed');
+    const fixedProjectIds = fixedProjects.map(p => p.id);
+    const fixedReports = filteredReports.filter(r => fixedProjectIds.includes(r.projectId));
+    
+    // Calcular eficiencia solo en proyectos de presupuesto
+    let fixedProjectsEfficiency = 0;
+    let fixedProjectsHours = 0;
+    let fixedProjectsIncome = 0;
+    
+    if (fixedReports.length > 0) {
+      fixedReports.forEach(report => {
+        if (report.labor) {
+          fixedProjectsHours += (report.labor.officialHours || 0) + (report.labor.workerHours || 0);
+        }
+        if (!report.isExtraWork) {
+          fixedProjectsIncome += report.invoicedAmount || 0;
+        }
+      });
+      
+      fixedProjectsEfficiency = fixedProjectsHours > 0 ? fixedProjectsIncome / fixedProjectsHours : 0;
+    }
     
     // Proyectos con alertas
     const projectsNearBudget = byProject.filter(p => {
@@ -130,12 +159,14 @@ const Dashboard = () => {
       avgDailyIncome,
       avgDailyCost,
       totalHours,
-      efficiency,
-      laborValue, // Valor de la mano de obra (para mostrar, no es coste)
+      efficiency, // Eficiencia global
+      fixedProjectsEfficiency, // Eficiencia solo en proyectos de presupuesto
+      fixedProjectsHours,
+      fixedProjectsIncome,
       projectsNearBudget,
       projectsOverBudget
     };
-  }, [summaryData, filteredReports]);
+  }, [summaryData, filteredReports, projects]);
 
   // Datos para gráfico de distribución de costes (solo materiales realmente)
   const costDistribution = useMemo(() => {
@@ -279,18 +310,18 @@ const Dashboard = () => {
           </div>
           <div className="metric-value">{formatCurrency(metrics.totalIncome)}</div>
           <div className="metric-detail">
-            {formatCurrency(metrics.avgDailyIncome)}/día
+            {formatCurrency(metrics.avgDailyIncome)}/día promedio
           </div>
         </div>
 
         <div className="metric-card metric-info">
           <div className="metric-header">
-            <span className="metric-icon">🔧</span>
-            <span className="metric-label">Valor Mano Obra</span>
+            <span className="metric-icon">⏱️</span>
+            <span className="metric-label">Horas Trabajadas</span>
           </div>
-          <div className="metric-value">{formatCurrency(metrics.laborValue)}</div>
+          <div className="metric-value">{formatNumber(metrics.totalHours)} h</div>
           <div className="metric-detail">
-            {formatNumber(metrics.totalHours)} horas trabajadas
+            Eficiencia: {formatCurrency(metrics.efficiency)}/hora
           </div>
         </div>
 
@@ -301,7 +332,7 @@ const Dashboard = () => {
           </div>
           <div className="metric-value">{formatCurrency(metrics.totalCost)}</div>
           <div className="metric-detail">
-            {formatCurrency(metrics.avgDailyCost)}/día
+            {formatCurrency(metrics.avgDailyCost)}/día promedio
           </div>
         </div>
 
@@ -315,6 +346,20 @@ const Dashboard = () => {
             {metrics.marginPercent.toFixed(1)}% de beneficio
           </div>
         </div>
+
+        {/* Card adicional para eficiencia en proyectos de presupuesto */}
+        {metrics.fixedProjectsHours > 0 && (
+          <div className="metric-card metric-accent">
+            <div className="metric-header">
+              <span className="metric-icon">📊</span>
+              <span className="metric-label">Eficiencia Presupuesto</span>
+            </div>
+            <div className="metric-value">{formatCurrency(metrics.fixedProjectsEfficiency)}/h</div>
+            <div className="metric-detail">
+              {formatCurrency(metrics.fixedProjectsIncome)} en {formatNumber(metrics.fixedProjectsHours)}h
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gráficos en Grid */}
