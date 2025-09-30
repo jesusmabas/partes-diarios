@@ -27,7 +27,7 @@ Font.register({
 });
 
 const styles = StyleSheet.create({
-  // ... (mantener todos tus estilos existentes)
+  // Estilo optimizado para la página
   page: { 
     padding: 18, 
     fontSize: 11, 
@@ -35,6 +35,7 @@ const styles = StyleSheet.create({
     flexDirection: "column", 
     height: "100%" 
   },
+  // Portada con estructura optimizada
   coverPage: {
     padding: 20,
     display: "flex",
@@ -68,6 +69,8 @@ const styles = StyleSheet.create({
   detailsColLeft: { width: "50%", padding: 4, fontSize: 11 },
   detailsColRight: { width: "50%", padding: 4, textAlign: "right", fontSize: 11 },
   footer: { fontSize: 11, textAlign: "right", marginTop: 10 },
+  
+  // Secciones con margen vertical optimizado
   section: { marginBottom: 12 },
   sectionTitle: { 
     fontSize: 16, 
@@ -78,19 +81,29 @@ const styles = StyleSheet.create({
   },
   text: { fontSize: 11, marginBottom: 4 },
   link: { color: "#007bff", textDecoration: "underline", fontSize: 11 },
+  
+  // Imágenes que respetan el aspect ratio
   image: { height: 150, objectFit: "contain", margin: 4, border: "1px solid #000" },
   imageRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
+  
+  // Tablas mejor espaciadas
   table: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000", marginTop: 8, marginBottom: 8 },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000" },
   tableHeader: { backgroundColor: "#f0f0f0", fontWeight: "bold", fontSize: 11 },
   tableCol: { width: "25%", borderRightWidth: 1, borderRightColor: "#000", padding: 4, fontSize: 11 },
   tableColWide: { width: "50%", borderRightWidth: 1, borderRightColor: "#000", padding: 4, fontSize: 11 },
   tableColLast: { width: "25%", padding: 4, fontSize: 11 },
+  
+  // Resumen de costos
   costSummary: { display: "table", width: "100%", borderStyle: "solid", borderWidth: 1, borderColor: "#000", marginTop: 12, marginBottom: 12 },
   costRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000" },
   costColLabel: { width: "70%", padding: 4, fontWeight: "bold", fontSize: 11 },
   costColValue: { width: "30%", padding: 4, textAlign: "right", fontSize: 11 },
+  
+  // Mensajes de error de imagen
   errorImage: { width: 180, height: 150, backgroundColor: "#f0f0f0", textAlign: "center", padding: 5, fontSize: 10 },
+  
+  // Tabla de presupuesto
   budgetTable: {
     display: "table",
     width: "100%",
@@ -125,6 +138,8 @@ const styles = StyleSheet.create({
     width: "50%",
     textAlign: "right",
   },
+  
+  // Página de resumen
   summaryPage: { 
     padding: 20, 
     fontSize: 11, 
@@ -206,6 +221,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#666"
   },
+  
+  // Estilos para el nuevo diseño de 2 columnas
   mainHeader: {
     marginBottom: 10,
   },
@@ -244,6 +261,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
   },
+  
+  // Estilos para trabajos extra
   extraWorkBadge: {
     backgroundColor: '#fff8e1',
     padding: 5,
@@ -259,38 +278,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff8e1',
     borderBottomWidth: 1,
     borderBottomColor: '#e67e22',
-  },
-  // NUEVOS ESTILOS PARA DATOS ACUMULATIVOS
-  cumulativeWarning: {
-    backgroundColor: '#fff3cd',
-    padding: 8,
-    marginBottom: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ffc107',
-    flexDirection: 'row'
-  },
-  warningText: {
-    fontSize: 10,
-    color: '#856404'
-  },
-  periodInfo: {
-    fontSize: 10,
-    color: '#666',
-    marginBottom: 10,
-    fontStyle: 'italic',
-    textAlign: 'center'
-  },
-  highlightRow: {
-    backgroundColor: '#e3f2fd'
-  },
-  highlightValue: {
-    color: '#1976d2',
-    fontWeight: 'bold'
   }
 });
 
 // Componente principal del PDF
-const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) => {
+const ReportPDFGenerator = ({ reports, projects }) => {
+  // Usar el servicio centralizado de cálculos
   const { 
     calculateLabor, 
     calculateMaterials, 
@@ -298,11 +291,12 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
     calculateBudget 
   } = useCalculationsService();
 
+  // Ordenar los reportes por fecha (del más antiguo al más nuevo)
   const sortedReports = useMemo(() => {
     return [...reports].sort((a, b) => {
       const dateA = new Date(a.reportDate);
       const dateB = new Date(b.reportDate);
-      return dateA - dateB;
+      return dateA - dateB; // Orden ascendente (antiguo a nuevo)
     });
   }, [reports]);
 
@@ -310,45 +304,34 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
   const project = projects.find((p) => p.id === firstReport?.projectId) || {};
   const currentDate = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // Obtener totales calculados desde el servicio
   const { totals } = calculateReportSummary(sortedReports, projects, firstReport?.projectId);
 
+  // Función para generar el título con soporte para múltiples semanas
   const renderTitle = () => {
     if (!reports || reports.length === 0) {
       return "Acta de obra";
     }
     
+    // Obtener todos los números de semana únicos
     const uniqueWeeks = [...new Set(reports.map(report => report.weekNumber))].sort((a, b) => a - b);
     const year = new Date(firstReport.reportDate).getFullYear();
     
+    // Si hay una sola semana
     if (uniqueWeeks.length === 1) {
       return `Acta semanal de obra - Semana ${uniqueWeeks[0]} - Año ${year}`;
     }
     
+    // Si son semanas consecutivas
     if (uniqueWeeks.length === uniqueWeeks[uniqueWeeks.length - 1] - uniqueWeeks[0] + 1) {
       return `Acta semanal de obra - Semanas ${uniqueWeeks[0]} a ${uniqueWeeks[uniqueWeeks.length - 1]} - Año ${year}`;
     }
     
+    // Si son semanas no consecutivas
     return `Acta semanal de obra - Semanas ${uniqueWeeks.join(', ')} - Año ${year}`;
   };
 
-  // NUEVA FUNCIÓN: Renderizar información del período
-  const renderPeriodInfo = () => {
-    if (!periodInfo) return null;
-    
-    const { startDate, endDate, reportCount } = periodInfo;
-    let text = `Este informe contiene ${reportCount} parte(s)`;
-    
-    if (startDate && endDate) {
-      text += ` del período ${new Date(startDate).toLocaleDateString("es-ES")} al ${new Date(endDate).toLocaleDateString("es-ES")}`;
-    } else if (startDate) {
-      text += ` desde ${new Date(startDate).toLocaleDateString("es-ES")}`;
-    } else if (endDate) {
-      text += ` hasta ${new Date(endDate).toLocaleDateString("es-ES")}`;
-    }
-    
-    return <Text style={styles.periodInfo}>{text}</Text>;
-  };
-
+  // Función para renderizar imágenes
   const renderImage = (src) => {
     try {
       if (!src || typeof src !== "string" || !src.startsWith("http")) {
@@ -358,12 +341,13 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
           </View>
         );
       }
+      // Usar el componente CompressedImage en lugar de Image directamente
       return <CompressedImage 
               src={src} 
               style={styles.image} 
               maxWidth={600} 
               maxHeight={500} 
-              quality={0.5}
+              quality={0.5} // Puedes ajustar la calidad aquí (0.1 a 1)
             />;
     } catch (error) {
       console.error("Error al cargar imagen en PDF:", error);
@@ -375,6 +359,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
     }
   };
 
+  // Verificar si hay trabajos extra
   const hasExtraWork = sortedReports.some(report => report.isExtraWork);
 
   return (
@@ -407,23 +392,28 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         </View>
       </Page>
 
-      {/* Páginas por parte diario - SIN CAMBIOS */}
+      {/* Páginas por parte diario */}
       {sortedReports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
         
+        // Usar servicios centralizados para cálculos
+        // **CORRECCIÓN**: Usamos la función de budgetUtils corregida
         const budgetSummary = project.type === "fixed" 
-          ? calculateBudget(project, reports)
+          ? calculateBudget(project, reports) // Pasamos todos los reportes para el cálculo correcto
           : { budgetAmount: 0, invoicedTotal: 0, remainingBudget: 0 };
           
+        // Calcular datos de labor y materiales si aplica
         const laborCalcs = report.labor ? calculateLabor(report.labor, project) : null;
         const materialsCalcs = report.materials ? calculateMaterials(report.materials) : null;
         
+        // Determinar si es un trabajo extra y su tipo
         const isExtraWork = report.isExtraWork;
         const extraWorkType = isExtraWork ? report.extraWorkType : null;
 
         return (
           <Page key={`report-${index}`} size="A4" style={styles.page}>
+            {/* Cabecera del parte */}
             <View style={styles.mainHeader}>
               <Text style={styles.sectionTitle}>Fecha: {new Date(report.reportDate).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -433,6 +423,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               </View>
               <Text style={{ fontSize: 11 }}>Dirección: {project.address || "No disponible"}</Text>
               
+              {/* Indicador de trabajo extra */}
               {isExtraWork && (
                 <View style={styles.extraWorkBadge}>
                   <Text style={styles.extraWorkText}>
@@ -444,7 +435,9 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               )}
             </View>
 
+            {/* Distribución en dos columnas */}
             <View style={styles.twoColumns}>
+              {/* Columna izquierda - Mano de obra o presupuesto */}
               <View style={styles.leftColumn}>
                 {isHourly || (isExtraWork && extraWorkType === "hourly") ? (
                   <>
@@ -515,6 +508,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                 )}
               </View>
 
+              {/* Columna derecha - Materiales */}
               <View style={styles.rightColumn}>
                 <Text style={styles.subSectionTitle}>Materiales</Text>
                 <View style={styles.materialsList}>
@@ -545,6 +539,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               </View>
             </View>
 
+            {/* Resumen de costes (ancho completo) */}
             {(isHourly || (isExtraWork && extraWorkType === "hourly")) && (
               <View style={styles.fullWidth}>
                 <Text style={styles.subSectionTitle}>Coste total MO + materiales</Text>
@@ -567,6 +562,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               </View>
             )}
 
+            {/* Trabajos realizados (ancho completo) */}
             <View style={styles.fullWidth}>
               <Text style={styles.subSectionTitle}>Trabajos realizados</Text>
               <View style={styles.workDescription}>
@@ -574,6 +570,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               </View>
             </View>
 
+            {/* Fotografías (ancho completo) */}
             <View style={styles.fullWidth}>
               <Text style={styles.subSectionTitle}>Fotografías</Text>
               <View style={styles.imageRow}>
@@ -589,13 +586,11 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         );
       })}
 
-      {/* Página de resumen - CON CAMBIOS PARA ACUMULATIVOS */}
+      {/* Página de resumen de totales */}
       <Page size="A4" style={styles.summaryPage}>
         <Text style={styles.summaryTitle}>
           Resumen de Totales - Proyecto {project.id}
         </Text>
-        
-        {renderPeriodInfo()}
         
         <View style={styles.detailsTable}>
           <View style={styles.detailsRow}>
@@ -631,90 +626,51 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
               <Text style={styles.summaryTotalValue}>{formatCurrency(totals.totalCost)}</Text>
             </View>
           </View>
-        ) : (
+        ) : ( // Lógica para proyectos de presupuesto cerrado
           (() => {
+            // **CORRECCIÓN**: Usamos la función de budgetUtils corregida para obtener los valores correctos
             const finalBudget = calculateBudget(project, sortedReports);
 
             return (
-              <>
-                {/* ADVERTENCIA DE DATOS ACUMULATIVOS */}
-                {cumulativeData && (
-                  <View style={styles.cumulativeWarning}>
-                    <Text style={styles.warningText}>
-                      ⚠️ Los totales facturados y horas son ACUMULADOS (desde el inicio del proyecto, no solo este período)
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.summaryTable}>
-                  <View style={styles.summaryHeaderRow}>
-                    <Text style={{ ...styles.summaryHeaderCol, width: "70%" }}>Concepto</Text>
-                    <Text style={{ ...styles.summaryHeaderCol, width: "30%" }}>Importe</Text>
-                  </View>
-                  
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Presupuesto Original</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.budgetAmount)}</Text>
-                  </View>
-                  
-                  {finalBudget.totalExtraWorkIncome > 0 && (
-                    <View style={[styles.summaryRow, styles.extraWorkSection]}>
-                      <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
-                        Ingresos por Trabajos Extra {cumulativeData ? '(acumulado)' : ''}
-                      </Text>
-                      <Text style={[styles.summaryColValue, { color: '#e67e22', fontWeight: 'bold' }]}>
-                        {formatCurrency(cumulativeData?.totalExtraIncome || finalBudget.totalExtraWorkIncome)}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  <View style={styles.summaryTotalRow}>
-                    <Text style={styles.summaryTotalLabel}>PRESUPUESTO TOTAL (CON EXTRAS)</Text>
-                    <Text style={styles.summaryTotalValue}>
-                      {formatCurrency(
-                        (finalBudget.budgetAmount || 0) + 
-                        (cumulativeData?.totalExtraIncome || finalBudget.totalExtraWorkIncome || 0)
-                      )}
-                    </Text>
-                  </View>
-
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryColLabel}>Facturado en este período</Text>
-                    <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced || 0)}</Text>
-                  </View>
-
-                  {/* MOSTRAR FACTURADO ACUMULADO SI HAY DATOS */}
-                  {cumulativeData && (
-                    <View style={[styles.summaryRow, styles.highlightRow]}>
-                      <Text style={[styles.summaryColLabel, { fontWeight: 'bold' }]}>
-                        Facturado ACUMULADO (total histórico)
-                      </Text>
-                      <Text style={[styles.summaryColValue, styles.highlightValue]}>
-                        {formatCurrency(cumulativeData.totalInvoiced)}
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.summaryTotalRow}>
-                    <Text style={styles.summaryTotalLabel}>IMPORTE RESTANTE</Text>
-                    <Text style={styles.summaryTotalValue}>
-                      {formatCurrency(
-                        (finalBudget.budgetAmount || 0) + 
-                        (cumulativeData?.totalExtraIncome || finalBudget.totalExtraWorkIncome || 0) - 
-                        (cumulativeData?.totalInvoiced || finalBudget.invoicedTotal || 0)
-                      )}
-                    </Text>
-                  </View>
-
-                  {/* MOSTRAR HORAS ACUMULADAS SI HAY DATOS */}
-                  {cumulativeData && cumulativeData.totalHours > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryColLabel}>Horas trabajadas (acumulado histórico)</Text>
-                      <Text style={styles.summaryColValue}>{formatNumber(cumulativeData.totalHours)} h</Text>
-                    </View>
-                  )}
+              <View style={styles.summaryTable}>
+                <View style={styles.summaryHeaderRow}>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "70%" }}>Concepto</Text>
+                  <Text style={{ ...styles.summaryHeaderCol, width: "30%" }}>Importe</Text>
                 </View>
-              </>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Presupuesto Original</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.budgetAmount)}</Text>
+                </View>
+                
+                {/* Mostramos la sección de extras solo si existen */}
+                {finalBudget.totalExtraWorkIncome > 0 && (
+                  <>
+                    <View style={[styles.summaryRow, styles.extraWorkSection]}>
+                        <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            Ingresos por Trabajos Extra
+                        </Text>
+                        <Text style={[styles.summaryColValue, { color: '#e67e22', fontWeight: 'bold' }]}>
+                            {formatCurrency(finalBudget.totalExtraWorkIncome)}
+                        </Text>
+                    </View>
+                  </>
+                )}
+                
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>PRESUPUESTO TOTAL (CON EXTRAS)</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.totalBudgetWithExtras)}</Text>
+                </View>
+
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryColLabel}>Total Facturado (del presupuesto original)</Text>
+                  <Text style={styles.summaryColValue}>{formatCurrency(finalBudget.invoicedTotal)}</Text>
+                </View>
+
+                <View style={styles.summaryTotalRow}>
+                  <Text style={styles.summaryTotalLabel}>IMPORTE RESTANTE</Text>
+                  <Text style={styles.summaryTotalValue}>{formatCurrency(finalBudget.remainingBudget)}</Text>
+                </View>
+              </View>
             );
           })()
         )}
@@ -722,7 +678,6 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         <Text style={styles.summaryNote}>
           Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado. Todos los importes reflejados en el presente informe NO incluyen el IVA correspondiente.
           {hasExtraWork ? " Los trabajos extra se muestran sumados al presupuesto original para calcular el total real del proyecto." : ""}
-          {cumulativeData ? " Los importes facturados y horas mostrados son acumulativos desde el inicio del proyecto." : ""}
         </Text>
       </Page>
     </Document>
