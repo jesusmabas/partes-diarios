@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useQueryProjects, useAddProject, useUpdateProject, useDeleteProject } from "../hooks/useQueryProjects";
 import { useQueryReportsInfinite } from "../hooks/useQueryReports";
-import { useFormValidation } from "../hooks/useFormValidation";
+import useFormValidation from "../hooks/useFormValidation";
 import { projectSchema } from "../utils/validationSchemas";
 import ProjectForm from "./ProjectForm";
 import ConfirmModal from "./common/ConfirmModal";
