@@ -27,7 +27,6 @@ Font.register({
 });
 
 const styles = StyleSheet.create({
-  // ... (mantener todos tus estilos existentes)
   page: { 
     padding: 18, 
     fontSize: 11, 
@@ -116,13 +115,13 @@ const styles = StyleSheet.create({
   budgetTableCell: {
     padding: 4,
     fontSize: 11,
-    width: "65%", // Aumentado de 50% a 65%
+    width: "65%",
     textAlign: "left",
   },
   budgetTableCellAmount: {
     padding: 4,
     fontSize: 11,
-    width: "35%", // Reducido de 50% a 35%
+    width: "35%",
     textAlign: "right",
   },
   summaryPage: { 
@@ -260,7 +259,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e67e22',
   },
-  // NUEVOS ESTILOS PARA DATOS ACUMULATIVOS
   cumulativeWarning: {
     backgroundColor: '#fef9e7',
     padding: 8,
@@ -292,7 +290,6 @@ const styles = StyleSheet.create({
   }
 });
 
-// Componente principal del PDF
 const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) => {
   const { 
     calculateLabor, 
@@ -334,7 +331,6 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
     return `Acta semanal de obra - Semanas ${uniqueWeeks.join(', ')} - Año ${year}`;
   };
 
-  // NUEVA FUNCIÓN: Renderizar información del período
   const renderPeriodInfo = () => {
     if (!periodInfo) return null;
     
@@ -410,7 +406,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         </View>
       </Page>
 
-      {/* Páginas por parte diario - SIN CAMBIOS */}
+      {/* Páginas por parte diario */}
       {sortedReports.map((report, index) => {
         const project = projects.find((p) => p.id === report.projectId) || {};
         const isHourly = project.type === "hourly";
@@ -594,7 +590,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         );
       })}
 
-      {/* Página de resumen - CON CAMBIOS PARA ACUMULATIVOS */}
+      {/* Página de resumen */}
       <Page size="A4" style={styles.summaryPage}>
         <Text style={styles.summaryTitle}>
           Resumen de Totales - Proyecto {project.id}
@@ -642,11 +638,10 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
 
             return (
               <>
-                {/* ADVERTENCIA DE DATOS ACUMULATIVOS */}
                 {cumulativeData && (
                   <View style={styles.cumulativeWarning}>
                     <Text style={styles.warningText}>
-                      ℹ Los totales facturados y horas trabajadas que se muestran a continuación son acumulativos desde el inicio del proyecto (no solo del período de este informe).
+                      Los totales facturados que se muestran a continuación son acumulativos desde el inicio del proyecto (no solo del período de este informe).
                     </Text>
                   </View>
                 )}
@@ -688,7 +683,6 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                     <Text style={styles.summaryColValue}>{formatCurrency(totals.totalInvoiced || 0)}</Text>
                   </View>
 
-                  {/* MOSTRAR FACTURADO ACUMULADO SI HAY DATOS */}
                   {cumulativeData && (
                     <View style={[styles.summaryRow, styles.highlightRow]}>
                       <Text style={[styles.summaryColLabel, { fontWeight: 'bold' }]}>
@@ -710,14 +704,6 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                       )}
                     </Text>
                   </View>
-
-                  {/* MOSTRAR HORAS ACUMULADAS SI HAY DATOS */}
-                  {cumulativeData && cumulativeData.totalHours > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryColLabel}>Horas trabajadas (acumulado histórico)</Text>
-                      <Text style={styles.summaryColValue}>{formatNumber(cumulativeData.totalHours)} h</Text>
-                    </View>
-                  )}
                 </View>
               </>
             );
@@ -727,7 +713,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
         <Text style={styles.summaryNote}>
           Este resumen incluye todos los partes diarios seleccionados en el rango de fechas especificado. Todos los importes reflejados en el presente informe NO incluyen el IVA correspondiente.
           {hasExtraWork ? " Los trabajos extra se muestran sumados al presupuesto original para calcular el total real del proyecto." : ""}
-          {cumulativeData ? " Los importes facturados y horas mostrados son acumulativos desde el inicio del proyecto." : ""}
+          {cumulativeData ? " Los importes facturados mostrados son acumulativos desde el inicio del proyecto." : ""}
         </Text>
       </Page>
     </Document>
