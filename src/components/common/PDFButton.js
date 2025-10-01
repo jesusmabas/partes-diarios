@@ -1,22 +1,111 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import ReportPDFGenerator from "../ReportPDFGenerator";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../firebase";
 
 const PDFButton = ({
   reports,
   projects,
   selectedProjectId,
-  onLoadAllReports, // Nueva prop: función para cargar todos los reportes
-  hasMoreReports = false, // Nueva prop: indica si hay más reportes sin cargar
-  isLoadingAll = false // Nueva prop: indica si se están cargando todos
+  startDate = "",
+  endDate = "",
+  onLoadAllReports,
+  hasMoreReports = false,
+  isLoadingAll = false
 }) => {
   const [preparingPDF, setPreparingPDF] = useState(false);
   const [allReportsLoaded, setAllReportsLoaded] = useState(!hasMoreReports);
+  const [cumulativeData, setCumulativeData] = useState(null);
+  const [isLoadingCumulative, setIsLoadingCumulative] = useState(false);
+
+  // Generar nombre de archivo con fechas
+  const generateFileName = () => {
+    const projectName = selectedProjectId || 'todos';
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (startDate && endDate) {
+      return `informe_${projectName}_${startDate}_a_${endDate}.pdf`;
+    } else if (startDate) {
+      return `informe_${projectName}_desde_${startDate}.pdf`;
+    } else if (endDate) {
+      return `informe_${projectName}_hasta_${endDate}.pdf`;
+    } else {
+      return `informe_${projectName}_${today}.pdf`;
+    }
+  };
+
+  // Calcular datos acumulativos (todo el historial del proyecto)
+  const calculateCumulativeData = useCallback(async () => {
+    if (!selectedProjectId) return null;
+
+    setIsLoadingCumulative(true);
+    try {
+      // Obtener TODOS los reportes del proyecto (sin filtro de fecha)
+      const reportsQuery = query(
+        collection(db, 'dailyReports'),
+        where('projectId', '==', selectedProjectId),
+        where('isExtraWork', '==', false)
+      );
+      
+      const snapshot = await getDocs(reportsQuery);
+      let totalInvoiced = 0;
+      let totalHours = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        totalInvoiced += parseFloat(data.invoicedAmount) || 0;
+        if (data.labor) {
+          totalHours += (parseFloat(data.labor.officialHours) || 0) + 
+                       (parseFloat(data.labor.workerHours) || 0);
+        }
+      });
+
+      // Obtener trabajos extra acumulados
+      const extraQuery = query(
+        collection(db, 'dailyReports'),
+        where('projectId', '==', selectedProjectId),
+        where('isExtraWork', '==', true)
+      );
+      
+      const extraSnapshot = await getDocs(extraQuery);
+      let totalExtraIncome = 0;
+
+      extraSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.extraWorkType === 'additional_budget') {
+          totalExtraIncome += parseFloat(data.extraBudgetAmount) || 0;
+        } else if (data.extraWorkType === 'hourly' && data.labor) {
+          totalExtraIncome += parseFloat(data.labor.totalLaborCost) || 0;
+        }
+      });
+
+      return {
+        totalInvoiced,
+        totalHours,
+        totalExtraIncome,
+        totalCount: snapshot.size + extraSnapshot.size
+      };
+    } catch (error) {
+      console.error('Error calculando datos acumulativos:', error);
+      return null;
+    } finally {
+      setIsLoadingCumulative(false);
+    }
+  }, [selectedProjectId]);
 
   const handlePDFClick = useCallback(async (e) => {
-    // Si hay reportes sin cargar, cargarlos primero
+    // Primero cargar datos acumulativos si hay proyecto seleccionado
+    if (selectedProjectId && !cumulativeData) {
+      e.preventDefault();
+      const cumulative = await calculateCumulativeData();
+      setCumulativeData(cumulative);
+      return; // El usuario tendrá que hacer click de nuevo
+    }
+
+    // Luego manejar carga de reportes si es necesario
     if (hasMoreReports && !allReportsLoaded && onLoadAllReports) {
-      e.preventDefault(); // Prevenir descarga inmediata
+      e.preventDefault();
       
       const userConfirm = window.confirm(
         `Solo se han cargado ${reports.length} reportes. ¿Deseas cargar todos los reportes antes de generar el PDF?\n\n` +
@@ -36,13 +125,11 @@ const PDFButton = ({
           setPreparingPDF(false);
         }
       } else {
-        // Usuario eligió continuar con reportes parciales
         setAllReportsLoaded(true);
       }
     }
-  }, [hasMoreReports, allReportsLoaded, onLoadAllReports, reports.length]);
+  }, [hasMoreReports, allReportsLoaded, onLoadAllReports, reports.length, selectedProjectId, cumulativeData, calculateCumulativeData]);
 
-  // Si no hay reportes
   if (reports.length === 0) {
     return (
       <div className="pdf-button-container">
@@ -53,18 +140,16 @@ const PDFButton = ({
     );
   }
 
-  // Si se están cargando todos los reportes
-  if (preparingPDF || isLoadingAll) {
+  if (preparingPDF || isLoadingAll || isLoadingCumulative) {
     return (
       <div className="pdf-button-container">
         <button className="pdf-button" disabled>
-          Cargando todos los reportes...
+          {isLoadingCumulative ? 'Calculando totales acumulados...' : 'Cargando todos los reportes...'}
         </button>
       </div>
     );
   }
 
-  // Advertencia si hay reportes sin cargar
   const showWarning = hasMoreReports && !allReportsLoaded;
 
   return (
@@ -82,9 +167,15 @@ const PDFButton = ({
           <ReportPDFGenerator
             reports={reports.map(r => ({...r}))}
             projects={projects.map(p => ({...p}))}
+            cumulativeData={cumulativeData}
+            periodInfo={{
+              startDate,
+              endDate,
+              reportCount: reports.length
+            }}
           />
         }
-        fileName={`informe_${selectedProjectId || 'todos'}_${new Date().toISOString().split('T')[0]}.pdf`}
+        fileName={generateFileName()}
         className={`pdf-button ${showWarning ? 'warning' : ''}`}
         onClick={handlePDFClick}
       >
