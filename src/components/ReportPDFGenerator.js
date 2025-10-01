@@ -116,13 +116,13 @@ const styles = StyleSheet.create({
   budgetTableCell: {
     padding: 4,
     fontSize: 11,
-    width: "50%",
+    width: "65%", // Aumentado de 50% a 65%
     textAlign: "left",
   },
   budgetTableCellAmount: {
     padding: 4,
     fontSize: 11,
-    width: "50%",
+    width: "35%", // Reducido de 50% a 35%
     textAlign: "right",
   },
   summaryPage: { 
@@ -262,29 +262,32 @@ const styles = StyleSheet.create({
   },
   // NUEVOS ESTILOS PARA DATOS ACUMULATIVOS
   cumulativeWarning: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: '#fef9e7',
     padding: 8,
-    marginBottom: 10,
+    marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#ffc107',
-    flexDirection: 'row'
+    borderLeftColor: '#d4a017',
+    borderRadius: 2
   },
   warningText: {
-    fontSize: 10,
-    color: '#856404'
+    fontSize: 9,
+    color: '#6b5300',
+    lineHeight: 1.4
   },
   periodInfo: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666',
-    marginBottom: 10,
+    marginBottom: 8,
     fontStyle: 'italic',
-    textAlign: 'center'
+    textAlign: 'center',
+    backgroundColor: '#f9f9f9',
+    padding: 6,
+    borderRadius: 2
   },
   highlightRow: {
-    backgroundColor: '#e3f2fd'
+    backgroundColor: '#f0f0f0'
   },
   highlightValue: {
-    color: '#1976d2',
     fontWeight: 'bold'
   }
 });
@@ -506,7 +509,9 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                           </View>
                           <View style={styles.budgetRow}>
                             <Text style={styles.budgetTableCell}>Total facturado (acumulado)</Text>
-                            <Text style={styles.budgetTableCellAmount}>{formatCurrency(budgetSummary.invoicedTotal)}</Text>
+                            <Text style={styles.budgetTableCellAmount}>
+                              {formatCurrency(cumulativeData?.totalInvoiced || budgetSummary.invoicedTotal)}
+                            </Text>
                           </View>
                         </>
                       )}
@@ -641,7 +646,7 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                 {cumulativeData && (
                   <View style={styles.cumulativeWarning}>
                     <Text style={styles.warningText}>
-                      ⚠️ Los totales facturados y horas son ACUMULADOS (desde el inicio del proyecto, no solo este período)
+                      ℹ Los totales facturados y horas trabajadas que se muestran a continuación son acumulativos desde el inicio del proyecto (no solo del período de este informe).
                     </Text>
                   </View>
                 )}
@@ -659,10 +664,10 @@ const ReportPDFGenerator = ({ reports, projects, cumulativeData, periodInfo }) =
                   
                   {finalBudget.totalExtraWorkIncome > 0 && (
                     <View style={[styles.summaryRow, styles.extraWorkSection]}>
-                      <Text style={[styles.summaryColLabel, { color: '#e67e22', fontWeight: 'bold' }]}>
+                      <Text style={styles.summaryColLabel}>
                         Ingresos por Trabajos Extra {cumulativeData ? '(acumulado)' : ''}
                       </Text>
-                      <Text style={[styles.summaryColValue, { color: '#e67e22', fontWeight: 'bold' }]}>
+                      <Text style={styles.summaryColValue}>
                         {formatCurrency(cumulativeData?.totalExtraIncome || finalBudget.totalExtraWorkIncome)}
                       </Text>
                     </View>
